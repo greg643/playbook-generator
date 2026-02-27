@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playbook Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e1e4e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #30363d;
+      border-radius: 8px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #58a6ff;
+      background: rgba(88, 166, 255, 0.05);
+    }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .drop-zone p { color: #8b949e; font-size: 0.9rem; }
+    .drop-zone .file-name {
+      color: #58a6ff;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      word-break: break-all;
+    }
+
+    input[type="file"] { display: none; }
+
+    /* Button */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary {
+      background: #238636;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-primary:disabled {
+      background: #21262d;
+      color: #484f58;
+      cursor: not-allowed;
+    }
+
+    /* Progress */
+    .progress-section {
+      margin-top: 1.5rem;
+      display: none;
+    }
+    .progress-section.active { display: block; }
+
+    .progress-bar-container {
+      background: #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 8px;
+      margin: 0.75rem 0;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #58a6ff;
+      border-radius: 6px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+    .progress-bar.indeterminate {
+      width: 30%;
+      animation: indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes indeterminate {
+      0% { margin-left: 0; }
+      50% { margin-left: 70%; }
+      100% { margin-left: 0; }
+    }
+
+    .status-text {
+      color: #8b949e;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    /* Downloads */
+    .downloads {
+      margin-top: 1.5rem;
+      display: none;
+    }
+    .downloads.active { display: block; }
+    .downloads h3 {
+      margin-bottom: 0.75rem;
+      color: #58a6ff;
+      font-size: 1rem;
+    }
+
+    .dl-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .dl-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e1e4e8;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .dl-btn:hover {
+      border-color: #58a6ff;
+      background: #161b22;
+    }
+    .dl-btn .dl-icon { font-size: 1.1rem; }
+
+    /* Error */
+    .error-msg {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      color: #f85149;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .error-msg.active { display: block; }
+
+    /* Reset link */
+    .reset-link {
+      display: none;
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .reset-link.active { display: block; }
+    .reset-link a {
+      color: #58a6ff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .reset-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <h1>Playbook Generator</h1>
+  <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
+
+  <div class="card">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">&#128196;</div>
+      <p>Drag &amp; drop a <strong>.pptx</strong> file here, or click to browse</p>
+      <div class="file-name" id="fileName"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".pptx">
+
+    <button class="btn btn-primary" id="generateBtn" disabled>Generate Playbook</button>
+
+    <div class="progress-section" id="progressSection">
+      <div class="progress-bar-container">
+        <div class="progress-bar indeterminate" id="progressBar"></div>
+      </div>
+      <p class="status-text" id="statusText">Uploading...</p>
+    </div>
+
+    <div class="downloads" id="downloads">
+      <h3>Your PDFs are ready</h3>
+      <div class="dl-grid" id="dlGrid"></div>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="reset-link" id="resetLink">
+      <a onclick="resetUI()">Generate another playbook</a>
+    </div>
+  </div>
+
+<script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileName = document.getElementById('fileName');
+  const generateBtn = document.getElementById('generateBtn');
+  const progressSection = document.getElementById('progressSection');
+  const progressBar = document.getElementById('progressBar');
+  const statusText = document.getElementById('statusText');
+  const downloads = document.getElementById('downloads');
+  const dlGrid = document.getElementById('dlGrid');
+  const errorMsg = document.getElementById('errorMsg');
+  const resetLink = document.getElementById('resetLink');
+
+  let selectedFile = null;
+  let pollTimer = null;
+
+  const FRIENDLY_NAMES = {
+    'offense_coach_card.pdf': 'Offense Coach Card',
+    'defense_coach_card.pdf': 'Defense Coach Card',
+    'offense_wristband.pdf': 'Offense Wristband',
+    'defense_wristband.pdf': 'Defense Wristband',
+  };
+
+  const FRIENDLY_ICONS = {
+    'offense_coach_card.pdf': '&#127944;',
+    'defense_coach_card.pdf': '&#128737;',
+    'offense_wristband.pdf': '&#9200;',
+    'defense_wristband.pdf': '&#9200;',
+  };
+
+  // Drop zone events
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.pptx')) selectFile(file);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  });
+
+  function selectFile(file) {
+    selectedFile = file;
+    fileName.textContent = file.name;
+    generateBtn.disabled = false;
+  }
+
+  generateBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    generateBtn.disabled = true;
+    showProgress('Uploading...');
+    hideError();
+    downloads.classList.remove('active');
+    resetLink.classList.remove('active');
+
+    try {
+      const form = new FormData();
+      form.append('file', selectedFile);
+
+      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      showProgress('Processing your playbook...');
+      startPolling(data.jobId);
+    } catch (err) {
+      showError(err.message);
+      generateBtn.disabled = false;
+    }
+  });
+
+  function startPolling(jobId) {
+    let elapsed = 0;
+    pollTimer = setInterval(async () => {
+      elapsed += 3;
+      try {
+        const res = await fetch(`/api/status/${jobId}`);
+        const data = await res.json();
+
+        if (data.status === 'complete') {
+          clearInterval(pollTimer);
+          progressSection.classList.remove('active');
+          showDownloads(jobId, data.files);
+        } else if (data.status === 'error') {
+          clearInterval(pollTimer);
+          progressSection.classList.remove('active');
+          showError(data.message || 'Processing failed');
+          resetLink.classList.add('active');
+        } else {
+          const step = data.step || 'processing';
+          const msgs = {
+            downloading: 'Downloading your file...',
+            generating: 'Generating coach cards & wristbands...',
+            uploading: 'Uploading results...',
+          };
+          statusText.textContent = msgs[step] || `Processing... (${elapsed}s)`;
+        }
+      } catch {
+        statusText.textContent = `Processing... (${elapsed}s)`;
+      }
+    }, 3000);
+  }
+
+  function showProgress(msg) {
+    progressSection.classList.add('active');
+    statusText.textContent = msg;
+    progressBar.classList.add('indeterminate');
+  }
+
+  function showDownloads(jobId, files) {
+    dlGrid.innerHTML = '';
+    files.forEach(f => {
+      const a = document.createElement('a');
+      a.className = 'dl-btn';
+      a.href = `/api/download/${jobId}/${f}`;
+      a.innerHTML = `<span class="dl-icon">${FRIENDLY_ICONS[f] || '&#128196;'}</span>${FRIENDLY_NAMES[f] || f}`;
+      dlGrid.appendChild(a);
+    });
+    downloads.classList.add('active');
+    resetLink.classList.add('active');
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('active');
+    progressSection.classList.remove('active');
+  }
+
+  function hideError() {
+    errorMsg.classList.remove('active');
+  }
+
+  function resetUI() {
+    selectedFile = null;
+    fileInput.value = '';
+    fileName.textContent = '';
+    generateBtn.disabled = true;
+    progressSection.classList.remove('active');
+    downloads.classList.remove('active');
+    errorMsg.classList.remove('active');
+    resetLink.classList.remove('active');
+    if (pollTimer) clearInterval(pollTimer);
+  }
+</script>
+
+</body>
+</html>

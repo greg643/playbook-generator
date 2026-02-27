@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+_playbook_work/
+playbook_output/
+.env
