@@ -20,4 +20,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 76317c04d814307dbb81c8fe71d287bb
-          command: pages deploy dashboard --project-name=playbook-generator --branch=main --commit-dirty=true
+          command: pages deploy . --project-name=playbook-generator --branch=main --commit-dirty=true
+          workingDirectory: dashboard
