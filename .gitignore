@@ -3,3 +3,5 @@ __pycache__/
 _playbook_work/
 playbook_output/
 .env
+venv/
+.DS_Store

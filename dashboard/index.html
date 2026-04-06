@@ -204,6 +204,15 @@
     </div>
     <input type="file" id="fileInput" accept=".pptx">
 
+    <div class="section-select" style="margin-top: 1rem; display: flex; gap: 1.5rem;">
+      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem;">
+        <input type="checkbox" id="chkOffense" checked> Offense
+      </label>
+      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem;">
+        <input type="checkbox" id="chkDefense" checked> Defense
+      </label>
+    </div>
+
     <button class="btn btn-primary" id="generateBtn" disabled>Generate Playbook</button>
 
     <div class="progress-section" id="progressSection">
@@ -237,6 +246,9 @@
   const dlGrid = document.getElementById('dlGrid');
   const errorMsg = document.getElementById('errorMsg');
   const resetLink = document.getElementById('resetLink');
+
+  const chkOffense = document.getElementById('chkOffense');
+  const chkDefense = document.getElementById('chkDefense');
 
   let selectedFile = null;
   let pollTimer = null;
@@ -284,8 +296,16 @@
     resetLink.classList.remove('active');
 
     try {
+      if (!chkOffense.checked && !chkDefense.checked) {
+        showError('Select at least one: Offense or Defense');
+        generateBtn.disabled = false;
+        return;
+      }
+
       const form = new FormData();
       form.append('file', selectedFile);
+      form.append('offense', chkOffense.checked);
+      form.append('defense', chkDefense.checked);
 
       const res = await fetch('/api/upload', { method: 'POST', body: form });
       const data = await res.json();
@@ -315,7 +335,9 @@
         } else if (data.status === 'error') {
           clearInterval(pollTimer);
           progressSection.classList.remove('active');
-          showError(data.message || 'Processing failed');
+          let errText = data.message || 'Processing failed';
+          if (data.detail) errText += `\n\nDetail: ${data.detail}`;
+          showError(errText);
           resetLink.classList.add('active');
         } else {
           const step = data.step || 'processing';
@@ -352,6 +374,7 @@
   }
 
   function showError(msg) {
+    errorMsg.style.whiteSpace = 'pre-wrap';
     errorMsg.textContent = msg;
     errorMsg.classList.add('active');
     progressSection.classList.remove('active');
@@ -366,6 +389,8 @@
     fileInput.value = '';
     fileName.textContent = '';
     generateBtn.disabled = true;
+    chkOffense.checked = true;
+    chkDefense.checked = true;
     progressSection.classList.remove('active');
     downloads.classList.remove('active');
     errorMsg.classList.remove('active');

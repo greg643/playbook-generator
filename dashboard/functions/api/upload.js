@@ -12,6 +12,12 @@ export async function onRequestPost(context) {
 
     const formData = await request.formData();
     const file = formData.get("file");
+    const offense = formData.get("offense") !== "false";
+    const defense = formData.get("defense") !== "false";
+
+    if (!offense && !defense) {
+      return Response.json({ error: "Select at least one: Offense or Defense" }, { status: 400 });
+    }
 
     if (!file || !(file instanceof File)) {
       return Response.json({ error: "No file uploaded" }, { status: 400 });
@@ -41,10 +47,14 @@ export async function onRequestPost(context) {
       httpMetadata: { contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
     });
 
-    // Write initial status
+    // Write initial status with options
     await env.PLAYBOOK_BUCKET.put(
       `${jobId}/status.json`,
-      JSON.stringify({ status: "processing", createdAt: new Date().toISOString() }),
+      JSON.stringify({
+        status: "processing",
+        createdAt: new Date().toISOString(),
+        options: { offense, defense },
+      }),
       { httpMetadata: { contentType: "application/json" } }
     );
 

@@ -64,6 +64,16 @@ def main():
             output_dir = tmpdir / "output"
             output_dir.mkdir()
 
+            # Read options from status.json
+            print("Reading job options from R2...")
+            status_obj = s3.get_object(Bucket=bucket, Key=f"{job_id}/status.json")
+            status_data = json.loads(status_obj["Body"].read())
+            options = status_data.get("options", {"offense": True, "defense": True})
+            gen_offense = options.get("offense", True)
+            gen_defense = options.get("defense", True)
+            sections = "both" if (gen_offense and gen_defense) else ("offense" if gen_offense else "defense")
+            print(f"  Sections: {sections}")
+
             # Download PPTX from R2
             print("Downloading PPTX from R2...")
             s3.download_file(bucket, f"{job_id}/input.pptx", str(pptx_path))
@@ -79,7 +89,7 @@ def main():
 
             # Override sys.argv for the pipeline
             original_argv = sys.argv
-            sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir)]
+            sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir), "--sections", sections]
 
             # Change to tmpdir so _playbook_work is created there
             original_cwd = os.getcwd()
@@ -120,12 +130,29 @@ def main():
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
+        tb = traceback.format_exc()
         print(f"Job {job_id} failed: {error_msg}")
-        traceback.print_exc()
+        print(tb)
+
+        # Build a user-friendly message with detail
+        if "LibreOffice" in str(e) or "soffice" in str(e):
+            friendly = "LibreOffice conversion failed. The PPTX file may be corrupted or in an unsupported format."
+        elif "pdftoppm" in str(e):
+            friendly = "PDF to image conversion failed. This is a server-side dependency issue."
+        elif "No PDF" in str(e) or "didn't produce" in str(e):
+            friendly = "Could not convert the PowerPoint file to PDF. Please check the file is a valid .pptx."
+        elif "no field rectangle" in str(e).lower():
+            friendly = "Could not detect play diagrams in the playbook. Make sure slides have rectangle shapes marking the field area."
+        elif "No slide images" in str(e) or "no PDF files" in str(e).lower():
+            friendly = "Pipeline produced no output. The playbook may not have recognizable offense/defense sections."
+        else:
+            friendly = str(e)
+
         try:
             update_status(s3, bucket, job_id, {
                 "status": "error",
-                "message": error_msg,
+                "message": friendly,
+                "detail": error_msg,
             })
         except Exception:
             print("Failed to update error status in R2")

@@ -212,7 +212,12 @@ def convert_pptx_to_images(pptx_path, work_dir, dpi=200):
     # Use system LibreOffice (soffice or libreoffice)
     soffice_cmd = shutil.which("soffice") or shutil.which("libreoffice")
     if not soffice_cmd:
-        raise FileNotFoundError("LibreOffice not found. Install it with: sudo apt install libreoffice")
+        # macOS: LibreOffice.app doesn't add to PATH by default
+        mac_soffice = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+        if os.path.exists(mac_soffice):
+            soffice_cmd = mac_soffice
+        else:
+            raise FileNotFoundError("LibreOffice not found. Install it: brew install --cask libreoffice")
     subprocess.run([
         soffice_cmd, "--headless", "--convert-to", "pdf",
         "--outdir", str(Path(work_dir).resolve()), pptx_abs
@@ -349,7 +354,7 @@ class PlaybookGenerator:
                     img = self.fix_image_transparency(img)
                     offense_images.append(img)
                     break
-        for i in range(1, 6):  # Support up to D5
+        for i in range(1, 7):  # Support up to D6
             for name in [f"D{i}.png", f"D{i}.jpg", f"d{i}.png", f"d{i}.jpg"]:
                 img_path = self.images_dir / name
                 if img_path.exists():
@@ -415,6 +420,15 @@ class PlaybookGenerator:
         c.save()
         print(f"  Created: {pdf_path}")
 
+    def _defense_row_layout(self, n):
+        """Return list of plays-per-row for n defense plays: 4→[2,2], 5→[2,1,2], 6→[2,2,2]."""
+        if n <= 4:
+            return [2, 2]
+        elif n == 5:
+            return [2, 1, 2]
+        else:
+            return [2, 2, 2]
+
     def create_coach_card_defense(self, images):
         if not images:
             return
@@ -424,16 +438,20 @@ class PlaybookGenerator:
         from reportlab.lib.units import inch
         from reportlab.lib.utils import ImageReader
 
+        n = len(images)
+        row_layout = self._defense_row_layout(n)
+        num_rows = len(row_layout)
+        cols = 2
+
         pdf_path = self.output_dir / "defense_coach_card.pdf"
         c = canvas.Canvas(str(pdf_path), pagesize=landscape(letter))
         page_width, page_height = landscape(letter)
-        cols, rows = 2, 2
         margin = 1.5 * inch
         label_space = 0.5 * inch
         grid_width = page_width - 2 * margin - label_space
         grid_height = page_height - 2 * margin
         cell_width = grid_width / cols
-        cell_height = grid_height / rows
+        cell_height = grid_height / num_rows
 
         c.saveState()
         c.setFont("Helvetica-Bold", 24)
@@ -442,22 +460,40 @@ class PlaybookGenerator:
         c.drawCentredString(0, 0, "DEFENSE")
         c.restoreState()
 
-        for idx, img in enumerate(images[:5]):
-            row = idx // cols
-            col = idx % cols
-            x = margin + label_space + col * cell_width
-            y = page_height - (margin + (row + 1) * cell_height)
-            img_buffer = io.BytesIO()
-            img.save(img_buffer, format='PNG')
-            img_buffer.seek(0)
-            padding = 10
-            c.drawImage(ImageReader(img_buffer),
-                        x + padding, y + padding,
-                        width=cell_width - 2*padding,
-                        height=cell_height - 2*padding,
-                        preserveAspectRatio=True)
+        # Draw grid lines
+        c.setStrokeColorRGB(0.7, 0.7, 0.7)
+        c.setLineWidth(0.5)
+        grid_x = margin + label_space
+        grid_y = margin
+        for r in range(num_rows + 1):
+            y_line = grid_y + r * cell_height
+            c.line(grid_x, y_line, grid_x + grid_width, y_line)
+        for cl in range(cols + 1):
+            x_line = grid_x + cl * cell_width
+            c.line(x_line, grid_y, x_line, grid_y + grid_height)
+
+        img_idx = 0
+        for row_num, count_in_row in enumerate(row_layout):
+            for col_num in range(count_in_row):
+                if img_idx >= n:
+                    break
+                if count_in_row == 1:
+                    x = margin + label_space + (grid_width - cell_width) / 2
+                else:
+                    x = margin + label_space + col_num * cell_width
+                y = page_height - (margin + (row_num + 1) * cell_height)
+                img_buffer = io.BytesIO()
+                images[img_idx].save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                padding = 10
+                c.drawImage(ImageReader(img_buffer),
+                            x + padding, y + padding,
+                            width=cell_width - 2*padding,
+                            height=cell_height - 2*padding,
+                            preserveAspectRatio=True)
+                img_idx += 1
         c.save()
-        print(f"  Created: {pdf_path}")
+        print(f"  Created: {pdf_path} ({n} plays, layout {'x'.join(str(r) for r in row_layout)})")
 
     def create_wristband_sheet_offense(self, images):
         if not images:
@@ -525,101 +561,104 @@ class PlaybookGenerator:
         from reportlab.lib.units import inch
         from reportlab.lib.utils import ImageReader
 
+        n = len(images)
         pdf_path = self.output_dir / "defense_wristband.pdf"
         c = canvas.Canvas(str(pdf_path), pagesize=landscape(letter))
         page_width, page_height = landscape(letter)
 
+        # Same card dimensions and gap as offense wristband
         card_width = 1.0655 * inch
         card_height = 1.0205 * inch
-        internal_gap = (1/32) * inch
-        label_width = 0.25 * inch
-        cut_width = 4.4085 * inch
-        cut_height = 2.0445 * inch
+        internal_gap = (3/64) * inch
+
+        # Column layout: each entry = cards stacked in that column
+        if n <= 4:
+            col_layout = [2, 2]        # 2x2
+        elif n == 5:
+            col_layout = [2, 1, 2]    # 2x1x2
+        else:
+            col_layout = [2, 2, 2]    # 2x2x2
+
+        num_cols = len(col_layout)
+
+        # Match offense group dimensions (4 cols × 2 rows) for consistent cut-out size
+        group_cols_ref = 4
+        group_rows_ref = 2
+        group_width = (group_cols_ref * card_width) + ((group_cols_ref - 1) * internal_gap)
+        group_height = (group_rows_ref * card_height) + ((group_rows_ref - 1) * internal_gap)
+
         groups_across, groups_down = 2, 3
-        h_spacing, v_spacing = 0.3 * inch, 0.3 * inch
-        total_width = (groups_across * cut_width) + ((groups_across - 1) * h_spacing)
-        total_height = (groups_down * cut_height) + ((groups_down - 1) * v_spacing)
+        group_spacing = 0.5 * inch
+        total_width = (groups_across * group_width) + ((groups_across - 1) * group_spacing)
+        total_height = (groups_down * group_height) + ((groups_down - 1) * group_spacing)
         start_x = (page_width - total_width) / 2
         start_y = page_height - ((page_height - total_height) / 2)
 
-        for group_num in range(6):
-            group_row = group_num // groups_across
-            group_col = group_num % groups_across
-            group_x = start_x + (group_col * (cut_width + h_spacing))
-            group_y = start_y - (group_row * (cut_height + v_spacing))
+        # DEFENSE label on the left, cards centered in remaining space
+        label_width = 0.25 * inch
+        label_gap = 0.05 * inch
+        defense_grid_width = (num_cols * card_width) + ((num_cols - 1) * internal_gap)
+        cards_area = group_width - label_width - label_gap
+        cards_x_offset = label_width + label_gap + (cards_area - defense_grid_width) / 2
 
+        for group_idx in range(6):
+            grow = group_idx // groups_across
+            gcol = group_idx % groups_across
+            group_x = start_x + (gcol * (group_width + group_spacing))
+            group_y = start_y - (grow * (group_height + group_spacing))
+
+            # Dashed cutting guide (same size as offense group)
             c.setStrokeColorRGB(0.3, 0.3, 0.3)
             c.setLineWidth(0.5)
             c.setDash([3, 3])
-            c.rect(group_x, group_y - cut_height, cut_width, cut_height)
+            c.rect(group_x, group_y - group_height, group_width, group_height)
             c.setDash([])
 
-            left_margin = 0.75 * inch
-            top_margin = (cut_height - (2 * card_height + internal_gap)) / 2
-
-            # Left DEFENSE label
-            label_x = group_x + left_margin - label_width
+            # DEFENSE label (rotated 90°, left side)
             c.saveState()
-            c.setFont("Helvetica-Bold", 20)
-            c.translate(label_x + label_width/2, group_y - cut_height/2)
+            c.setFont("Helvetica-Bold", 18)
+            c.translate(group_x + label_width, group_y - group_height / 2)
             c.rotate(90)
             c.drawCentredString(0, 0, "DEFENSE")
             c.restoreState()
 
-            # Draw defense plays: A(D1) top-left, C(D3) bottom-left, B(D2) top-right, D(D4) bottom-right
-            positions = [
-                (0, 0, 0),  # A = D1, top-left
-                (1, 0, 1),  # C = D3, bottom-left  (image index 2)
-                (2, 1, 0),  # B = D2, top-right     (image index 1)
-                (3, 1, 1),  # D = D4, bottom-right  (image index 3)
-            ]
-            img_order = [0, 2, 1, 3]  # A, C, B, D
+            img_idx = 0
+            for col_num, cards_in_col in enumerate(col_layout):
+                for row in range(cards_in_col):
+                    if img_idx >= n:
+                        break
+                    x = group_x + cards_x_offset + col_num * (card_width + internal_gap)
+                    if cards_in_col == 1:
+                        # Center single card vertically within the 2-row height
+                        y = group_y - group_height / 2 - card_height / 2
+                    else:
+                        y = group_y - ((row + 1) * card_height) - (row * internal_gap)
 
-            for pos_idx, (_, col_off, row_off) in enumerate(positions):
-                img_idx = img_order[pos_idx]
-                if img_idx >= len(images):
-                    continue
+                    c.setStrokeColorRGB(0.7, 0.7, 0.7)
+                    c.setLineWidth(0.5)
+                    c.rect(x, y, card_width, card_height)
 
-                if col_off == 0:
-                    x = group_x + left_margin
-                else:
-                    middle_x = group_x + left_margin + (2 * card_width) + 0.1 * inch
-                    # Draw middle DEFENSE label (only once per group)
-                    if row_off == 0:
-                        c.saveState()
-                        c.setFont("Helvetica-Bold", 20)
-                        c.translate(middle_x, group_y - cut_height/2)
-                        c.rotate(90)
-                        c.drawCentredString(0, 0, "DEFENSE")
-                        c.restoreState()
-                    x = middle_x + label_width
-
-                y = group_y - top_margin - ((row_off + 1) * card_height) - (row_off * internal_gap)
-
-                c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                c.setLineWidth(0.5)
-                c.rect(x, y, card_width, card_height)
-
-                img_buffer = io.BytesIO()
-                images[img_idx].save(img_buffer, format='PNG')
-                img_buffer.seek(0)
-                c.drawImage(ImageReader(img_buffer),
-                            x, y, width=card_width, height=card_height,
-                            preserveAspectRatio=True, mask='auto')
+                    img_buffer = io.BytesIO()
+                    images[img_idx].save(img_buffer, format='PNG')
+                    img_buffer.seek(0)
+                    c.drawImage(ImageReader(img_buffer),
+                                x, y, width=card_width, height=card_height,
+                                preserveAspectRatio=True, mask='auto')
+                    img_idx += 1
 
         c.save()
-        print(f"  Created: {pdf_path}")
+        print(f"  Created: {pdf_path} (6 cards, layout {'x'.join(str(r) for r in col_layout)})")
 
-    def generate_all(self):
+    def generate_all(self, gen_offense=True, gen_defense=True):
         print("\nLoading play images...")
         offense_images, defense_images = self.load_images()
         print(f"Found {len(offense_images)} offense plays and {len(defense_images)} defense formations")
 
-        if offense_images:
+        if gen_offense and offense_images:
             print("\nGenerating offense materials...")
             self.create_coach_card_offense(offense_images)
             self.create_wristband_sheet_offense(offense_images)
-        if defense_images:
+        if gen_defense and defense_images:
             print("\nGenerating defense materials...")
             self.create_coach_card_defense(defense_images)
             self.create_wristband_sheet_defense(defense_images)
@@ -633,11 +672,20 @@ class PlaybookGenerator:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 playbook_pipeline.py <playbook.pptx> [output_dir]")
+        print("Usage: python3 playbook_pipeline.py <playbook.pptx> [output_dir] [--sections offense|defense|both]")
         sys.exit(1)
 
     pptx_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else "playbook_output"
+    output_dir = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else "playbook_output"
+
+    # Parse --sections flag
+    sections = "both"
+    if "--sections" in sys.argv:
+        idx = sys.argv.index("--sections")
+        if idx + 1 < len(sys.argv):
+            sections = sys.argv[idx + 1].lower()
+    gen_offense = sections in ("both", "offense")
+    gen_defense = sections in ("both", "defense")
 
     work_dir = Path("_playbook_work")
     work_dir.mkdir(exist_ok=True)
@@ -706,9 +754,9 @@ def main():
     crop_plays(plays, slide_images, slide_w, slide_h, plays_dir)
 
     # Step 4: Generate PDFs
-    print("\nSTEP 4: Generating coach cards and wristbands...")
+    print(f"\nSTEP 4: Generating coach cards and wristbands (sections: {sections})...")
     generator = PlaybookGenerator(str(plays_dir), output_dir)
-    generator.generate_all()
+    generator.generate_all(gen_offense=gen_offense, gen_defense=gen_defense)
 
     # Cleanup
     print(f"\nPlay images saved in: {plays_dir}/")
