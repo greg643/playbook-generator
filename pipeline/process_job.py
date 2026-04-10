@@ -68,11 +68,17 @@ def main():
             print("Reading job options from R2...")
             status_obj = s3.get_object(Bucket=bucket, Key=f"{job_id}/status.json")
             status_data = json.loads(status_obj["Body"].read())
-            options = status_data.get("options", {"offense": True, "defense": True})
-            gen_offense = options.get("offense", True)
-            gen_defense = options.get("defense", True)
+            options = status_data.get("options", {})
+            # Support both old-style (offense/defense booleans) and new-style (4 granular outputs)
+            offense_coach_card = options.get("offense_coach_card", options.get("offense", True))
+            offense_wristband = options.get("offense_wristband", options.get("offense", True))
+            defense_coach_card = options.get("defense_coach_card", options.get("defense", True))
+            defense_wristband = options.get("defense_wristband", options.get("defense", True))
+            gen_offense = offense_coach_card or offense_wristband
+            gen_defense = defense_coach_card or defense_wristband
             sections = "both" if (gen_offense and gen_defense) else ("offense" if gen_offense else "defense")
-            print(f"  Sections: {sections}")
+            print(f"  Outputs: offense_coach_card={offense_coach_card}, offense_wristband={offense_wristband}, "
+                  f"defense_coach_card={defense_coach_card}, defense_wristband={defense_wristband}")
 
             # Download PPTX from R2
             print("Downloading PPTX from R2...")
@@ -87,9 +93,17 @@ def main():
             sys.path.insert(0, str(pipeline_dir))
             from playbook_pipeline import main as pipeline_main
 
+            # Build the list of selected outputs
+            selected = []
+            if offense_coach_card: selected.append("offense_coach_card")
+            if offense_wristband: selected.append("offense_wristband")
+            if defense_coach_card: selected.append("defense_coach_card")
+            if defense_wristband: selected.append("defense_wristband")
+
             # Override sys.argv for the pipeline
             original_argv = sys.argv
-            sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir), "--sections", sections]
+            sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir),
+                         "--sections", sections, "--outputs", ",".join(selected)]
 
             # Change to tmpdir so _playbook_work is created there
             original_cwd = os.getcwd()

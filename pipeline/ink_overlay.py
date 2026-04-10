@@ -158,9 +158,9 @@ def extract_fallback_images(pptx_unzipped_path: str, pptx_path: str, slide_num: 
     return fallback_images
 
 
-def extract_ink_strokes(pptx_unzipped_path: str, slide_num: int, pptx_zip: zipfile.ZipFile) -> List[Tuple[List[Tuple[float, float]], Tuple[int, int, int, int], str]]:
+def extract_ink_strokes(pptx_unzipped_path: str, slide_num: int, pptx_zip: zipfile.ZipFile) -> List[Tuple[List[Tuple[float, float]], Tuple[int, int, int, int], str, float]]:
     """
-    Extract ink strokes from InkML files with position and color information.
+    Extract ink strokes from InkML files with position, color, and width information.
 
     Handles contentParts that are:
     1. At the slide root level
@@ -243,7 +243,7 @@ def extract_ink_strokes(pptx_unzipped_path: str, slide_num: int, pptx_zip: zipfi
                 'choff_x': choff_x,
                 'choff_y': choff_y,
                 'chext_cx': chext_cx,
-                'chext_cy': chext_cy
+                'chext_cy': chext_cy,
             }
 
     # Now process all contentParts
@@ -286,6 +286,8 @@ def extract_ink_strokes(pptx_unzipped_path: str, slide_num: int, pptx_zip: zipfi
 
         # If the contentPart is inside a group, transform its coordinates from child space to slide space
         if group_transform is not None:
+            import math
+
             # Apply group transform: slide_coord = group_offset + (child_coord - chOff) * (group_ext / chExt)
             scale_x = group_transform['group_w'] / group_transform['chext_cx'] if group_transform['chext_cx'] != 0 else 1
             scale_y = group_transform['group_h'] / group_transform['chext_cy'] if group_transform['chext_cy'] != 0 else 1
@@ -306,20 +308,20 @@ def extract_ink_strokes(pptx_unzipped_path: str, slide_num: int, pptx_zip: zipfi
         try:
             ink_content = pptx_zip.read(ink_path).decode('utf-8')
             strokes = parse_inkml(ink_content)
-            # strokes is now list of (points, dummy_pos, color)
-            for stroke_points, _, color_hex in strokes:
-                ink_strokes.append((stroke_points, (x, y, w, h), color_hex))
+            # strokes is now list of (points, dummy_pos, color, brush_width_cm)
+            for stroke_points, _, color_hex, brush_width_cm in strokes:
+                ink_strokes.append((stroke_points, (x, y, w, h), color_hex, brush_width_cm))
         except KeyError:
             pass
 
     return ink_strokes
 
 
-def parse_inkml(inkml_content: str) -> List[Tuple[List[Tuple[float, float]], Tuple[int, int, int, int], str]]:
+def parse_inkml(inkml_content: str) -> List[Tuple[List[Tuple[float, float]], Tuple[int, int, int, int], str, float]]:
     """
-    Parse InkML XML and extract stroke coordinates with color info.
+    Parse InkML XML and extract stroke coordinates with color and width info.
 
-    Returns list of (stroke_points, (0,0,0,0), color_hex).
+    Returns list of (stroke_points, (0,0,0,0), color_hex, brush_width_cm).
 
     InkML delta encoding:
     - First point is absolute: "3055 4785 24575"
@@ -340,9 +342,10 @@ def parse_inkml(inkml_content: str) -> List[Tuple[List[Tuple[float, float]], Tup
         if not trace_text:
             continue
 
-        # Look up brush color
+        # Look up brush color and width
         brush_ref = trace.get('brushRef')
         trace_brush_color = brush_color
+        trace_brush_width_cm = 0.07056  # default from observed InkML files
         if brush_ref:
             brush_id = brush_ref.lstrip('#')
             for brush in root.findall('.//inkml:brush', NS):
@@ -350,7 +353,11 @@ def parse_inkml(inkml_content: str) -> List[Tuple[List[Tuple[float, float]], Tup
                     for prop in brush.findall('inkml:brushProperty', NS):
                         if prop.get('name') == 'color':
                             trace_brush_color = prop.get('value')
-                            break
+                        elif prop.get('name') == 'width':
+                            try:
+                                trace_brush_width_cm = float(prop.get('value', 0))
+                            except ValueError:
+                                pass
 
         points = []
         points = []
@@ -404,7 +411,7 @@ def parse_inkml(inkml_content: str) -> List[Tuple[List[Tuple[float, float]], Tup
                 continue
 
         if points:
-            strokes.append((points, (0, 0, 0, 0), trace_brush_color))
+            strokes.append((points, (0, 0, 0, 0), trace_brush_color, trace_brush_width_cm))
 
     return strokes
 
@@ -473,7 +480,7 @@ def hex_to_rgba(hex_color: str, alpha: int = 255) -> Tuple[int, int, int, int]:
 
 def overlay_inkml_strokes_approach_b(
     slide_image_path: str,
-    ink_strokes: List[Tuple[List[Tuple[float, float]], Tuple[int, int, int, int], str]],
+    ink_strokes: List[Tuple[List[Tuple[float, float]], Tuple[int, int, int, int], str, float]],
     slide_width_emu: int,
     slide_height_emu: int,
     slide_image_width_px: int,
@@ -503,7 +510,7 @@ def overlay_inkml_strokes_approach_b(
     slide_width_expected_px = slide_width_inches * dpi
     scale_factor = slide_image_width_px / slide_width_expected_px
 
-    for stroke_points, (x_emu, y_emu, w_emu, h_emu), color_hex in ink_strokes:
+    for stroke_points, (x_emu, y_emu, w_emu, h_emu), color_hex, brush_width_cm in ink_strokes:
         if len(stroke_points) < 2:
             continue
 
@@ -527,10 +534,12 @@ def overlay_inkml_strokes_approach_b(
         # Convert color from hex to RGBA
         stroke_color = hex_to_rgba(color_hex)
 
-        # Estimate stroke width in pixels from InkML brush width
-        # InkML brush width is in cm (0.05 cm), convert to pixels
-        brush_width_px = emu_to_pixels(0.05 * 360000, dpi)  # 0.05cm in EMU
-        brush_width_px = max(1, int(brush_width_px * scale_factor))
+        # Convert brush width from cm to pixels at the rendering DPI
+        # Apply 1.75x multiplier: InkML stores raw pen input width, but PowerPoint
+        # renders strokes visually thicker than the stored value
+        brush_width_emu = brush_width_cm * 360000  # cm to EMU
+        brush_width_px = emu_to_pixels(brush_width_emu, dpi) * scale_factor * 1.75
+        brush_width_px = max(2, int(brush_width_px))
 
         # Draw the stroke
         for i in range(len(stroke_points) - 1):

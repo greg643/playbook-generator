@@ -204,12 +204,18 @@
     </div>
     <input type="file" id="fileInput" accept=".pptx">
 
-    <div class="section-select" style="margin-top: 1rem; display: flex; gap: 1.5rem;">
+    <div class="section-select" style="margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1.5rem;">
       <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem;">
-        <input type="checkbox" id="chkOffense" checked> Offense
+        <input type="checkbox" id="chkOffenseCoach" checked> Offense Coach Card
       </label>
       <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem;">
-        <input type="checkbox" id="chkDefense" checked> Defense
+        <input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card
+      </label>
+      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem;">
+        <input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband
+      </label>
+      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem;">
+        <input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband
       </label>
     </div>
 
@@ -247,8 +253,10 @@
   const errorMsg = document.getElementById('errorMsg');
   const resetLink = document.getElementById('resetLink');
 
-  const chkOffense = document.getElementById('chkOffense');
-  const chkDefense = document.getElementById('chkDefense');
+  const chkOffenseCoach = document.getElementById('chkOffenseCoach');
+  const chkOffenseWrist = document.getElementById('chkOffenseWrist');
+  const chkDefenseCoach = document.getElementById('chkDefenseCoach');
+  const chkDefenseWrist = document.getElementById('chkDefenseWrist');
 
   let selectedFile = null;
   let pollTimer = null;
@@ -296,16 +304,19 @@
     resetLink.classList.remove('active');
 
     try {
-      if (!chkOffense.checked && !chkDefense.checked) {
-        showError('Select at least one: Offense or Defense');
+      if (!chkOffenseCoach.checked && !chkOffenseWrist.checked &&
+          !chkDefenseCoach.checked && !chkDefenseWrist.checked) {
+        showError('Select at least one output');
         generateBtn.disabled = false;
         return;
       }
 
       const form = new FormData();
       form.append('file', selectedFile);
-      form.append('offense', chkOffense.checked);
-      form.append('defense', chkDefense.checked);
+      form.append('offense_coach_card', chkOffenseCoach.checked);
+      form.append('offense_wristband', chkOffenseWrist.checked);
+      form.append('defense_coach_card', chkDefenseCoach.checked);
+      form.append('defense_wristband', chkDefenseWrist.checked);
 
       const res = await fetch('/api/upload', { method: 'POST', body: form });
       const data = await res.json();
@@ -389,8 +400,10 @@
     fileInput.value = '';
     fileName.textContent = '';
     generateBtn.disabled = true;
-    chkOffense.checked = true;
-    chkDefense.checked = true;
+    chkOffenseCoach.checked = true;
+    chkOffenseWrist.checked = true;
+    chkDefenseCoach.checked = true;
+    chkDefenseWrist.checked = true;
     progressSection.classList.remove('active');
     downloads.classList.remove('active');
     errorMsg.classList.remove('active');

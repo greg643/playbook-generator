@@ -391,18 +391,6 @@ class PlaybookGenerator:
         c.drawCentredString(0, 0, "OFFENSE")
         c.restoreState()
 
-        # Draw grid lines
-        c.setStrokeColorRGB(0.7, 0.7, 0.7)
-        c.setLineWidth(0.5)
-        grid_x = margin + label_space
-        grid_y = margin
-        for r in range(rows + 1):
-            y_line = grid_y + r * cell_height
-            c.line(grid_x, y_line, grid_x + grid_width, y_line)
-        for cl in range(cols + 1):
-            x_line = grid_x + cl * cell_width
-            c.line(x_line, grid_y, x_line, grid_y + grid_height)
-
         for idx, img in enumerate(images[:16]):
             row = idx // cols
             col = idx % cols
@@ -446,7 +434,7 @@ class PlaybookGenerator:
         pdf_path = self.output_dir / "defense_coach_card.pdf"
         c = canvas.Canvas(str(pdf_path), pagesize=landscape(letter))
         page_width, page_height = landscape(letter)
-        margin = 1.5 * inch
+        margin = 0.75 * inch
         label_space = 0.5 * inch
         grid_width = page_width - 2 * margin - label_space
         grid_height = page_height - 2 * margin
@@ -459,18 +447,6 @@ class PlaybookGenerator:
         c.rotate(90)
         c.drawCentredString(0, 0, "DEFENSE")
         c.restoreState()
-
-        # Draw grid lines
-        c.setStrokeColorRGB(0.7, 0.7, 0.7)
-        c.setLineWidth(0.5)
-        grid_x = margin + label_space
-        grid_y = margin
-        for r in range(num_rows + 1):
-            y_line = grid_y + r * cell_height
-            c.line(grid_x, y_line, grid_x + grid_width, y_line)
-        for cl in range(cols + 1):
-            x_line = grid_x + cl * cell_width
-            c.line(x_line, grid_y, x_line, grid_y + grid_height)
 
         img_idx = 0
         for row_num, count_in_row in enumerate(row_layout):
@@ -538,9 +514,6 @@ class PlaybookGenerator:
                     col = play_idx % group_cols
                     x = group_x + (col * (card_width + internal_gap))
                     y = group_y - ((row + 1) * card_height) - (row * internal_gap)
-                    c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                    c.setLineWidth(0.5)
-                    c.rect(x, y, card_width, card_height)
 
                     img = page_images[play_idx]
                     img_buffer = io.BytesIO()
@@ -634,10 +607,6 @@ class PlaybookGenerator:
                     else:
                         y = group_y - ((row + 1) * card_height) - (row * internal_gap)
 
-                    c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                    c.setLineWidth(0.5)
-                    c.rect(x, y, card_width, card_height)
-
                     img_buffer = io.BytesIO()
                     images[img_idx].save(img_buffer, format='PNG')
                     img_buffer.seek(0)
@@ -649,19 +618,25 @@ class PlaybookGenerator:
         c.save()
         print(f"  Created: {pdf_path} (6 cards, layout {'x'.join(str(r) for r in col_layout)})")
 
-    def generate_all(self, gen_offense=True, gen_defense=True):
+    def generate_all(self, gen_offense=True, gen_defense=True,
+                      offense_coach_card=True, offense_wristband=True,
+                      defense_coach_card=True, defense_wristband=True):
         print("\nLoading play images...")
         offense_images, defense_images = self.load_images()
         print(f"Found {len(offense_images)} offense plays and {len(defense_images)} defense formations")
 
         if gen_offense and offense_images:
             print("\nGenerating offense materials...")
-            self.create_coach_card_offense(offense_images)
-            self.create_wristband_sheet_offense(offense_images)
+            if offense_coach_card:
+                self.create_coach_card_offense(offense_images)
+            if offense_wristband:
+                self.create_wristband_sheet_offense(offense_images)
         if gen_defense and defense_images:
             print("\nGenerating defense materials...")
-            self.create_coach_card_defense(defense_images)
-            self.create_wristband_sheet_defense(defense_images)
+            if defense_coach_card:
+                self.create_coach_card_defense(defense_images)
+            if defense_wristband:
+                self.create_wristband_sheet_defense(defense_images)
 
         print(f"\nDone! Output in: {self.output_dir}/")
         for pdf in sorted(self.output_dir.glob("*.pdf")):
@@ -672,20 +647,50 @@ class PlaybookGenerator:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 playbook_pipeline.py <playbook.pptx> [output_dir] [--sections offense|defense|both]")
+        print("Usage: python3 playbook_pipeline.py <playbook.pptx> [output_dir] [--sections offense|defense|both] [--mode standard|screenshot]")
         sys.exit(1)
 
     pptx_path = sys.argv[1]
     output_dir = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else "playbook_output"
 
-    # Parse --sections flag
+    # Parse --sections flag (shorthand: offense, defense, or both)
     sections = "both"
     if "--sections" in sys.argv:
         idx = sys.argv.index("--sections")
         if idx + 1 < len(sys.argv):
             sections = sys.argv[idx + 1].lower()
-    gen_offense = sections in ("both", "offense")
-    gen_defense = sections in ("both", "defense")
+
+    # Parse --outputs flag (granular: comma-separated list of output types)
+    # e.g. --outputs offense_coach_card,offense_wristband,defense_wristband
+    # If not specified, derive from --sections (all outputs for selected sections)
+    all_outputs = {"offense_coach_card", "offense_wristband", "defense_coach_card", "defense_wristband"}
+    if "--outputs" in sys.argv:
+        idx = sys.argv.index("--outputs")
+        if idx + 1 < len(sys.argv):
+            selected_outputs = set(sys.argv[idx + 1].lower().split(","))
+        else:
+            selected_outputs = all_outputs
+    else:
+        selected_outputs = set()
+        if sections in ("both", "offense"):
+            selected_outputs |= {"offense_coach_card", "offense_wristband"}
+        if sections in ("both", "defense"):
+            selected_outputs |= {"defense_coach_card", "defense_wristband"}
+
+    gen_offense = "offense_coach_card" in selected_outputs or "offense_wristband" in selected_outputs
+    gen_defense = "defense_coach_card" in selected_outputs or "defense_wristband" in selected_outputs
+    offense_coach_card = "offense_coach_card" in selected_outputs
+    offense_wristband = "offense_wristband" in selected_outputs
+    defense_coach_card = "defense_coach_card" in selected_outputs
+    defense_wristband = "defense_wristband" in selected_outputs
+
+    # Parse --mode flag: "standard" (200 DPI + ink overlay) or "screenshot" (600 DPI, no ink overlay)
+    mode = "standard"
+    if "--mode" in sys.argv:
+        idx = sys.argv.index("--mode")
+        if idx + 1 < len(sys.argv):
+            mode = sys.argv[idx + 1].lower()
+    render_dpi = 600 if mode == "screenshot" else 400
 
     work_dir = Path("_playbook_work")
     work_dir.mkdir(exist_ok=True)
@@ -697,6 +702,7 @@ def main():
     print(f"{'='*60}")
     print(f"Input:  {pptx_path}")
     print(f"Output: {output_dir}/")
+    print(f"Mode:   {mode} ({render_dpi} DPI{', no ink overlay' if mode == 'screenshot' else ''})")
     print()
 
     # Step 1: Analyze
@@ -715,39 +721,41 @@ def main():
         print(f"\nSTEP 2: Using {len(base_slides)} existing slide images (skipping conversion)")
         slide_images = base_slides
     else:
-        print("\nSTEP 2: Converting slides to images...")
-        slides_dir, slide_images = convert_pptx_to_images(pptx_path, work_dir)
+        print(f"\nSTEP 2: Converting slides to images at {render_dpi} DPI...")
+        slides_dir, slide_images = convert_pptx_to_images(pptx_path, work_dir, dpi=render_dpi)
 
-    # Step 2.5: Overlay ink annotations (hand-drawn routes)
-    # Check if ink overlay was already applied (presence of _with_ink files)
-    ink_files = list(slides_dir.glob("*_with_ink.png")) if slides_dir.exists() else []
-    if ink_files:
-        print(f"\nSTEP 2.5: Ink overlays already applied ({len(ink_files)} files), skipping...")
+    # Step 2.5: Overlay ink annotations (standard mode only)
+    if mode == "screenshot":
+        print("\nSTEP 2.5: Screenshot mode — skipping ink overlay (using LibreOffice native rendering)")
     else:
-        print("\nSTEP 2.5: Overlaying ink annotations (hand-drawn routes)...")
-        pptx_unzipped_dir = work_dir / "pptx_unzipped"
-        pptx_unzipped_dir.mkdir(exist_ok=True)
-        import zipfile
-        with zipfile.ZipFile(pptx_path, 'r') as z:
-            z.extractall(str(pptx_unzipped_dir))
-        ink_output = overlay_ink_on_slides(
-            pptx_path=str(Path(pptx_path).resolve()),
-            pptx_unzipped_path=str(pptx_unzipped_dir),
-            slides_dir=str(slides_dir),
-            approach='B',
-            use_fallback_if_failed=True,
-            dpi=200
-        )
-        # Replace original slide images with ink-overlaid versions
-        for slide_num, ink_path in ink_output.items():
-            ink_img_path = Path(ink_path)
-            for sf in slide_images:
-                num_str = sf.stem.split("-")[-1]
-                if int(num_str) == slide_num:
-                    shutil.copy2(str(ink_img_path), str(sf))
-                    print(f"  Replaced slide-{slide_num:02d}.png with ink-overlaid version")
-                    break
-        print(f"  Overlaid ink on {len(ink_output)} slides")
+        ink_files = list(slides_dir.glob("*_with_ink.png")) if slides_dir.exists() else []
+        if ink_files:
+            print(f"\nSTEP 2.5: Ink overlays already applied ({len(ink_files)} files), skipping...")
+        else:
+            print("\nSTEP 2.5: Overlaying ink annotations (hand-drawn routes)...")
+            pptx_unzipped_dir = work_dir / "pptx_unzipped"
+            pptx_unzipped_dir.mkdir(exist_ok=True)
+            import zipfile
+            with zipfile.ZipFile(pptx_path, 'r') as z:
+                z.extractall(str(pptx_unzipped_dir))
+            ink_output = overlay_ink_on_slides(
+                pptx_path=str(Path(pptx_path).resolve()),
+                pptx_unzipped_path=str(pptx_unzipped_dir),
+                slides_dir=str(slides_dir),
+                approach='B',
+                use_fallback_if_failed=True,
+                dpi=render_dpi
+            )
+            # Replace original slide images with ink-overlaid versions
+            for slide_num, ink_path in ink_output.items():
+                ink_img_path = Path(ink_path)
+                for sf in slide_images:
+                    num_str = sf.stem.split("-")[-1]
+                    if int(num_str) == slide_num:
+                        shutil.copy2(str(ink_img_path), str(sf))
+                        print(f"  Replaced slide-{slide_num:02d}.png with ink-overlaid version")
+                        break
+            print(f"  Overlaid ink on {len(ink_output)} slides")
 
     # Step 3: Crop plays
     print("\nSTEP 3: Cropping play images...")
@@ -756,7 +764,9 @@ def main():
     # Step 4: Generate PDFs
     print(f"\nSTEP 4: Generating coach cards and wristbands (sections: {sections})...")
     generator = PlaybookGenerator(str(plays_dir), output_dir)
-    generator.generate_all(gen_offense=gen_offense, gen_defense=gen_defense)
+    generator.generate_all(gen_offense=gen_offense, gen_defense=gen_defense,
+                           offense_coach_card=offense_coach_card, offense_wristband=offense_wristband,
+                           defense_coach_card=defense_coach_card, defense_wristband=defense_wristband)
 
     # Cleanup
     print(f"\nPlay images saved in: {plays_dir}/")

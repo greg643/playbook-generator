@@ -12,11 +12,13 @@ export async function onRequestPost(context) {
 
     const formData = await request.formData();
     const file = formData.get("file");
-    const offense = formData.get("offense") !== "false";
-    const defense = formData.get("defense") !== "false";
+    const offense_coach_card = formData.get("offense_coach_card") !== "false";
+    const offense_wristband = formData.get("offense_wristband") !== "false";
+    const defense_coach_card = formData.get("defense_coach_card") !== "false";
+    const defense_wristband = formData.get("defense_wristband") !== "false";
 
-    if (!offense && !defense) {
-      return Response.json({ error: "Select at least one: Offense or Defense" }, { status: 400 });
+    if (!offense_coach_card && !offense_wristband && !defense_coach_card && !defense_wristband) {
+      return Response.json({ error: "Select at least one output" }, { status: 400 });
     }
 
     if (!file || !(file instanceof File)) {
@@ -53,7 +55,7 @@ export async function onRequestPost(context) {
       JSON.stringify({
         status: "processing",
         createdAt: new Date().toISOString(),
-        options: { offense, defense },
+        options: { offense_coach_card, offense_wristband, defense_coach_card, defense_wristband },
       }),
       { httpMetadata: { contentType: "application/json" } }
     );
