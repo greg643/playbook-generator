@@ -497,19 +497,21 @@ class PlaybookGenerator:
         start_x = (page_width - total_width) / 2
         start_y = page_height - ((page_height - total_height) / 2)
 
-        for page_num in range(2):
+        # Render ceil(N/8) pages (capped at 2 — play names only go 01..16).
+        # Partial pages place the k available cards in the first k grid
+        # positions of every cut-out group, same as full pages.
+        num_pages = min(2, (len(images) + 7) // 8)
+        for page_num in range(num_pages):
             if page_num > 0:
                 c.showPage()
             start_idx = page_num * 8
             page_images = images[start_idx:start_idx + 8]
-            if len(page_images) < 8:
-                continue
             for group_idx in range(6):
                 group_row = group_idx // groups_across
                 group_col = group_idx % groups_across
                 group_x = start_x + (group_col * (group_width + group_spacing))
                 group_y = start_y - (group_row * (group_height + group_spacing))
-                for play_idx in range(8):
+                for play_idx in range(len(page_images)):
                     row = play_idx // group_cols
                     col = play_idx % group_cols
                     x = group_x + (col * (card_width + internal_gap))

@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playbook Editor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e1e4e8;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.65rem 1.25rem;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      flex-shrink: 0;
+    }
+    .topbar h1 { font-size: 1.05rem; font-weight: 600; color: #fff; }
+    .topbar .back { color: #8b949e; font-size: 0.85rem; text-decoration: none; }
+    .topbar .back:hover { color: #58a6ff; }
+    .topbar .spacer { flex: 1; }
+    .topbar .email { color: #8b949e; font-size: 0.85rem; }
+    .linkbtn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e1e4e8;
+      border-radius: 8px;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .linkbtn:hover { border-color: #58a6ff; }
+
+    /* Auth view */
+    .auth-wrap {
+      flex: 1;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 4rem 1rem;
+      overflow: auto;
+    }
+    .auth-wrap.active { display: flex; }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 400px;
+    }
+    .card h2 { font-size: 1.2rem; margin-bottom: 0.35rem; color: #fff; }
+    .auth-sub { color: #8b949e; font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .field { display: block; margin-bottom: 0.9rem; font-size: 0.8rem; color: #8b949e; }
+    .field input {
+      width: 100%;
+      margin-top: 0.3rem;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 0.55rem 0.7rem;
+      color: #e1e4e8;
+      font-size: 0.95rem;
+    }
+    .field input:focus { outline: none; border-color: #58a6ff; }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary { background: #238636; color: #fff; }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-primary:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+    .btn-secondary {
+      background: #21262d;
+      color: #e1e4e8;
+      border: 1px solid #30363d;
+      margin-top: 0.6rem;
+    }
+    .btn-secondary:hover { border-color: #58a6ff; }
+
+    .error-msg {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      color: #f85149;
+      font-size: 0.85rem;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .error-msg.active { display: block; }
+
+    /* Editor layout */
+    .editor { flex: 1; display: none; min-height: 0; }
+    .editor.active { display: grid; grid-template-columns: 230px minmax(0, 1fr) 252px; }
+
+    /* Sidebar */
+    .sidebar { border-right: 1px solid #30363d; overflow-y: auto; padding: 0.9rem 0.7rem; }
+    .side-section + .side-section { margin-top: 1.4rem; }
+    .side-section h2 {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #8b949e;
+      margin-bottom: 0.5rem;
+      padding-left: 0.25rem;
+    }
+    .play-row {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.3rem 0.45rem;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .play-row:hover { background: #161b22; }
+    .play-row.active { background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.4); }
+    .inc-check {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: #58a6ff;
+      cursor: pointer;
+    }
+    /* Excluded from playbook: fade everything but the toggle so it stays findable */
+    .play-row.excluded > :not(.inc-check) { opacity: 0.45; }
+    .badge {
+      width: 1.55rem;
+      height: 1.55rem;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .play-row .pname {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.83rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .row-btns { display: none; gap: 1px; flex-shrink: 0; }
+    .play-row:hover .row-btns, .play-row.active .row-btns { display: flex; }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 0.78rem;
+      line-height: 1;
+      padding: 3px 4px;
+      border-radius: 4px;
+    }
+    .icon-btn:hover { color: #e1e4e8; background: #21262d; }
+    .icon-btn:disabled { opacity: 0.3; cursor: default; }
+    .add-btn {
+      display: block;
+      width: 100%;
+      margin-top: 0.4rem;
+      padding: 0.4rem;
+      background: none;
+      border: 1px dashed #30363d;
+      border-radius: 8px;
+      color: #8b949e;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .add-btn:hover:not(:disabled) { border-color: #58a6ff; color: #58a6ff; }
+    .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Canvas column */
+    .canvas-col {
+      position: relative;  /* draw-actions overlays instead of reflowing the SVG */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      padding: 1.25rem;
+      overflow: auto;
+      gap: 0.7rem;
+    }
+    #canvas {
+      width: 100%;
+      max-width: 660px;
+      height: auto;
+      display: block;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+      border-radius: 2px;
+      touch-action: none;
+    }
+    .canvas-hint { color: #8b949e; font-size: 0.78rem; text-align: center; min-height: 1em; }
+
+    .draw-actions {
+      /* Overlaid on the canvas so its appearance never shifts the SVG mid-draw */
+      position: absolute; bottom: 0.6rem; left: 50%; transform: translateX(-50%);
+      z-index: 5;
+      display: flex; align-items: center; gap: 0.6rem; justify-content: center;
+      padding: 0.45rem 0.75rem;
+      background: rgba(22, 27, 34, 0.92); border: 1px solid #30363d; border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    }
+    .draw-actions-label { color: #58a6ff; font-size: 0.82rem; font-weight: 600; }
+    .draw-btn {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.3rem 0.65rem; border-radius: 6px; border: 1px solid #30363d;
+      background: #21262d; color: #e1e4e8; font-size: 0.8rem; cursor: pointer;
+    }
+    .draw-btn:hover { border-color: #58a6ff; }
+    .draw-btn-finish { background: #238636; border-color: #238636; color: #fff; }
+    .draw-btn-finish:hover { background: #2ea043; border-color: #2ea043; }
+    .draw-btn kbd {
+      font-size: 0.68rem; padding: 0 0.3rem; border-radius: 4px;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    }
+    .empty-hint {
+      color: #8b949e;
+      font-size: 0.9rem;
+      text-align: center;
+      max-width: 380px;
+      line-height: 1.6;
+    }
+
+    /* Right toolbar */
+    .toolbar { border-left: 1px solid #30363d; overflow-y: auto; padding: 0.9rem; }
+    .tb-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8b949e;
+      margin: 1.1rem 0 0.4rem;
+    }
+    .toolbar .tb-label:first-child { margin-top: 0; }
+    #playName {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 0.5rem 0.65rem;
+      color: #e1e4e8;
+      font-size: 0.9rem;
+    }
+    #playName:focus { outline: none; border-color: #58a6ff; }
+    .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+    .tool-btn {
+      padding: 0.45rem 0.25rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e1e4e8;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .tool-btn.active { border-color: #58a6ff; background: rgba(88, 166, 255, 0.12); color: #58a6ff; }
+    .undo-row { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
+    .undo-row .tool-btn { flex: 1; }
+    .swatches { display: flex; gap: 0.45rem; }
+    .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid #30363d;
+      cursor: pointer;
+      padding: 0;
+    }
+    .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px #58a6ff; }
+    .seg { display: flex; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; margin-top: 0.35rem; }
+    .seg button {
+      flex: 1;
+      background: #21262d;
+      border: none;
+      color: #8b949e;
+      padding: 0.35rem 0.2rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .seg button + button { border-left: 1px solid #30363d; }
+    .seg button.active { background: rgba(88, 166, 255, 0.15); color: #58a6ff; }
+    .save-row { display: flex; align-items: center; gap: 0.6rem; }
+    .save-row .btn { width: auto; margin-top: 0; padding: 0.45rem 1.1rem; font-size: 0.85rem; }
+    #saveIndicator { font-size: 0.75rem; color: #8b949e; }
+    #saveIndicator.saved { color: #2ea043; }
+    #saveIndicator.unsaved { color: #d29922; }
+    .gen-checks { display: flex; flex-direction: column; gap: 0.35rem; }
+    .gen-checks label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .toolbar .btn-primary { margin-top: 0.7rem; padding: 0.55rem; font-size: 0.9rem; }
+
+    /* Progress (same look as index.html) */
+    .progress-section { margin-top: 1rem; display: none; }
+    .progress-section.active { display: block; }
+    .progress-bar-container {
+      background: #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 8px;
+      margin: 0.75rem 0;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #58a6ff;
+      border-radius: 6px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+    .progress-bar.indeterminate {
+      width: 30%;
+      animation: indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes indeterminate {
+      0% { margin-left: 0; }
+      50% { margin-left: 70%; }
+      100% { margin-left: 0; }
+    }
+    .status-text { color: #8b949e; font-size: 0.85rem; text-align: center; }
+
+    /* Downloads (same look as index.html) */
+    .downloads { margin-top: 1rem; display: none; }
+    .downloads.active { display: block; }
+    .downloads h3 { margin-bottom: 0.75rem; color: #58a6ff; font-size: 0.9rem; }
+    .dl-grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+    .dl-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e1e4e8;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .dl-btn:hover { border-color: #58a6ff; background: #161b22; }
+    .dl-btn .dl-icon { font-size: 1.1rem; }
+    .reset-link { display: none; margin-top: 0.75rem; text-align: center; }
+    .reset-link.active { display: block; }
+    .reset-link a {
+      color: #58a6ff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .reset-link a:hover { text-decoration: underline; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(1, 4, 9, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1.25rem;
+      width: 100%;
+      max-width: 340px;
+    }
+    .modal h3 { font-size: 0.95rem; color: #fff; margin-bottom: 0.6rem; }
+    .modal p { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.6rem; word-break: break-word; }
+    .modal input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 0.5rem 0.65rem;
+      color: #e1e4e8;
+      font-size: 0.9rem;
+    }
+    .modal input:focus { outline: none; border-color: #58a6ff; }
+    .modal .btn-row { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
+    .modal .btn-row button {
+      padding: 0.45rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .mbtn-cancel { background: #21262d; color: #e1e4e8; border-color: #30363d !important; }
+    .mbtn-cancel:hover { border-color: #58a6ff !important; }
+    .mbtn-confirm { background: #238636; color: #fff; }
+    .mbtn-confirm:hover { background: #2ea043; }
+    .mbtn-danger { background: #da3633; color: #fff; }
+    .mbtn-danger:hover { background: #f85149; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <h1>Playbook Editor</h1>
+    <a class="back" href="/">&larr; PPTX upload</a>
+    <div class="spacer"></div>
+    <span class="email" id="userEmail"></span>
+    <button class="linkbtn" id="signOutBtn" style="display:none">Sign out</button>
+  </div>
+
+  <div class="auth-wrap" id="authView">
+    <div class="card">
+      <h2>Sign in</h2>
+      <p class="auth-sub">Create and edit plays in the browser, then generate the same coach cards &amp; wristband PDFs.</p>
+      <label class="field">Email
+        <input type="email" id="authEmail" autocomplete="email">
+      </label>
+      <label class="field">Password
+        <input type="password" id="authPassword" autocomplete="current-password">
+      </label>
+      <div class="error-msg" id="authError"></div>
+      <button class="btn btn-primary" id="loginBtn">Sign in</button>
+      <button class="btn btn-secondary" id="registerBtn">Create account</button>
+    </div>
+  </div>
+
+  <div class="editor" id="editorView">
+    <aside class="sidebar">
+      <div class="side-section">
+        <h2 id="offenseHeading">OFFENSE (0 in playbook / 0)</h2>
+        <div id="offenseList"></div>
+        <button class="add-btn" id="addOffenseBtn">+ Add play</button>
+      </div>
+      <div class="side-section">
+        <h2 id="defenseHeading">DEFENSE (0 in playbook / 0)</h2>
+        <div id="defenseList"></div>
+        <button class="add-btn" id="addDefenseBtn">+ Add play</button>
+      </div>
+    </aside>
+
+    <main class="canvas-col" id="canvasCol">
+      <div class="empty-hint" id="emptyHint" style="display:none">
+        No plays yet. Click <strong>+ Add play</strong> in the sidebar to create your first
+        offense or defense play &mdash; new plays start with the standard formation.
+      </div>
+      <p class="canvas-hint" id="canvasHint"></p>
+      <div class="draw-actions" id="drawActions" style="display:none">
+        <span class="draw-actions-label">Drawing&hellip;</span>
+        <button type="button" id="finishDrawBtn" class="draw-btn draw-btn-finish">&#10003; Finish <kbd>Enter</kbd></button>
+        <button type="button" id="cancelDrawBtn" class="draw-btn">&#10005; Cancel <kbd>Esc</kbd></button>
+      </div>
+    </main>
+
+    <aside class="toolbar">
+      <div class="tb-label">Play name</div>
+      <input id="playName" maxlength="60" placeholder="Play name" autocomplete="off" disabled>
+
+      <div class="tb-label">Tools</div>
+      <div class="tools" id="tools"></div>
+      <div class="undo-row">
+        <button class="tool-btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)">&#8630; Undo</button>
+        <button class="tool-btn" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">&#8631; Redo</button>
+      </div>
+
+      <div class="tb-label">Route / line style</div>
+      <div class="swatches" id="swatches"></div>
+      <div class="seg" id="dashSeg">
+        <button data-dash="false">Solid</button>
+        <button data-dash="true">Dashed</button>
+      </div>
+      <div class="seg" id="endSeg" title="Route end">
+        <button data-end="arrow">Arrow</button>
+        <button data-end="ball">Ball</button>
+        <button data-end="none">None</button>
+      </div>
+
+      <div class="tb-label">Save</div>
+      <div class="save-row">
+        <button class="btn btn-primary" id="saveBtn">Save</button>
+        <span id="saveIndicator" class="saved">Saved</span>
+      </div>
+
+      <div class="tb-label">Generate</div>
+      <div class="gen-checks">
+        <label><input type="checkbox" id="chkOffenseCoach" checked> Offense Coach Card</label>
+        <label><input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband</label>
+        <label><input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card</label>
+        <label><input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband</label>
+      </div>
+      <button class="btn btn-primary" id="generateBtn">Generate PDFs</button>
+
+      <div class="progress-section" id="progressSection">
+        <div class="progress-bar-container">
+          <div class="progress-bar indeterminate" id="progressBar"></div>
+        </div>
+        <p class="status-text" id="statusText">Working&hellip;</p>
+      </div>
+
+      <div class="downloads" id="downloads">
+        <h3>Your PDFs are ready</h3>
+        <div class="dl-grid" id="dlGrid"></div>
+      </div>
+
+      <div class="error-msg" id="genError"></div>
+
+      <div class="reset-link" id="resetLink">
+        <a id="resetGenLink">Generate again</a>
+      </div>
+    </aside>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalBox"></div>
+  </div>
+
+<script>
+'use strict';
+
+// ---------- Constants ----------
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const VB_W = 1076, VB_H = 1000, HEADER_H = 170;
+const FIELD_X = 8, FIELD_W = 1060, FIELD_H = 822;
+const MAX_OFFENSE = 16, MAX_DEFENSE = 6;
+
+const OFFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'QB'];
+const DEFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'N'];
+
+const OFFENSE_CHIPS = {
+  '1': { fill: '#C00000', text: '#FFFFFF' },
+  '2': { fill: '#FFC000', text: '#1F3864' },
+  '3': { fill: '#7030A0', text: '#FFFFFF' },
+  '4': { fill: '#00B050', text: '#FFFFFF' },
+  '5': { fill: '#FFFF00', text: '#1F3864' },
+  'QB': { fill: '#000000', text: '#FFFFFF' },
+};
+const DEFENSE_CHIPS = {
+  '1': { fill: '#7030A0', text: '#FFFFFF' },
+  '2': { fill: '#FFFF00', text: '#1F3864' },
+  '3': { fill: '#000000', text: '#FFFFFF' },
+  '4': { fill: '#C00000', text: '#FFFFFF' },
+  '5': { fill: '#00B050', text: '#FFFFFF' },
+  'N': { fill: '#FFC000', text: '#1F3864' },
+};
+const OFFENSE_DEFAULT_POS = {
+  '1': [0.09, 0.66], '2': [0.21, 0.66], '3': [0.33, 0.66],
+  '4': [0.45, 0.66], 'QB': [0.62, 0.66], '5': [0.10, 0.88],
+};
+const DEFENSE_DEFAULT_POS = {
+  '2': [0.30, 0.12], '3': [0.68, 0.12], '1': [0.50, 0.38],
+  '4': [0.20, 0.62], 'N': [0.50, 0.62], '5': [0.80, 0.62],
+};
+const ROUTE_COLORS = ['#FF0000', '#000000', '#1F6E8C', '#0070C0', '#00B050'];
+
+const FRIENDLY_NAMES = {
+  'offense_coach_card.pdf': 'Offense Coach Card',
+  'defense_coach_card.pdf': 'Defense Coach Card',
+  'offense_wristband.pdf': 'Offense Wristband',
+  'defense_wristband.pdf': 'Defense Wristband',
+};
+const FRIENDLY_ICONS = {
+  'offense_coach_card.pdf': '\u{1F3C8}',
+  'defense_coach_card.pdf': '\u{1F6E1}️',
+  'offense_wristband.pdf': '⏰',
+  'defense_wristband.pdf': '⏰',
+};
+
+// ---------- Coordinate helpers ----------
+// Play coords are normalized 0..1 relative to the field (white area below the
+// header). fx/fy map to viewBox units; normX/normY map back.
+
+function fx(nx) { return FIELD_X + nx * FIELD_W; }
+function fy(ny) { return HEADER_H + ny * FIELD_H; }
+function normX(vx) { return (vx - FIELD_X) / FIELD_W; }
+function normY(vy) { return (vy - HEADER_H) / FIELD_H; }
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
+
+// ---------- SVG building blocks ----------
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+function svgTextEl(x, y, str, size, fill, weight) {
+  const t = svgEl('text', {
+    x, y, fill,
+    'font-family': 'Arial, Helvetica, sans-serif',
+    'font-size': size,
+    'font-weight': weight,
+    'text-anchor': 'middle',
+    'dominant-baseline': 'central',
+  });
+  t.textContent = str;
+  return t;
+}
+
+const measureCtx = document.createElement('canvas').getContext('2d');
+
+function textWidth(text, size, weight) {
+  measureCtx.font = (weight || 400) + ' ' + size + 'px Arial, Helvetica, sans-serif';
+  return measureCtx.measureText(text).width;
+}
+
+function fitFont(text, maxSize, maxWidth, weight) {
+  if (!text) return maxSize;
+  const w = textWidth(text, maxSize, weight);
+  if (w <= maxWidth) return maxSize;
+  return Math.max(10, maxSize * maxWidth / w);
+}
+
+function straightPath(pts) {
+  return pts.map((p, i) => (i ? 'L ' : 'M ') + p[0] + ' ' + p[1]).join(' ');
+}
+
+// Midpoint quadratic smoothing so hand-drawn routes look like the ink originals.
+function smoothPath(pts) {
+  if (pts.length < 2) return '';
+  let d = 'M ' + pts[0][0] + ' ' + pts[0][1];
+  if (pts.length === 2) return d + ' L ' + pts[1][0] + ' ' + pts[1][1];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+    const my = (pts[i][1] + pts[i + 1][1]) / 2;
+    d += ' Q ' + pts[i][0] + ' ' + pts[i][1] + ' ' + mx + ' ' + my;
+  }
+  const last = pts[pts.length - 1];
+  return d + ' L ' + last[0] + ' ' + last[1];
+}
+
+function strokePathEl(d, color, width, dashed, dashArray) {
+  const p = svgEl('path', {
+    d, fill: 'none', stroke: color, 'stroke-width': width,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+  });
+  if (dashed) p.setAttribute('stroke-dasharray', dashArray || '26 20');
+  return p;
+}
+
+// Index of the segment of the polyline pts nearest to (x,y) within maxDist, else null.
+function nearestSegmentIndex(pts, x, y, maxDist) {
+  let best = null, bestD = maxDist;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+    const dx = x2 - x1, dy = y2 - y1;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / l2)) : 0;
+    const d = Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
+    if (d <= bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+function arrowHeadEl(pts, color) {
+  const n = pts.length;
+  if (n < 2) return null;
+  const x1 = pts[n - 2][0], y1 = pts[n - 2][1], x2 = pts[n - 1][0], y2 = pts[n - 1][1];
+  const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+  const px = -uy, py = ux;
+  const L = 44, HW = 17;
+  const bx = x2 - ux * L, by = y2 - uy * L;
+  return svgEl('polygon', {
+    points: x2 + ',' + y2 + ' ' + (bx + px * HW) + ',' + (by + py * HW) + ' ' + (bx - px * HW) + ',' + (by - py * HW),
+    fill: color,
+  });
+}
+
+function footballGlyph(x, y) {
+  const g = svgEl('g', { transform: 'translate(' + x + ' ' + y + ') rotate(-25)' });
+  g.appendChild(svgEl('ellipse', {
+    cx: 0, cy: 0, rx: 40, ry: 27,
+    fill: '#8B4513', stroke: '#5C2E0D', 'stroke-width': 4,
+  }));
+  const lace = (x1, y1, x2, y2) => svgEl('line', {
+    x1, y1, x2, y2, stroke: '#FFFFFF', 'stroke-width': 5, 'stroke-linecap': 'round',
+  });
+  g.appendChild(lace(-18, 0, 18, 0));
+  for (const tx of [-12, -4, 4, 12]) g.appendChild(lace(tx, -7, tx, 7));
+  return g;
+}
+
+// Routes start at the chip's CURRENT position so dragging a chip keeps its
+// routes attached.
+function routeFieldPoints(play, route) {
+  const pts = route.points.map(p => [fx(p[0]), fy(p[1])]);
+  const chip = play.chips && play.chips[route.chip];
+  if (chip && pts.length) pts[0] = [fx(chip.x), fy(chip.y)];
+  return pts;
+}
+
+// ---------- Pure renderer: play data -> SVG element ----------
+// The SAME function drives the interactive canvas and PNG export.
+
+let clipSeq = 0;
+
+function render(play, section, playIndex) {
+  const svg = svgEl('svg', { viewBox: '0 0 ' + VB_W + ' ' + VB_H });
+  const clipId = 'field-clip-' + (++clipSeq);
+  const defs = svgEl('defs', {});
+  const clip = svgEl('clipPath', { id: clipId });
+  clip.appendChild(svgEl('rect', { x: 0, y: HEADER_H, width: VB_W, height: VB_H - HEADER_H }));
+  defs.appendChild(clip);
+  svg.appendChild(defs);
+
+  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: VB_W, height: VB_H, fill: '#FFFFFF' }));
+  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: VB_W, height: HEADER_H, fill: '#C9C9C9' }));
+
+  const content = svgEl('g', { 'clip-path': 'url(#' + clipId + ')' });
+
+  for (const ln of play.lines || []) {
+    if (!Array.isArray(ln.points) || ln.points.length < 2) continue;
+    const pts = ln.points.map(p => [fx(p[0]), fy(p[1])]);
+    content.appendChild(strokePathEl(
+      straightPath(pts), ln.color || '#1F6E8C', ln.width || 13, ln.dash, ln.dashArray));
+    if (ln.end === 'arrow') {
+      const head = arrowHeadEl(pts, ln.color || '#1F6E8C');
+      if (head) content.appendChild(head);
+    } else if (ln.end === 'ball') {
+      content.appendChild(footballGlyph(pts[pts.length - 1][0], pts[pts.length - 1][1]));
+    }
+  }
+
+  for (const rt of play.routes || []) {
+    const pts = routeFieldPoints(play, rt);
+    if (pts.length < 2) continue;
+    content.appendChild(strokePathEl(smoothPath(pts), rt.color || '#FF0000', 13, rt.dash));
+    if (rt.end === 'arrow') {
+      const head = arrowHeadEl(pts, rt.color || '#FF0000');
+      if (head) content.appendChild(head);
+    } else if (rt.end === 'ball') {
+      content.appendChild(footballGlyph(pts[pts.length - 1][0], pts[pts.length - 1][1]));
+    }
+  }
+
+  for (const b of play.balls || []) content.appendChild(footballGlyph(fx(b.x), fy(b.y)));
+
+  for (const lb of play.labels || []) {
+    const size = (lb.size || 0.055) * FIELD_H;
+    content.appendChild(svgTextEl(fx(lb.x), fy(lb.y), lb.text || '', size, lb.color || '#0070C0', 700));
+  }
+
+  const chipSpec = section === 'defense' ? DEFENSE_CHIPS : OFFENSE_CHIPS;
+  const chipKeys = section === 'defense' ? DEFENSE_CHIP_KEYS : OFFENSE_CHIP_KEYS;
+  for (const key of chipKeys) {
+    const c = play.chips && play.chips[key];
+    if (!c) continue;
+    const cx = fx(c.x), cy = fy(c.y);
+    if (section === 'defense') {
+      content.appendChild(svgEl('rect', {
+        x: cx - 46, y: cy - 46, width: 92, height: 92,
+        fill: chipSpec[key].fill, stroke: '#000000', 'stroke-width': 6,
+        transform: 'rotate(45 ' + cx + ' ' + cy + ')',
+      }));
+    } else {
+      content.appendChild(svgEl('circle', {
+        cx, cy, r: 58,
+        fill: chipSpec[key].fill, stroke: '#000000', 'stroke-width': 6,
+      }));
+    }
+    content.appendChild(svgTextEl(cx, cy, key, key === 'QB' ? 52 : 64, chipSpec[key].text, 700));
+  }
+
+  svg.appendChild(content);
+
+  svg.appendChild(svgEl('line', { x1: 0, y1: HEADER_H, x2: VB_W, y2: HEADER_H, stroke: '#000000', 'stroke-width': 8 }));
+  svg.appendChild(svgEl('line', { x1: 165, y1: 0, x2: 165, y2: HEADER_H, stroke: '#000000', 'stroke-width': 8 }));
+  svg.appendChild(svgEl('rect', { x: 4, y: 4, width: VB_W - 8, height: VB_H - 8, fill: 'none', stroke: '#000000', 'stroke-width': 8 }));
+
+  // playIndex is the play's 0-based position among the INCLUDED plays of its
+  // section (see includedIndex), or null for a play excluded from the playbook.
+  const numText = playIndex == null ? '–'
+    : section === 'defense' ? String.fromCharCode(65 + playIndex) : String(playIndex + 1);
+  svg.appendChild(svgTextEl(82.5, 87, numText, 130, '#000000', 400));
+  const name = play.name || '';
+  const nameSize = fitFont(name, 105, VB_W - 165 - 40, 400);
+  svg.appendChild(svgTextEl(165 + (VB_W - 165) / 2, 87, name, nameSize, '#000000', 400));
+
+  return svg;
+}
+
+// ---------- Element refs ----------
+
+const $ = id => document.getElementById(id);
+const authView = $('authView'), editorView = $('editorView');
+const authEmail = $('authEmail'), authPassword = $('authPassword'), authError = $('authError');
+const loginBtn = $('loginBtn'), registerBtn = $('registerBtn'), signOutBtn = $('signOutBtn');
+const userEmail = $('userEmail');
+const offenseHeading = $('offenseHeading'), defenseHeading = $('defenseHeading');
+const offenseList = $('offenseList'), defenseList = $('defenseList');
+const addOffenseBtn = $('addOffenseBtn'), addDefenseBtn = $('addDefenseBtn');
+const canvasCol = $('canvasCol'), emptyHint = $('emptyHint'), canvasHint = $('canvasHint');
+const drawActions = $('drawActions');
+$('finishDrawBtn').addEventListener('click', () => finishDrawing());
+$('cancelDrawBtn').addEventListener('click', () => { drawing = null; refreshCanvas(); });
+const playName = $('playName'), toolsEl = $('tools'), swatchesEl = $('swatches');
+const dashSeg = $('dashSeg'), endSeg = $('endSeg');
+const undoBtn = $('undoBtn'), redoBtn = $('redoBtn');
+const saveBtn = $('saveBtn'), saveIndicator = $('saveIndicator');
+const chkOffenseCoach = $('chkOffenseCoach'), chkOffenseWrist = $('chkOffenseWrist');
+const chkDefenseCoach = $('chkDefenseCoach'), chkDefenseWrist = $('chkDefenseWrist');
+const generateBtn = $('generateBtn'), progressSection = $('progressSection'), statusText = $('statusText');
+const downloads = $('downloads'), dlGrid = $('dlGrid'), genError = $('genError');
+const resetLink = $('resetLink'), resetGenLink = $('resetGenLink');
+const modalOverlay = $('modalOverlay'), modalBox = $('modalBox');
+
+// ---------- Editor state ----------
+
+let doc = null;                 // {schema, offense:[], defense:[]}
+let cur = null;                 // {section, index} of the open play
+let tool = 'select';
+let style = { color: '#FF0000', dash: false, end: 'arrow' };
+let selection = null;           // {kind:'route'|'line'|'label'|'ball', index}
+let drawing = null;             // in-progress route/line
+let drag = null;
+let nameUndoPushed = false;
+const undoStacks = {};          // play.id -> {undo:[], redo:[]}
+
+function currentPlay() {
+  return doc && cur ? doc[cur.section][cur.index] || null : null;
+}
+
+function selectedItem() {
+  const play = currentPlay();
+  if (!play || !selection) return null;
+  const arr = { route: play.routes, line: play.lines, label: play.labels, ball: play.balls }[selection.kind];
+  return arr ? arr[selection.index] : null;
+}
+
+// "In playbook" flag: absent means true, so docs saved before this field
+// existed keep every play included. Excluded plays get no number and are
+// skipped by generate/export.
+function isIncluded(play) {
+  return !!play && play.included !== false;
+}
+
+// 0-based position among the INCLUDED plays of a section, or null when the
+// play at arrayIndex is excluded. This (not the array index) is what
+// render() and PNG export use for the play number/letter.
+function includedIndex(section, arrayIndex) {
+  if (!doc) return null;
+  const arr = doc[section] || [];
+  if (!isIncluded(arr[arrayIndex])) return null;
+  let n = 0;
+  for (let k = 0; k < arrayIndex; k++) if (isIncluded(arr[k])) n++;
+  return n;
+}
+
+// ---------- Interactive canvas ----------
+// One persistent <svg> keeps pointer capture; each refresh re-runs the pure
+// renderer and swaps its children in.
+
+const canvasSvg = svgEl('svg', { viewBox: '0 0 ' + VB_W + ' ' + VB_H });
+canvasSvg.id = 'canvas';
+canvasSvg.style.display = 'none';
+canvasCol.insertBefore(canvasSvg, canvasHint);
+
+function svgPointOf(evt) {
+  const ctm = canvasSvg.getScreenCTM();
+  if (ctm) {
+    const pt = new DOMPoint(evt.clientX, evt.clientY).matrixTransform(ctm.inverse());
+    return [pt.x, pt.y];
+  }
+  const r = canvasSvg.getBoundingClientRect();
+  return [(evt.clientX - r.left) * VB_W / r.width, (evt.clientY - r.top) * VB_H / r.height];
+}
+
+function refreshCanvas() {
+  const play = currentPlay();
+  if (!play) {
+    canvasSvg.style.display = 'none';
+    emptyHint.style.display = 'block';
+    drawActions.style.display = 'none';
+    return;
+  }
+  emptyHint.style.display = 'none';
+  canvasSvg.style.display = 'block';
+  drawActions.style.display = drawing ? 'flex' : 'none';
+  const fresh = render(play, cur.section, includedIndex(cur.section, cur.index));
+  canvasSvg.replaceChildren(...fresh.childNodes);
+  drawOverlay();
+}
+
+function drawingFieldPoints() {
+  const pts = drawing.points.map(p => [fx(p[0]), fy(p[1])]);
+  if (drawing.hover) pts.push([fx(drawing.hover[0]), fy(drawing.hover[1])]);
+  return pts;
+}
+
+function drawOverlay() {
+  const play = currentPlay();
+  if (!play) return;
+  const ov = svgEl('g', {});
+  if (selection && (selection.kind === 'route' || selection.kind === 'line')) {
+    const item = selectedItem();
+    if (item) {
+      const pts = selection.kind === 'route'
+        ? routeFieldPoints(play, item)
+        : item.points.map(p => [fx(p[0]), fy(p[1])]);
+      ov.appendChild(strokePathEl(straightPath(pts), 'rgba(88,166,255,0.4)', 24, false));
+      const start = selection.kind === 'route' ? 1 : 0;   // route point 0 rides the chip
+      for (let i = start; i < pts.length; i++) {
+        ov.appendChild(svgEl('circle', {
+          cx: pts[i][0], cy: pts[i][1], r: 13,
+          fill: '#0f1117', stroke: '#58a6ff', 'stroke-width': 5,
+        }));
+      }
+    }
+  } else if (selection && selection.kind === 'ball') {
+    const b = play.balls[selection.index];
+    if (b) ov.appendChild(svgEl('circle', {
+      cx: fx(b.x), cy: fy(b.y), r: 55,
+      fill: 'none', stroke: '#58a6ff', 'stroke-width': 4, 'stroke-dasharray': '10 8',
+    }));
+  } else if (selection && selection.kind === 'label') {
+    const lb = play.labels[selection.index];
+    if (lb) {
+      const size = (lb.size || 0.055) * FIELD_H;
+      const w = textWidth(lb.text || '', size, 700) + 28, h = size + 24;
+      ov.appendChild(svgEl('rect', {
+        x: fx(lb.x) - w / 2, y: fy(lb.y) - h / 2, width: w, height: h, rx: 6,
+        fill: 'none', stroke: '#58a6ff', 'stroke-width': 4, 'stroke-dasharray': '10 8',
+      }));
+    }
+  }
+  if (drawing) {
+    const pts = drawingFieldPoints();
+    if (pts.length >= 2) {
+      const d = drawing.kind === 'route' ? smoothPath(pts) : straightPath(pts);
+      const p = strokePathEl(d, style.color, 13, style.dash);
+      p.setAttribute('opacity', '0.65');
+      ov.appendChild(p);
+    }
+    for (const p of pts) ov.appendChild(svgEl('circle', { cx: p[0], cy: p[1], r: 8, fill: '#58a6ff' }));
+  }
+  canvasSvg.appendChild(ov);
+}
+
+// ---------- Hit testing ----------
+
+function segDist(x, y, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const L2 = dx * dx + dy * dy;
+  let t = L2 ? ((x - x1) * dx + (y - y1) * dy) / L2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
+}
+
+function hitPolyline(pts, x, y, threshold) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (segDist(x, y, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]) <= threshold) return true;
+  }
+  return false;
+}
+
+function hitChip(play, x, y) {
+  let best = null, bd = 64;
+  for (const k in play.chips) {
+    const c = play.chips[k];
+    const d = dist(x, y, fx(c.x), fy(c.y));
+    if (d < bd) { bd = d; best = k; }
+  }
+  return best;
+}
+
+function nearestChip(play, x, y) {
+  let best = null, bd = Infinity;
+  for (const k in play.chips) {
+    const c = play.chips[k];
+    const d = dist(x, y, fx(c.x), fy(c.y));
+    if (d < bd) { bd = d; best = k; }
+  }
+  return best;
+}
+
+function hitBall(play, x, y) {
+  for (let i = play.balls.length - 1; i >= 0; i--) {
+    if (dist(x, y, fx(play.balls[i].x), fy(play.balls[i].y)) <= 48) return i;
+  }
+  return null;
+}
+
+function hitLabel(play, x, y) {
+  for (let i = play.labels.length - 1; i >= 0; i--) {
+    const lb = play.labels[i];
+    const size = (lb.size || 0.055) * FIELD_H;
+    const hw = textWidth(lb.text || '', size, 700) / 2 + 14;
+    const hh = size / 2 + 12;
+    if (Math.abs(x - fx(lb.x)) <= hw && Math.abs(y - fy(lb.y)) <= hh) return i;
+  }
+  return null;
+}
+
+// Routes render as smoothed curves that bow away from the raw waypoint
+// polyline, so hit-test against the same curve the user sees: sample the
+// midpoint-quadratic spline into a dense polyline first.
+function densifyForHit(pts) {
+  if (pts.length < 3) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p0 = out[out.length - 1];
+    const c = pts[i];
+    const p2 = [(pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2];
+    for (const t of [0.25, 0.5, 0.75, 1]) {
+      const u = 1 - t;
+      out.push([
+        u * u * p0[0] + 2 * u * t * c[0] + t * t * p2[0],
+        u * u * p0[1] + 2 * u * t * c[1] + t * t * p2[1],
+      ]);
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+function hitRoute(play, x, y) {
+  for (let i = play.routes.length - 1; i >= 0; i--) {
+    if (hitPolyline(densifyForHit(routeFieldPoints(play, play.routes[i])), x, y, 20)) return i;
+  }
+  return null;
+}
+
+function hitLine(play, x, y) {
+  for (let i = play.lines.length - 1; i >= 0; i--) {
+    const pts = play.lines[i].points.map(p => [fx(p[0]), fy(p[1])]);
+    if (hitPolyline(pts, x, y, 20)) return i;
+  }
+  return null;
+}
+
+// ---------- Pointer interaction ----------
+
+canvasSvg.addEventListener('pointerdown', onPointerDown);
+canvasSvg.addEventListener('pointermove', onPointerMove);
+canvasSvg.addEventListener('pointerup', onPointerUp);
+canvasSvg.addEventListener('pointercancel', onPointerUp);
+canvasSvg.addEventListener('dblclick', onDblClick);
+
+// preventDefault on pointerdown suppresses native click/dblclick synthesis,
+// so double-clicks are detected manually from consecutive pointerdowns.
+let lastPointerDown = { t: 0, x: 0, y: 0 };
+
+function onPointerDown(e) {
+  if (e.button !== 0) return;
+  const play = currentPlay();
+  if (!play) return;
+  e.preventDefault();
+  canvasSvg.setPointerCapture(e.pointerId);
+  const [x, y] = svgPointOf(e);
+  const nx = clamp01(normX(x)), ny = clamp01(normY(y));
+
+  const now = performance.now();
+  // Tight thresholds: a real double-click lands within a few px, while two
+  // quick nearby waypoints (a sharp zigzag) shouldn't end the drawing.
+  const isDouble = now - lastPointerDown.t < 350 && dist(x, y, lastPointerDown.x, lastPointerDown.y) < 14;
+  lastPointerDown = { t: isDouble ? 0 : now, x, y };
+  if (isDouble) {
+    if (drawing) { finishDrawing(); return; }
+    if (tool === 'select') {
+      // Double-click on a selected route/line: handle → remove waypoint,
+      // segment → insert a waypoint there (reshape without redrawing).
+      if (selection && (selection.kind === 'route' || selection.kind === 'line')) {
+        const item = selectedItem();
+        if (item) {
+          const pts = selection.kind === 'route'
+            ? routeFieldPoints(play, item)
+            : item.points.map(p => [fx(p[0]), fy(p[1])]);
+          const start = selection.kind === 'route' ? 1 : 0;
+          for (let i = start; i < pts.length; i++) {
+            if (dist(x, y, pts[i][0], pts[i][1]) <= 24) {
+              if (item.points.length > 2) {
+                pushUndo();
+                item.points.splice(i, 1);
+                markDirty();
+                refreshCanvas();
+              }
+              return;
+            }
+          }
+          const seg = nearestSegmentIndex(pts, x, y, 26);
+          if (seg != null) {
+            pushUndo();
+            item.points.splice(seg + 1, 0, [nx, ny]);
+            markDirty();
+            refreshCanvas();
+            return;
+          }
+        }
+      }
+      const li = hitLabel(play, x, y);
+      if (li != null) { drag = null; editLabel(li); return; }
+    }
+  }
+
+  if (tool === 'select') {
+    if (selection && (selection.kind === 'route' || selection.kind === 'line')) {
+      const item = selectedItem();
+      if (item) {
+        const pts = selection.kind === 'route'
+          ? routeFieldPoints(play, item)
+          : item.points.map(p => [fx(p[0]), fy(p[1])]);
+        const start = selection.kind === 'route' ? 1 : 0;
+        for (let i = start; i < pts.length; i++) {
+          if (dist(x, y, pts[i][0], pts[i][1]) <= 24) {
+            drag = { kind: 'point', pointIndex: i, preSnap: snapshot(play), moved: false };
+            return;
+          }
+        }
+      }
+    }
+    const ck = hitChip(play, x, y);
+    if (ck) {
+      selection = null;
+      drag = { kind: 'chip', key: ck, preSnap: snapshot(play), moved: false };
+      refreshCanvas();
+      return;
+    }
+    const li = hitLabel(play, x, y);
+    if (li != null) {
+      selection = { kind: 'label', index: li };
+      drag = { kind: 'label', index: li, preSnap: snapshot(play), moved: false };
+      refreshCanvas();
+      return;
+    }
+    const bi = hitBall(play, x, y);
+    if (bi != null) {
+      selection = { kind: 'ball', index: bi };
+      drag = { kind: 'ball', index: bi, preSnap: snapshot(play), moved: false };
+      refreshCanvas();
+      return;
+    }
+    const ri = hitRoute(play, x, y);
+    if (ri != null) { selection = { kind: 'route', index: ri }; refreshCanvas(); return; }
+    const lni = hitLine(play, x, y);
+    if (lni != null) { selection = { kind: 'line', index: lni }; refreshCanvas(); return; }
+    if (selection) { selection = null; refreshCanvas(); }
+  } else if (tool === 'route') {
+    if (!drawing) {
+      const key = nearestChip(play, x, y);
+      if (!key) return;
+      const c = play.chips[key];
+      // Routes must start near a player: ignore stray clicks far from any chip
+      // instead of silently starting a route from an unexpected one.
+      if (dist(x, y, fx(c.x), fy(c.y)) > 220) return;
+      drawing = { kind: 'route', chip: key, points: [[c.x, c.y]], hover: [nx, ny] };
+      if (dist(x, y, fx(c.x), fy(c.y)) > 75) drawing.points.push([nx, ny]);
+    } else {
+      addDrawingPoint(nx, ny);
+    }
+    refreshCanvas();
+  } else if (tool === 'line') {
+    if (!drawing) drawing = { kind: 'line', points: [[nx, ny]], hover: [nx, ny] };
+    else addDrawingPoint(nx, ny);
+    refreshCanvas();
+  } else if (tool === 'text') {
+    placeText(nx, ny);
+  } else if (tool === 'ball') {
+    pushUndo();
+    play.balls.push({ x: nx, y: ny });
+    markDirty();
+    refreshCanvas();
+  } else if (tool === 'erase') {
+    eraseAt(play, x, y);
+  }
+}
+
+function onPointerMove(e) {
+  const play = currentPlay();
+  if (!play) return;
+  if (!drag && !drawing && tool === 'select') {
+    // Hover feedback: show what a click would grab (a miss looks identical to
+    // a hit otherwise, which hides aiming errors from the user).
+    const [hx, hy] = svgPointOf(e);
+    const over = hitChip(play, hx, hy) != null || hitLabel(play, hx, hy) != null ||
+      hitBall(play, hx, hy) != null || hitRoute(play, hx, hy) != null || hitLine(play, hx, hy) != null;
+    canvasSvg.style.cursor = over ? 'pointer' : 'default';
+  }
+  if (drag) {
+    const [x, y] = svgPointOf(e);
+    const nx = clamp01(normX(x)), ny = clamp01(normY(y));
+    if (drag.kind === 'chip') {
+      const c = play.chips[drag.key];
+      if (c) { c.x = nx; c.y = ny; }
+    } else if (drag.kind === 'ball') {
+      const b = play.balls[drag.index];
+      if (b) { b.x = nx; b.y = ny; }
+    } else if (drag.kind === 'label') {
+      const lb = play.labels[drag.index];
+      if (lb) { lb.x = nx; lb.y = ny; }
+    } else if (drag.kind === 'point') {
+      const item = selectedItem();
+      if (item && item.points[drag.pointIndex]) item.points[drag.pointIndex] = [nx, ny];
+    }
+    if (!drag.moved && drag.preSnap) {
+      // First real movement: NOW the drag becomes an undoable action.
+      // (Pushing eagerly on pointerdown would wipe the redo stack on no-op clicks.)
+      const s = stackFor(play);
+      s.undo.push(drag.preSnap);
+      if (s.undo.length > 50) s.undo.shift();
+      s.redo.length = 0;
+    }
+    drag.moved = true;
+    refreshCanvas();
+  } else if (drawing) {
+    const [x, y] = svgPointOf(e);
+    drawing.hover = [clamp01(normX(x)), clamp01(normY(y))];
+    refreshCanvas();
+  }
+}
+
+function onPointerUp() {
+  if (!drag) return;
+  if (drag.moved) markDirty();
+  drag = null;
+}
+
+function onDblClick(e) {
+  // Native dblclick only fires when pointerdown wasn't canceled (e.g. some
+  // trackpad/touch paths); the primary path is the manual detection in
+  // onPointerDown. Both funnel into the same actions.
+  e.preventDefault();
+  if (drawing) { finishDrawing(); return; }
+  if (tool !== 'select') return;
+  const play = currentPlay();
+  if (!play) return;
+  const [x, y] = svgPointOf(e);
+  const li = hitLabel(play, x, y);
+  if (li == null) return;
+  editLabel(li);
+}
+
+function editLabel(li) {
+  const play = currentPlay();
+  if (!play || !play.labels[li]) return;
+  showModal({ title: 'Edit text', withInput: true, defaultValue: play.labels[li].text, confirmLabel: 'Save' })
+    .then(text => {
+      if (text === null || !currentPlay()) return;
+      pushUndo();
+      const trimmed = text.trim();
+      if (trimmed) currentPlay().labels[li].text = trimmed.slice(0, 80);
+      else currentPlay().labels.splice(li, 1);
+      selection = null;
+      markDirty();
+      refreshCanvas();
+    });
+}
+
+function addDrawingPoint(nx, ny) {
+  const pts = drawing.points;
+  const last = pts[pts.length - 1];
+  if (last && Math.hypot(nx - last[0], ny - last[1]) < 0.01) return;
+  pts.push([nx, ny]);
+}
+
+function finishDrawing() {
+  if (!drawing) return;
+  const play = currentPlay();
+  const d = drawing;
+  drawing = null;
+  if (play && d.points.length >= 2) {
+    pushUndo();
+    if (d.kind === 'route') {
+      play.routes.push({ chip: d.chip, color: style.color, dash: style.dash, end: style.end, points: d.points });
+    } else {
+      play.lines.push({ color: style.color, dash: style.dash, end: style.end, points: d.points });
+    }
+    markDirty();
+  }
+  refreshCanvas();
+}
+
+function eraseAt(play, x, y) {
+  const li = hitLabel(play, x, y);
+  const bi = li == null ? hitBall(play, x, y) : null;
+  const ri = li == null && bi == null ? hitRoute(play, x, y) : null;
+  const lni = li == null && bi == null && ri == null ? hitLine(play, x, y) : null;
+  if (li == null && bi == null && ri == null && lni == null) return;
+  pushUndo();
+  if (li != null) play.labels.splice(li, 1);
+  else if (bi != null) play.balls.splice(bi, 1);
+  else if (ri != null) play.routes.splice(ri, 1);
+  else play.lines.splice(lni, 1);
+  selection = null;
+  markDirty();
+  refreshCanvas();
+}
+
+function deleteSelection() {
+  const play = currentPlay();
+  if (!play || !selection) return;
+  const arr = { route: play.routes, line: play.lines, label: play.labels, ball: play.balls }[selection.kind];
+  if (!arr || selection.index >= arr.length) { selection = null; return; }
+  pushUndo();
+  arr.splice(selection.index, 1);
+  selection = null;
+  markDirty();
+  refreshCanvas();
+}
+
+function placeText(nx, ny) {
+  showModal({ title: 'Add text', withInput: true, confirmLabel: 'Add' }).then(text => {
+    if (text === null || !currentPlay()) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    pushUndo();
+    currentPlay().labels.push({ x: nx, y: ny, text: trimmed.slice(0, 80), color: '#0070C0', size: 0.055 });
+    markDirty();
+    refreshCanvas();
+  });
+}
+
+// ---------- Undo / redo (per play, deep-copy snapshots, cap 50) ----------
+
+function stackFor(play) {
+  return undoStacks[play.id] || (undoStacks[play.id] = { undo: [], redo: [] });
+}
+
+function snapshot(play) {
+  return JSON.parse(JSON.stringify(play));
+}
+
+function pushUndo() {
+  const play = currentPlay();
+  if (!play) return;
+  const s = stackFor(play);
+  s.undo.push(snapshot(play));
+  if (s.undo.length > 50) s.undo.shift();
+  s.redo.length = 0;
+}
+
+function historyStep(dir) {
+  const play = currentPlay();
+  if (!play) return;
+  const s = stackFor(play);
+  const from = dir === 'undo' ? s.undo : s.redo;
+  const to = dir === 'undo' ? s.redo : s.undo;
+  const snap = from.pop();
+  if (!snap) return;
+  to.push(snapshot(play));
+  doc[cur.section][cur.index] = snap;
+  selection = null;
+  drawing = null;
+  nameUndoPushed = false;
+  markDirty();
+  syncPlayName();
+  renderSidebar();
+  refreshCanvas();
+}
+
+undoBtn.addEventListener('click', () => historyStep('undo'));
+redoBtn.addEventListener('click', () => historyStep('redo'));
+
+// ---------- Keyboard ----------
+
+document.addEventListener('keydown', e => {
+  if (modalOverlay.classList.contains('active')) {
+    if (e.key === 'Escape') closeModal(modalCancelValue);
+    return;
+  }
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    historyStep(e.shiftKey ? 'redo' : 'undo');
+    return;
+  }
+  if (mod && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); historyStep('redo'); return; }
+  if (e.key === 'Enter' && drawing) { e.preventDefault(); finishDrawing(); return; }
+  if (e.key === 'Escape') {
+    if (drawing) { drawing = null; refreshCanvas(); }  // cancel, don't commit
+    else if (selection) { selection = null; refreshCanvas(); }
+    return;
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selection) {
+    e.preventDefault();
+    deleteSelection();
+  }
+});
+
+// ---------- Tools & style UI ----------
+
+const TOOL_DEFS = [
+  ['select', 'Select'], ['route', 'Route'], ['line', 'Line'],
+  ['text', 'Text'], ['ball', 'Ball'], ['erase', 'Erase'],
+];
+const HINTS = {
+  select: 'Drag chips, text and balls. Click a route or line to select it — drag its handles to reshape, double-click a segment to add a bend, double-click a handle to remove it, restyle with the controls, or press Delete.',
+  route: 'Click near a chip to start, then click waypoints. Double-click or press Enter to finish.',
+  line: 'Click waypoints for a zone line. Double-click or press Enter to finish.',
+  text: 'Click the field to place a text label. Double-click a label with Select to edit it.',
+  ball: 'Click the field to place a football.',
+  erase: 'Click a route, line, label or ball to remove it.',
+};
+
+for (const [id, label] of TOOL_DEFS) {
+  const b = document.createElement('button');
+  b.className = 'tool-btn';
+  b.dataset.tool = id;
+  b.textContent = label;
+  b.addEventListener('click', () => setTool(id));
+  toolsEl.appendChild(b);
+}
+for (const c of ROUTE_COLORS) {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.dataset.color = c;
+  b.style.background = c;
+  b.title = c;
+  b.addEventListener('click', () => setStyle('color', c));
+  swatchesEl.appendChild(b);
+}
+dashSeg.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => setStyle('dash', b.dataset.dash === 'true')));
+endSeg.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => setStyle('end', b.dataset.end)));
+
+function setTool(t) {
+  if (drawing) finishDrawing();
+  tool = t;
+  if (t !== 'select') selection = null;
+  if (t === 'line') { style.color = '#1F6E8C'; style.dash = true; style.end = 'none'; }  // zone-line default
+  if (t === 'route') { style.end = style.end === 'none' ? 'arrow' : style.end; }  // routes usually end in arrows
+  canvasSvg.style.cursor = t === 'select' ? 'default' : 'crosshair';
+  syncToolUI();
+  syncStyleUI();
+  setHint();
+  refreshCanvas();
+}
+
+function setStyle(prop, val) {
+  style[prop] = val;
+  const item = selectedItem();
+  if (item && (selection.kind === 'route' || selection.kind === 'line')) {
+    pushUndo();
+    item[prop] = val;
+    markDirty();
+    refreshCanvas();
+  }
+  syncStyleUI();
+}
+
+function syncToolUI() {
+  toolsEl.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+}
+
+function syncStyleUI() {
+  swatchesEl.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.color === style.color));
+  dashSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', (b.dataset.dash === 'true') === style.dash));
+  endSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.end === style.end));
+}
+
+function setHint() {
+  canvasHint.textContent = currentPlay() ? HINTS[tool] : '';
+}
+
+// ---------- Play document management ----------
+
+function makePlay(section) {
+  const play = { id: crypto.randomUUID(), name: 'New Play', chips: {}, routes: [], lines: [], labels: [], balls: [] };
+  const defaults = section === 'defense' ? DEFENSE_DEFAULT_POS : OFFENSE_DEFAULT_POS;
+  for (const k in defaults) play.chips[k] = { x: defaults[k][0], y: defaults[k][1] };
+  if (section === 'offense') {
+    play.lines.push({
+      color: '#1F6E8C', dash: true, width: 10, dashArray: '28 18',
+      points: [[0.0, 0.55], [1.0, 0.55]],
+    });
+  } else {
+    play.balls.push({ x: 0.50, y: 0.90 });
+  }
+  return play;
+}
+
+function normalizePlay(p, section) {
+  const play = {
+    id: typeof p.id === 'string' && p.id ? p.id : crypto.randomUUID(),
+    name: typeof p.name === 'string' ? p.name.slice(0, 60) : 'Untitled',
+    chips: {}, routes: [], lines: [], labels: [], balls: [],
+  };
+  if (p.included === false) play.included = false;  // absent means included
+  const defaults = section === 'defense' ? DEFENSE_DEFAULT_POS : OFFENSE_DEFAULT_POS;
+  for (const k in defaults) {
+    const c = p.chips && p.chips[k];
+    play.chips[k] = {
+      x: c && Number.isFinite(+c.x) ? clamp01(+c.x) : defaults[k][0],
+      y: c && Number.isFinite(+c.y) ? clamp01(+c.y) : defaults[k][1],
+    };
+  }
+  // Drop malformed entries (e.g. a null point) instead of throwing — a bad
+  // stored doc must never make the whole editor unloadable.
+  const normPts = pts => pts
+    .filter(pt => Array.isArray(pt) && pt.length >= 2)
+    .map(pt => [clamp01(+pt[0] || 0), clamp01(+pt[1] || 0)]);
+  if (Array.isArray(p.routes)) for (const r of p.routes) {
+    if (!r || !Array.isArray(r.points)) continue;
+    const rpts = normPts(r.points);
+    if (rpts.length < 2) continue;
+    play.routes.push({
+      chip: typeof r.chip === 'string' ? r.chip : '1',
+      color: typeof r.color === 'string' ? r.color : '#FF0000',
+      dash: !!r.dash,
+      end: ['arrow', 'ball', 'none'].includes(r.end) ? r.end : 'arrow',
+      points: rpts,
+    });
+  }
+  if (Array.isArray(p.lines)) for (const l of p.lines) {
+    if (!l || !Array.isArray(l.points)) continue;
+    const lpts = normPts(l.points);
+    if (lpts.length < 2) continue;
+    const line = {
+      color: typeof l.color === 'string' ? l.color : '#1F6E8C',
+      dash: !!l.dash,
+      end: ['arrow', 'ball', 'none'].includes(l.end) ? l.end : 'none',
+      points: lpts,
+    };
+    if (Number.isFinite(+l.width)) line.width = +l.width;
+    if (typeof l.dashArray === 'string') line.dashArray = l.dashArray.slice(0, 20);
+    play.lines.push(line);
+  }
+  if (Array.isArray(p.labels)) for (const lb of p.labels) {
+    if (!lb || typeof lb.text !== 'string' || !lb.text) continue;
+    play.labels.push({
+      x: clamp01(+lb.x || 0), y: clamp01(+lb.y || 0),
+      text: lb.text.slice(0, 80),
+      color: typeof lb.color === 'string' ? lb.color : '#0070C0',
+      size: Number.isFinite(+lb.size) ? Math.max(0.02, Math.min(0.2, +lb.size)) : 0.055,
+    });
+  }
+  if (Array.isArray(p.balls)) for (const b of p.balls) {
+    if (!b) continue;
+    play.balls.push({ x: clamp01(+b.x || 0), y: clamp01(+b.y || 0) });
+  }
+  return play;
+}
+
+function normalizeDoc(d) {
+  const out = { schema: 1, offense: [], defense: [] };
+  for (const sec of ['offense', 'defense']) {
+    const arr = Array.isArray(d && d[sec]) ? d[sec] : [];
+    const max = sec === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
+    for (const p of arr.slice(0, max)) out[sec].push(normalizePlay(p || {}, sec));
+  }
+  return out;
+}
+
+function firstAvailable() {
+  if (doc.offense.length) return { section: 'offense', index: 0 };
+  if (doc.defense.length) return { section: 'defense', index: 0 };
+  return null;
+}
+
+function openPlay(section, index) {
+  if (drawing) finishDrawing();
+  cur = { section, index };
+  selection = null;
+  nameUndoPushed = false;
+  refreshAll();
+}
+
+function addPlay(section) {
+  if (!doc) return;
+  const max = section === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
+  if (doc[section].length >= max) return;
+  doc[section].push(makePlay(section));
+  markDirty();
+  openPlay(section, doc[section].length - 1);
+}
+
+function duplicatePlay(section, i) {
+  const max = section === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
+  if (doc[section].length >= max) return;
+  const copy = JSON.parse(JSON.stringify(doc[section][i]));
+  copy.id = crypto.randomUUID();
+  copy.name = (copy.name + ' copy').slice(0, 60);
+  doc[section].splice(i + 1, 0, copy);
+  if (cur && cur.section === section && cur.index > i) cur.index++;
+  markDirty();
+  openPlay(section, i + 1);
+}
+
+async function deletePlay(section, i) {
+  const play = doc[section][i];
+  const ok = await showModal({
+    title: 'Delete play',
+    message: 'Delete "' + (play.name || 'Untitled') + '"? This can’t be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+  drawing = null;  // an in-progress route must not commit to a shifted/deleted play
+  doc[section].splice(i, 1);
+  delete undoStacks[play.id];
+  if (cur && cur.section === section) {
+    if (cur.index === i) {
+      cur = doc[section].length ? { section, index: Math.min(i, doc[section].length - 1) } : firstAvailable();
+    } else if (cur.index > i) {
+      cur.index--;
+    }
+  }
+  markDirty();
+  refreshAll();
+}
+
+function movePlay(section, i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= doc[section].length) return;
+  const arr = doc[section];
+  const tmp = arr[i];
+  arr[i] = arr[j];
+  arr[j] = tmp;
+  if (cur && cur.section === section) {
+    if (cur.index === i) cur.index = j;
+    else if (cur.index === j) cur.index = i;
+  }
+  markDirty();
+  refreshAll();
+}
+
+addOffenseBtn.addEventListener('click', () => addPlay('offense'));
+addDefenseBtn.addEventListener('click', () => addPlay('defense'));
+
+// ---------- Sidebar ----------
+
+function renderSidebar() {
+  renderSection('offense', offenseList, offenseHeading, addOffenseBtn, MAX_OFFENSE);
+  renderSection('defense', defenseList, defenseHeading, addDefenseBtn, MAX_DEFENSE);
+}
+
+function renderSection(section, listEl, headEl, addBtn, max) {
+  const arr = doc ? doc[section] : [];
+  const inPlaybook = arr.filter(isIncluded).length;
+  headEl.textContent = section.toUpperCase() + ' (' + inPlaybook + ' in playbook / ' + arr.length + ')';
+  listEl.replaceChildren();
+  let incCounter = 0;  // running included-index → badge number/letter
+  arr.forEach((play, i) => {
+    const included = isIncluded(play);
+    const row = document.createElement('div');
+    row.className = 'play-row'
+      + (cur && cur.section === section && cur.index === i ? ' active' : '')
+      + (included ? '' : ' excluded');
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'inc-check';
+    chk.title = 'In playbook';
+    chk.checked = included;
+    chk.addEventListener('click', e => e.stopPropagation());  // don't open the play
+    chk.addEventListener('change', () => togglePlayIncluded(section, i));
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = !included ? '–'
+      : section === 'defense' ? String.fromCharCode(65 + incCounter) : String(incCounter + 1);
+    if (included) incCounter++;
+    const name = document.createElement('span');
+    name.className = 'pname';
+    name.textContent = play.name || 'Untitled';
+    name.title = play.name || '';
+    const btns = document.createElement('span');
+    btns.className = 'row-btns';
+    const mk = (txt, title, fn, disabled) => {
+      const b = document.createElement('button');
+      b.className = 'icon-btn';
+      b.textContent = txt;
+      b.title = title;
+      b.disabled = !!disabled;
+      b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+      btns.appendChild(b);
+    };
+    mk('↑', 'Move up', () => movePlay(section, i, -1), i === 0);
+    mk('↓', 'Move down', () => movePlay(section, i, 1), i === arr.length - 1);
+    mk('⧉', 'Duplicate', () => duplicatePlay(section, i), arr.length >= max);
+    mk('✕', 'Delete', () => deletePlay(section, i));
+    row.append(chk, badge, name, btns);
+    row.addEventListener('click', () => openPlay(section, i));
+    listEl.appendChild(row);
+  });
+  addBtn.disabled = !doc || arr.length >= max;
+}
+
+function togglePlayIncluded(section, i) {
+  const play = doc && doc[section][i];
+  if (!play) return;
+  if (isIncluded(play)) play.included = false;
+  else delete play.included;  // absent means included — keeps docs minimal
+  markDirty();
+  renderSidebar();   // renumbers every badge in the section + heading counts
+  refreshCanvas();   // the open play's header number can change too
+}
+
+function syncPlayName() {
+  const play = currentPlay();
+  playName.value = play ? play.name : '';
+  playName.disabled = !play;
+}
+
+function refreshAll() {
+  renderSidebar();
+  syncPlayName();
+  refreshCanvas();
+  setHint();
+}
+
+playName.addEventListener('input', () => {
+  const play = currentPlay();
+  if (!play) return;
+  if (!nameUndoPushed) { pushUndo(); nameUndoPushed = true; }
+  play.name = playName.value.slice(0, 60);
+  markDirty();
+  renderSidebar();
+  refreshCanvas();
+});
+playName.addEventListener('blur', () => { nameUndoPushed = false; });
+
+// ---------- Autosave (debounce 1.5s -> PUT /api/plays) ----------
+
+let saveTimer = null;
+let changeCounter = 0;
+let saveState = 'saved';   // 'saved' | 'saving' | 'unsaved'
+
+function updateSaveIndicator(msg) {
+  saveIndicator.className = saveState === 'saved' ? 'saved' : saveState === 'unsaved' ? 'unsaved' : '';
+  saveIndicator.textContent = msg ||
+    (saveState === 'saved' ? 'Saved' : saveState === 'saving' ? 'Saving…' : 'Unsaved changes');
+}
+
+function markDirty() {
+  if (!doc) return;
+  changeCounter++;
+  saveState = 'unsaved';
+  updateSaveIndicator();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveDoc(), 1500);
+}
+
+// Saves are serialized: concurrent callers queue behind the in-flight PUT so a
+// stale body can never land after a newer one.
+let saveChain = Promise.resolve(false);
+
+function saveDoc() {
+  const p = saveChain.then(() => doSave(), () => doSave());
+  saveChain = p;
+  return p;
+}
+
+async function doSave() {
+  if (!doc) return false;
+  clearTimeout(saveTimer);
+  const at = changeCounter;
+  saveState = 'saving';
+  updateSaveIndicator();
+  try {
+    doc.schema = 1;
+    doc.updatedAt = new Date().toISOString();
+    const res = await fetch('/api/plays', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc),
+    });
+    if (res.status === 401) {
+      showAuthView('Your session expired — sign in to keep working.');
+      return false;
+    }
+    if (!res.ok) throw new Error('Save failed');
+    saveState = changeCounter === at ? 'saved' : 'unsaved';
+    updateSaveIndicator();
+    return true;
+  } catch {
+    if (!doc) return false;
+    saveState = 'unsaved';
+    updateSaveIndicator('Save failed — retrying…');
+    saveTimer = setTimeout(() => saveDoc(), 4000);
+    return false;
+  }
+}
+
+saveBtn.addEventListener('click', () => saveDoc());
+
+window.addEventListener('beforeunload', e => {
+  if (doc && saveState !== 'saved') { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ---------- Modal (no window.alert/confirm/prompt) ----------
+
+let modalCloser = null;
+let modalCancelValue = null;
+
+function closeModal(val) {
+  if (modalCloser) modalCloser(val);
+}
+
+function showModal({ title, message, withInput, defaultValue, confirmLabel, danger }) {
+  return new Promise(resolve => {
+    modalCancelValue = withInput ? null : false;
+    modalBox.replaceChildren();
+    const h = document.createElement('h3');
+    h.textContent = title;
+    modalBox.appendChild(h);
+    if (message) {
+      const p = document.createElement('p');
+      p.textContent = message;
+      modalBox.appendChild(p);
+    }
+    let input = null;
+    if (withInput) {
+      input = document.createElement('input');
+      input.maxLength = 80;
+      input.value = defaultValue || '';
+      modalBox.appendChild(input);
+    }
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    const cancel = document.createElement('button');
+    cancel.className = 'mbtn-cancel';
+    cancel.textContent = 'Cancel';
+    const confirm = document.createElement('button');
+    confirm.className = danger ? 'mbtn-danger' : 'mbtn-confirm';
+    confirm.textContent = confirmLabel || 'OK';
+    row.append(cancel, confirm);
+    modalBox.appendChild(row);
+    const close = val => {
+      modalOverlay.classList.remove('active');
+      modalCloser = null;
+      resolve(val);
+    };
+    modalCloser = close;
+    cancel.addEventListener('click', () => close(modalCancelValue));
+    confirm.addEventListener('click', () => close(withInput ? input.value : true));
+    if (input) {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+        else if (e.key === 'Escape') { e.preventDefault(); close(null); }
+      });
+    }
+    modalOverlay.classList.add('active');
+    (input || confirm).focus();
+    if (input) input.select();
+  });
+}
+
+modalOverlay.addEventListener('click', e => {
+  if (e.target === modalOverlay) closeModal(modalCancelValue);
+});
+
+// ---------- PNG export (2152x2000, white background) ----------
+// Renders offscreen from data, so plays not currently open export correctly.
+// `index` is the play's included-index (0-based position among included plays
+// of its section — see includedIndex), or null for an excluded play ('–' header).
+
+async function exportPlayPNG(play, section, index) {
+  const svg = render(play, section, index);
+  svg.setAttribute('width', '2152');
+  svg.setAttribute('height', '2000');
+  const xml = new XMLSerializer().serializeToString(svg);
+  const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = 2152;
+    canvas.height = 2000;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve, reject) =>
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('PNG export failed')), 'image/png'));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ---------- Generate flow ----------
+
+let generating = false;
+let pollTimer = null;
+
+function showProgress(msg) {
+  progressSection.classList.add('active');
+  statusText.textContent = msg;
+}
+
+function showGenError(msg) {
+  genError.textContent = msg;
+  genError.classList.add('active');
+  progressSection.classList.remove('active');
+}
+
+function hideGenError() {
+  genError.classList.remove('active');
+}
+
+generateBtn.addEventListener('click', async () => {
+  if (generating || !doc) return;
+  const options = {
+    offense_coach_card: chkOffenseCoach.checked,
+    offense_wristband: chkOffenseWrist.checked,
+    defense_coach_card: chkDefenseCoach.checked,
+    defense_wristband: chkDefenseWrist.checked,
+  };
+  hideGenError();
+  downloads.classList.remove('active');
+  resetLink.classList.remove('active');
+  if (!options.offense_coach_card && !options.offense_wristband &&
+      !options.defense_coach_card && !options.defense_wristband) {
+    showGenError('Select at least one output');
+    return;
+  }
+  const needOffense = options.offense_coach_card || options.offense_wristband;
+  const needDefense = options.defense_coach_card || options.defense_wristband;
+  // Only plays with the "In playbook" toggle on are exported, numbered by
+  // their included order (excluded plays don't consume a number).
+  const offensePlays = doc.offense.filter(isIncluded);
+  const defensePlays = doc.defense.filter(isIncluded);
+  if (needOffense && !offensePlays.length) {
+    showGenError(doc.offense.length
+      ? 'No offense plays are in the playbook — turn the "In playbook" toggle on for at least one offense play, or uncheck the offense outputs.'
+      : 'Add at least one offense play, or uncheck the offense outputs.');
+    return;
+  }
+  if (needDefense && !defensePlays.length) {
+    showGenError(doc.defense.length
+      ? 'No defense plays are in the playbook — turn the "In playbook" toggle on for at least one defense play, or uncheck the defense outputs.'
+      : 'Add at least one defense play, or uncheck the defense outputs.');
+    return;
+  }
+  generating = true;
+  generateBtn.disabled = true;
+  try {
+    showProgress('Saving…');
+    if (!await saveDoc()) throw new Error('Could not save your playbook');
+    showProgress('Rendering play images…');
+    // Export from a frozen copy: the canvas stays interactive during the async
+    // export loop, and a mid-export edit must not tear the rendered set.
+    const frozenOffense = offensePlays.map(snapshot);
+    const frozenDefense = defensePlays.map(snapshot);
+    const form = new FormData();
+    form.append('options', JSON.stringify(options));
+    if (needOffense) {
+      for (let i = 0; i < frozenOffense.length; i++) {
+        const blob = await exportPlayPNG(frozenOffense[i], 'offense', i);
+        form.append('plays', blob, String(i + 1).padStart(2, '0') + '.png');
+      }
+    }
+    if (needDefense) {
+      for (let i = 0; i < frozenDefense.length; i++) {
+        const blob = await exportPlayPNG(frozenDefense[i], 'defense', i);
+        form.append('plays', blob, 'D' + (i + 1) + '.png');
+      }
+    }
+    showProgress('Uploading play images…');
+    const res = await fetch('/api/generate', { method: 'POST', body: form });
+    if (res.status === 401) {
+      showAuthView('Your session expired — sign in again.');
+      throw new Error('Not signed in');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Generate failed');
+    showProgress('Processing your playbook…');
+    startPolling(data.jobId);
+  } catch (err) {
+    showGenError(err.message);
+    generating = false;
+    generateBtn.disabled = false;
+  }
+});
+
+function startPolling(jobId) {
+  let elapsed = 0;
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    elapsed += 3;
+    try {
+      const res = await fetch('/api/status/' + jobId);
+      const data = await res.json();
+      if (data.status === 'complete') {
+        clearInterval(pollTimer);
+        progressSection.classList.remove('active');
+        showDownloads(jobId, data.files || []);
+        generating = false;
+        generateBtn.disabled = false;
+      } else if (data.status === 'error') {
+        clearInterval(pollTimer);
+        let errText = data.message || 'Processing failed';
+        if (data.detail) errText += '\n\nDetail: ' + data.detail;
+        showGenError(errText);
+        resetLink.classList.add('active');
+        generating = false;
+        generateBtn.disabled = false;
+      } else {
+        const msgs = {
+          downloading: 'Preparing play images…',
+          generating: 'Generating coach cards & wristbands…',
+          uploading: 'Uploading results…',
+        };
+        statusText.textContent = msgs[data.step] || 'Processing… (' + elapsed + 's)';
+      }
+    } catch {
+      statusText.textContent = 'Processing… (' + elapsed + 's)';
+    }
+  }, 3000);
+}
+
+function showDownloads(jobId, files) {
+  dlGrid.replaceChildren();
+  files.forEach(f => {
+    const a = document.createElement('a');
+    a.className = 'dl-btn';
+    a.href = '/api/download/' + jobId + '/' + f;
+    const icon = document.createElement('span');
+    icon.className = 'dl-icon';
+    icon.textContent = FRIENDLY_ICONS[f] || '\u{1F4C4}';
+    a.appendChild(icon);
+    a.appendChild(document.createTextNode(FRIENDLY_NAMES[f] || f));
+    dlGrid.appendChild(a);
+  });
+  downloads.classList.add('active');
+  resetLink.classList.add('active');
+}
+
+resetGenLink.addEventListener('click', () => {
+  downloads.classList.remove('active');
+  resetLink.classList.remove('active');
+  progressSection.classList.remove('active');
+  hideGenError();
+});
+
+// ---------- Auth ----------
+
+function showAuthError(msg) {
+  authError.textContent = msg;
+  authError.classList.add('active');
+}
+
+function hideAuthError() {
+  authError.classList.remove('active');
+}
+
+function showAuthView(msg) {
+  editorView.classList.remove('active');
+  authView.classList.add('active');
+  signOutBtn.style.display = 'none';
+  userEmail.textContent = '';
+  if (msg) showAuthError(msg);
+  else hideAuthError();
+}
+
+let docOwner = null;  // email the in-memory doc was loaded for
+
+function discardLocalDoc() {
+  clearTimeout(saveTimer);
+  doc = null;
+  docOwner = null;
+  cur = null;
+  selection = null;
+  drawing = null;
+  for (const k in undoStacks) delete undoStacks[k];
+}
+
+async function enterEditor(email) {
+  userEmail.textContent = email || '';
+  signOutBtn.style.display = '';
+  authView.classList.remove('active');
+  editorView.classList.add('active');
+  hideAuthError();
+  if (doc && saveState !== 'saved' && docOwner === email) {
+    // Same user re-authenticated with unsaved local work: keep it and push it up.
+    saveDoc();
+    refreshAll();
+    return;
+  }
+  // Anything held locally belongs to a different account (or nobody) — drop it
+  // rather than risk writing one user's playbook into another's account.
+  discardLocalDoc();
+  let data = null;
+  try {
+    const res = await fetch('/api/plays');
+    if (res.status === 401) { showAuthView(); return; }
+    if (!res.ok) throw new Error('load failed');
+    data = await res.json();
+  } catch {
+    // Fail closed: editing an empty doc here would let autosave overwrite the
+    // account's stored playbook.
+    showAuthView('Could not load your playbook — check your connection and sign in again.');
+    return;
+  }
+  doc = normalizeDoc(data || {});
+  docOwner = email;
+  saveState = 'saved';
+  updateSaveIndicator();
+  cur = firstAvailable();
+  refreshAll();
+}
+
+async function authSubmit(path) {
+  const email = authEmail.value.trim().toLowerCase();
+  const password = authPassword.value;
+  hideAuthError();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAuthError('Enter a valid email address'); return; }
+  if (!password) { showAuthError('Enter your password'); return; }
+  if (path.endsWith('register') && password.length < 8) {
+    showAuthError('Password must be at least 8 characters');
+    return;
+  }
+  loginBtn.disabled = registerBtn.disabled = true;
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Sign-in failed');
+    authPassword.value = '';
+    await enterEditor(data.email || email);
+  } catch (err) {
+    showAuthError(err.message);
+  } finally {
+    loginBtn.disabled = registerBtn.disabled = false;
+  }
+}
+
+loginBtn.addEventListener('click', () => authSubmit('/api/auth/login'));
+registerBtn.addEventListener('click', () => authSubmit('/api/auth/register'));
+authPassword.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.click(); });
+authEmail.addEventListener('keydown', e => { if (e.key === 'Enter') authPassword.focus(); });
+
+signOutBtn.addEventListener('click', async () => {
+  if (doc && saveState !== 'saved') {
+    const ok = await saveDoc();
+    if (!ok) {
+      const anyway = await showModal({
+        title: 'Unsaved changes',
+        message: "Your latest edits couldn't be saved. Sign out anyway and lose them?",
+        confirmLabel: 'Sign out',
+        danger: true,
+      });
+      if (!anyway) return;
+    }
+  }
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
+  discardLocalDoc();
+  showAuthView();
+});
+
+// ---------- Init ----------
+
+syncToolUI();
+syncStyleUI();
+
+(async function init() {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      await enterEditor(data.email);
+      return;
+    }
+  } catch { /* fall through */ }
+  showAuthView();
+})();
+</script>
+
+</body>
+</html>

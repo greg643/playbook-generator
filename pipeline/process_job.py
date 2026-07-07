@@ -2,7 +2,8 @@
 """
 GitHub Actions job orchestrator.
 
-Downloads a PPTX from R2, runs the playbook pipeline, uploads PDFs back to R2.
+Downloads job input from R2 (an uploaded PPTX, or play PNGs exported by the
+web editor in images mode), runs the playbook pipeline, uploads PDFs back to R2.
 
 Usage:
     python pipeline/process_job.py <job_id>
@@ -14,6 +15,7 @@ Environment variables:
 import os
 import sys
 import json
+import time
 import tempfile
 import traceback
 from pathlib import Path
@@ -32,14 +34,37 @@ def get_r2_client():
     )
 
 
-def update_status(s3, bucket, job_id, status_dict):
-    """Write status.json to R2."""
+def update_status(s3, bucket, job_id, status_dict, request_fields=None):
+    """Write status.json to R2, preserving the original job request fields
+    (mode/options/createdAt) so a re-run of the job still knows what it is."""
+    body = {**(request_fields or {}), **status_dict}
     s3.put_object(
         Bucket=bucket,
         Key=f"{job_id}/status.json",
-        Body=json.dumps(status_dict),
+        Body=json.dumps(body),
         ContentType="application/json",
     )
+
+
+def download_play_images(s3, bucket, job_id, plays_dir):
+    """Download every object under <job_id>/plays/ from R2 (paginated)."""
+    count = 0
+    list_kwargs = {"Bucket": bucket, "Prefix": f"{job_id}/plays/"}
+    while True:
+        listing = s3.list_objects_v2(**list_kwargs)
+        for obj in listing.get("Contents", []):
+            name = obj["Key"].rsplit("/", 1)[-1]
+            if not name:
+                continue
+            dest = plays_dir / name
+            s3.download_file(bucket, obj["Key"], str(dest))
+            print(f"  Downloaded {name} ({dest.stat().st_size} bytes)")
+            count += 1
+        if listing.get("IsTruncated"):
+            list_kwargs["ContinuationToken"] = listing["NextContinuationToken"]
+        else:
+            break
+    return count
 
 
 def main():
@@ -53,70 +78,130 @@ def main():
 
     print(f"Processing job: {job_id}")
 
+    request_fields = {}
     try:
+        # Read the job request first: the status update below overwrites
+        # status.json, and the editor flow stores mode + options there.
+        # Retry transient failures rather than misrouting an images job
+        # into the PPTX path on a blip.
+        request_data = None
+        for attempt in range(3):
+            try:
+                request_obj = s3.get_object(Bucket=bucket, Key=f"{job_id}/status.json")
+                request_data = json.loads(request_obj["Body"].read())
+                break
+            except s3.exceptions.NoSuchKey:
+                request_data = {}  # genuinely absent (legacy job): PPTX defaults
+                break
+            except Exception as e:
+                print(f"  status.json pre-read attempt {attempt + 1} failed: {e}")
+                time.sleep(2 * (attempt + 1))
+        if request_data is None:
+            raise RuntimeError("Could not read the job request (status.json) from R2")
+        request_fields = {k: request_data[k] for k in ("mode", "options", "createdAt") if k in request_data}
+        mode = request_data.get("mode", "pptx")
+        print(f"Job mode: {mode}")
+
         # Update status to processing
-        update_status(s3, bucket, job_id, {"status": "processing", "step": "downloading"})
+        update_status(s3, bucket, job_id, {"status": "processing", "step": "downloading"}, request_fields)
 
         # Create temporary working directory
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
-            pptx_path = tmpdir / "input.pptx"
             output_dir = tmpdir / "output"
             output_dir.mkdir()
 
-            # Read options from status.json
-            print("Reading job options from R2...")
-            status_obj = s3.get_object(Bucket=bucket, Key=f"{job_id}/status.json")
-            status_data = json.loads(status_obj["Body"].read())
-            options = status_data.get("options", {})
-            # Support both old-style (offense/defense booleans) and new-style (4 granular outputs)
-            offense_coach_card = options.get("offense_coach_card", options.get("offense", True))
-            offense_wristband = options.get("offense_wristband", options.get("offense", True))
-            defense_coach_card = options.get("defense_coach_card", options.get("defense", True))
-            defense_wristband = options.get("defense_wristband", options.get("defense", True))
-            gen_offense = offense_coach_card or offense_wristband
-            gen_defense = defense_coach_card or defense_wristband
-            sections = "both" if (gen_offense and gen_defense) else ("offense" if gen_offense else "defense")
-            print(f"  Outputs: offense_coach_card={offense_coach_card}, offense_wristband={offense_wristband}, "
-                  f"defense_coach_card={defense_coach_card}, defense_wristband={defense_wristband}")
+            if mode == "images":
+                # Editor flow: play PNGs were uploaded to <job_id>/plays/ by /api/generate
+                options = request_data.get("options", {})
+                offense_coach_card = options.get("offense_coach_card", options.get("offense", True))
+                offense_wristband = options.get("offense_wristband", options.get("offense", True))
+                defense_coach_card = options.get("defense_coach_card", options.get("defense", True))
+                defense_wristband = options.get("defense_wristband", options.get("defense", True))
+                gen_offense = offense_coach_card or offense_wristband
+                gen_defense = defense_coach_card or defense_wristband
+                print(f"  Outputs: offense_coach_card={offense_coach_card}, offense_wristband={offense_wristband}, "
+                      f"defense_coach_card={defense_coach_card}, defense_wristband={defense_wristband}")
 
-            # Download PPTX from R2
-            print("Downloading PPTX from R2...")
-            s3.download_file(bucket, f"{job_id}/input.pptx", str(pptx_path))
-            print(f"  Downloaded {pptx_path.stat().st_size} bytes")
+                # Download play images from R2
+                print("Downloading play images from R2...")
+                plays_dir = tmpdir / "plays"
+                plays_dir.mkdir()
+                count = download_play_images(s3, bucket, job_id, plays_dir)
+                if count == 0:
+                    raise RuntimeError("No play images found for this job")
 
-            # Run the pipeline
-            update_status(s3, bucket, job_id, {"status": "processing", "step": "generating"})
+                # Generate PDFs straight from the play images (no LibreOffice step)
+                update_status(s3, bucket, job_id, {"status": "processing", "step": "generating"}, request_fields)
 
-            # Import and run pipeline from the same package
-            pipeline_dir = Path(__file__).parent
-            sys.path.insert(0, str(pipeline_dir))
-            from playbook_pipeline import main as pipeline_main
+                pipeline_dir = Path(__file__).parent
+                sys.path.insert(0, str(pipeline_dir))
+                from playbook_pipeline import PlaybookGenerator
 
-            # Build the list of selected outputs
-            selected = []
-            if offense_coach_card: selected.append("offense_coach_card")
-            if offense_wristband: selected.append("offense_wristband")
-            if defense_coach_card: selected.append("defense_coach_card")
-            if defense_wristband: selected.append("defense_wristband")
+                generator = PlaybookGenerator(str(plays_dir), str(output_dir))
+                generator.generate_all(
+                    gen_offense=gen_offense,
+                    gen_defense=gen_defense,
+                    offense_coach_card=offense_coach_card,
+                    offense_wristband=offense_wristband,
+                    defense_coach_card=defense_coach_card,
+                    defense_wristband=defense_wristband,
+                )
+            else:
+                pptx_path = tmpdir / "input.pptx"
 
-            # Override sys.argv for the pipeline
-            original_argv = sys.argv
-            sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir),
-                         "--sections", sections, "--outputs", ",".join(selected)]
+                # Use the pre-read job request: the "processing" status write above
+                # replaced status.json, so re-reading it here would lose the options
+                # (that re-read bug silently ignored output selections until now).
+                options = request_data.get("options", {})
+                # Support both old-style (offense/defense booleans) and new-style (4 granular outputs)
+                offense_coach_card = options.get("offense_coach_card", options.get("offense", True))
+                offense_wristband = options.get("offense_wristband", options.get("offense", True))
+                defense_coach_card = options.get("defense_coach_card", options.get("defense", True))
+                defense_wristband = options.get("defense_wristband", options.get("defense", True))
+                gen_offense = offense_coach_card or offense_wristband
+                gen_defense = defense_coach_card or defense_wristband
+                sections = "both" if (gen_offense and gen_defense) else ("offense" if gen_offense else "defense")
+                print(f"  Outputs: offense_coach_card={offense_coach_card}, offense_wristband={offense_wristband}, "
+                      f"defense_coach_card={defense_coach_card}, defense_wristband={defense_wristband}")
 
-            # Change to tmpdir so _playbook_work is created there
-            original_cwd = os.getcwd()
-            os.chdir(str(tmpdir))
+                # Download PPTX from R2
+                print("Downloading PPTX from R2...")
+                s3.download_file(bucket, f"{job_id}/input.pptx", str(pptx_path))
+                print(f"  Downloaded {pptx_path.stat().st_size} bytes")
 
-            try:
-                pipeline_main()
-            finally:
-                os.chdir(original_cwd)
-                sys.argv = original_argv
+                # Run the pipeline
+                update_status(s3, bucket, job_id, {"status": "processing", "step": "generating"}, request_fields)
+
+                # Import and run pipeline from the same package
+                pipeline_dir = Path(__file__).parent
+                sys.path.insert(0, str(pipeline_dir))
+                from playbook_pipeline import main as pipeline_main
+
+                # Build the list of selected outputs
+                selected = []
+                if offense_coach_card: selected.append("offense_coach_card")
+                if offense_wristband: selected.append("offense_wristband")
+                if defense_coach_card: selected.append("defense_coach_card")
+                if defense_wristband: selected.append("defense_wristband")
+
+                # Override sys.argv for the pipeline
+                original_argv = sys.argv
+                sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir),
+                             "--sections", sections, "--outputs", ",".join(selected)]
+
+                # Change to tmpdir so _playbook_work is created there
+                original_cwd = os.getcwd()
+                os.chdir(str(tmpdir))
+
+                try:
+                    pipeline_main()
+                finally:
+                    os.chdir(original_cwd)
+                    sys.argv = original_argv
 
             # Upload PDFs to R2
-            update_status(s3, bucket, job_id, {"status": "processing", "step": "uploading"})
+            update_status(s3, bucket, job_id, {"status": "processing", "step": "uploading"}, request_fields)
 
             pdf_files = sorted(output_dir.glob("*.pdf"))
             uploaded = []
@@ -139,7 +224,7 @@ def main():
             update_status(s3, bucket, job_id, {
                 "status": "complete",
                 "files": uploaded,
-            })
+            }, request_fields)
             print(f"Job {job_id} complete. Uploaded: {uploaded}")
 
     except Exception as e:
@@ -157,6 +242,8 @@ def main():
             friendly = "Could not convert the PowerPoint file to PDF. Please check the file is a valid .pptx."
         elif "no field rectangle" in str(e).lower():
             friendly = "Could not detect play diagrams in the playbook. Make sure slides have rectangle shapes marking the field area."
+        elif "no play images" in str(e).lower():
+            friendly = "No play images were found for this job. Please try generating again from the editor."
         elif "No slide images" in str(e) or "no PDF files" in str(e).lower():
             friendly = "Pipeline produced no output. The playbook may not have recognizable offense/defense sections."
         else:
@@ -167,7 +254,7 @@ def main():
                 "status": "error",
                 "message": friendly,
                 "detail": error_msg,
-            })
+            }, request_fields)
         except Exception:
             print("Failed to update error status in R2")
         sys.exit(1)

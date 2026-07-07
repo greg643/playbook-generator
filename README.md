@@ -19,6 +19,17 @@ Browser → Cloudflare Pages (static HTML)
         → CF Worker /api/download/[id]/[file] → serves PDFs from R2
 ```
 
+## Play Editor
+
+Browser-based editor at `/editor` — sign in, build plays directly (drag the fixed player chips, draw routes/lines/labels), and generate the same four PDFs without PowerPoint.
+
+- **Auth**: email + password. Passwords hashed with PBKDF2-SHA256 (per-user salt, 100k iterations); sessions are HMAC-signed cookies (`pb_session`, 30 days). The signing secret is auto-created in R2 at `auth/secret` on first use — no setup required.
+- **R2 keys**:
+  - `auth/secret` — session signing secret
+  - `users/byemail/<sha256(email)>.json` — credential record (userId, salt, hash)
+  - `accounts/<userId>/playbook.json` — the user's saved plays (JSON)
+- **Images-mode jobs**: the editor exports each play to PNG (`01.png`–`16.png` offense, `D1.png`–`D6.png` defense) and `POST /api/generate` stores them at `<jobId>/plays/` with `mode: "images"` in status.json. The same GitHub Actions job downloads the PNGs and runs the same `PlaybookGenerator`, producing identical PDFs — no LibreOffice step. Status polling and downloads reuse the existing endpoints.
+
 ## Local development
 
 ```bash

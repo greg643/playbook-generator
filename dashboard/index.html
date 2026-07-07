@@ -175,6 +175,21 @@
     }
     .error-msg.active { display: block; }
 
+    /* Editor link */
+    .editor-link {
+      display: inline-block;
+      margin: -1.4rem 0 1.8rem;
+      padding: 0.3rem 0.85rem;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      color: #58a6ff;
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .editor-link:hover { border-color: #58a6ff; }
+
     /* Reset link */
     .reset-link {
       display: none;
@@ -195,6 +210,7 @@
 
   <h1>Playbook Generator</h1>
   <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
+  <a class="editor-link" href="/editor">&#9999;&#65039; Play Editor (beta)</a>
 
   <div class="card">
     <div class="drop-zone" id="dropZone">
