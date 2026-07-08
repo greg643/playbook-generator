@@ -552,7 +552,11 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VB_W = 1076, VB_H = 1000, HEADER_H = 170;
 const FIELD_X = 8, FIELD_W = 1060, FIELD_H = 822;
-const MAX_OFFENSE = 16, MAX_DEFENSE = 6;
+// Storage caps — how many plays an account can keep (active + archive). The
+// playbook itself (included plays) is separately capped at generate time:
+// 16 offense / 6 defense, the most the printed cards can hold.
+const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
+const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
 
 const OFFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'QB'];
 const DEFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'N'];
@@ -1953,6 +1957,16 @@ generateBtn.addEventListener('click', async () => {
     showGenError(doc.defense.length
       ? 'No defense plays are in the playbook — turn the "In playbook" toggle on for at least one defense play, or uncheck the defense outputs.'
       : 'Add at least one defense play, or uncheck the defense outputs.');
+    return;
+  }
+  if (needOffense && offensePlays.length > MAX_INCLUDED_OFFENSE) {
+    showGenError('The printed cards hold at most ' + MAX_INCLUDED_OFFENSE + ' offense plays — ' +
+      offensePlays.length + ' are in the playbook. Toggle some out and try again.');
+    return;
+  }
+  if (needDefense && defensePlays.length > MAX_INCLUDED_DEFENSE) {
+    showGenError('The printed cards hold at most ' + MAX_INCLUDED_DEFENSE + ' defense plays — ' +
+      defensePlays.length + ' are in the playbook. Toggle some out and try again.');
     return;
   }
   generating = true;
