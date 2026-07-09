@@ -55,7 +55,7 @@ ROUTE_ATTACH_EMU = 500000      # chip-attach radius (~1.4 chip radii); farther =
 BALL_TIP_FRAC = 0.06           # football within this fraction of field diagonal of a tip
 INK_MARKER_DIAG_FRAC = 0.055   # ink stroke smaller than this = arrowhead scribble
 INK_MARKER_ATTACH_FRAC = 0.08  # marker attaches to a body endpoint within this
-MAX_ROUTE_POINTS = 10
+MAX_ROUTE_POINTS = 18
 
 THEME_ALIAS = {'tx1': 'dk1', 'bg1': 'lt1', 'tx2': 'dk2', 'bg2': 'lt2'}
 
@@ -207,28 +207,45 @@ def transform_local_points(pts, cx, cy, flip_h, flip_v, rot_deg, left, top, xf):
     return out
 
 
-def downsample(pts, max_n=MAX_ROUTE_POINTS):
-    """Uniform arc-length downsample keeping both endpoints."""
+def _perp_dist(p, a, b):
+    """Perpendicular distance from p to segment a-b."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    l2 = dx * dx + dy * dy
+    if l2 == 0:
+        return dist(p, a)
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2))
+    return dist(p, (a[0] + t * dx, a[1] + t * dy))
+
+
+def _rdp(pts, eps):
+    """Ramer-Douglas-Peucker: keeps high-curvature points (hooks, curls)
+    that uniform arc-length sampling flattens away."""
+    if len(pts) < 3:
+        return list(pts)
+    dmax, idx = 0.0, 0
+    for i in range(1, len(pts) - 1):
+        d = _perp_dist(pts[i], pts[0], pts[-1])
+        if d > dmax:
+            dmax, idx = d, i
+    if dmax <= eps:
+        return [pts[0], pts[-1]]
+    left = _rdp(pts[:idx + 1], eps)
+    right = _rdp(pts[idx:], eps)
+    return left[:-1] + right
+
+
+def downsample(pts, max_n=MAX_ROUTE_POINTS, eps_hint=None):
+    """Curvature-preserving simplification (RDP), escalating tolerance
+    until the point budget fits. Keeps both endpoints."""
     if len(pts) <= max_n:
         return list(pts)
-    cum = [0.0]
-    for i in range(1, len(pts)):
-        cum.append(cum[-1] + dist(pts[i - 1], pts[i]))
-    total = cum[-1]
-    if total <= 0:
-        return [pts[0], pts[-1]]
-    out = [pts[0]]
-    j = 0
-    for k in range(1, max_n - 1):
-        target = total * k / (max_n - 1)
-        while j < len(cum) - 1 and cum[j + 1] < target:
-            j += 1
-        seg = cum[j + 1] - cum[j]
-        t = (target - cum[j]) / seg if seg > 0 else 0.0
-        x = pts[j][0] + (pts[j + 1][0] - pts[j][0]) * t
-        y = pts[j][1] + (pts[j + 1][1] - pts[j][1]) * t
-        out.append((x, y))
-    out.append(pts[-1])
+    span = max(max(p[0] for p in pts) - min(p[0] for p in pts),
+               max(p[1] for p in pts) - min(p[1] for p in pts)) or 1.0
+    eps = eps_hint if eps_hint else span * 0.008
+    out = _rdp(list(pts), eps)
+    while len(out) > max_n:
+        eps *= 1.6
+        out = _rdp(list(pts), eps)
     return out
 
 

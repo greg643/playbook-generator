@@ -739,19 +739,92 @@ function nearestSegmentIndex(pts, x, y, maxDist) {
   return best;
 }
 
-function arrowHeadEl(pts, color) {
-  const n = pts.length;
-  if (n < 2) return null;
-  const x1 = pts[n - 2][0], y1 = pts[n - 2][1], x2 = pts[n - 1][0], y2 = pts[n - 1][1];
-  const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-  const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+const ARROW_LEN = 44, ARROW_HW = 17;
+
+// Direction of the path as it arrives at its tip, measured over a span long
+// enough to ignore degenerate final stubs (imported/downsampled points).
+function tailDirection(pts, span) {
+  const tip = pts[pts.length - 1];
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const d = Math.hypot(tip[0] - pts[i][0], tip[1] - pts[i][1]);
+    if (d >= span) return [(tip[0] - pts[i][0]) / d, (tip[1] - pts[i][1]) / d];
+  }
+  const a = pts[0];
+  const d = Math.hypot(tip[0] - a[0], tip[1] - a[1]) || 1;
+  return [(tip[0] - a[0]) / d, (tip[1] - a[1]) / d];
+}
+
+// Copy of pts with the last `cut` units of arc length removed, so the stroke
+// stops at the arrowhead's base instead of poking past its tip.
+function trimTail(pts, cut) {
+  let rem = cut;
+  const out = pts.map(p => [p[0], p[1]]);
+  while (out.length >= 2) {
+    const a = out[out.length - 2], b = out[out.length - 1];
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (d > rem) {
+      const t = (d - rem) / d;
+      out[out.length - 1] = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      return out;
+    }
+    rem -= d;
+    out.pop();
+  }
+  return pts;
+}
+
+function polylineLength(pts) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  return L;
+}
+
+function arrowHeadAt(tip, dir, color) {
+  const [ux, uy] = dir;
   const px = -uy, py = ux;
-  const L = 44, HW = 17;
-  const bx = x2 - ux * L, by = y2 - uy * L;
+  const bx = tip[0] - ux * ARROW_LEN, by = tip[1] - uy * ARROW_LEN;
   return svgEl('polygon', {
-    points: x2 + ',' + y2 + ' ' + (bx + px * HW) + ',' + (by + py * HW) + ' ' + (bx - px * HW) + ',' + (by - py * HW),
+    points: tip[0] + ',' + tip[1] + ' ' + (bx + px * ARROW_HW) + ',' + (by + py * ARROW_HW) + ' ' + (bx - px * ARROW_HW) + ',' + (by - py * ARROW_HW),
     fill: color,
   });
+}
+
+// Dense sampling of the smoothed curve — used for rendering (so trims and
+// arrow directions follow the curve the user actually sees) and hit-testing.
+function densifyForRender(pts) {
+  if (pts.length < 3) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p0 = out[out.length - 1];
+    const c = pts[i];
+    const p2 = [(pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2];
+    for (let s = 1; s <= 8; s++) {
+      const t = s / 8, u = 1 - t;
+      out.push([
+        u * u * p0[0] + 2 * u * t * c[0] + t * t * p2[0],
+        u * u * p0[1] + 2 * u * t * c[1] + t * t * p2[1],
+      ]);
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+// Stroke + optional end decoration for a route or line. PowerPoint-style
+// arrows: the stroke ends at the head's base, the head's tip sits exactly on
+// the final point, aligned with the arriving curve.
+function appendStrokeWithEnd(parent, pts, { color, width, dash, dashArray, end, corner }) {
+  const base = corner === 'sharp' ? pts : densifyForRender(pts);
+  let drawPts = base;
+  if (end === 'arrow' && polylineLength(base) > ARROW_LEN * 1.5) {
+    drawPts = trimTail(base, ARROW_LEN - 6);
+  }
+  parent.appendChild(strokePathEl(straightPath(drawPts), color, width, dash, dashArray));
+  if (end === 'arrow') {
+    parent.appendChild(arrowHeadAt(base[base.length - 1], tailDirection(base, 40), color));
+  } else if (end === 'ball') {
+    parent.appendChild(footballGlyph(base[base.length - 1][0], base[base.length - 1][1]));
+  }
 }
 
 function footballGlyph(x, y) {
@@ -799,27 +872,20 @@ function render(play, section, playIndex) {
   for (const ln of play.lines || []) {
     if (!Array.isArray(ln.points) || ln.points.length < 2) continue;
     const pts = ln.points.map(p => [fx(p[0]), fy(p[1])]);
-    content.appendChild(strokePathEl(
-      (ln.corner === 'smooth' ? smoothPath : straightPath)(pts),
-      ln.color || '#1F6E8C', ln.width || 13, ln.dash, ln.dashArray));
-    if (ln.end === 'arrow') {
-      const head = arrowHeadEl(pts, ln.color || '#1F6E8C');
-      if (head) content.appendChild(head);
-    } else if (ln.end === 'ball') {
-      content.appendChild(footballGlyph(pts[pts.length - 1][0], pts[pts.length - 1][1]));
-    }
+    appendStrokeWithEnd(content, pts, {
+      color: ln.color || '#1F6E8C', width: ln.width || 13,
+      dash: ln.dash, dashArray: ln.dashArray,
+      end: ln.end, corner: ln.corner === 'smooth' ? 'smooth' : 'sharp',
+    });
   }
 
   for (const rt of play.routes || []) {
     const pts = routeFieldPoints(play, rt);
     if (pts.length < 2) continue;
-    content.appendChild(strokePathEl((rt.corner === 'sharp' ? straightPath : smoothPath)(pts), rt.color || '#FF0000', 13, rt.dash));
-    if (rt.end === 'arrow') {
-      const head = arrowHeadEl(pts, rt.color || '#FF0000');
-      if (head) content.appendChild(head);
-    } else if (rt.end === 'ball') {
-      content.appendChild(footballGlyph(pts[pts.length - 1][0], pts[pts.length - 1][1]));
-    }
+    appendStrokeWithEnd(content, pts, {
+      color: rt.color || '#FF0000', width: 13, dash: rt.dash,
+      end: rt.end, corner: rt.corner === 'sharp' ? 'sharp' : 'smooth',
+    });
   }
 
   for (const b of play.balls || []) content.appendChild(footballGlyph(fx(b.x), fy(b.y)));
@@ -1080,22 +1146,7 @@ function hitLabel(play, x, y) {
 // polyline, so hit-test against the same curve the user sees: sample the
 // midpoint-quadratic spline into a dense polyline first.
 function densifyForHit(pts) {
-  if (pts.length < 3) return pts;
-  const out = [pts[0]];
-  for (let i = 1; i < pts.length - 1; i++) {
-    const p0 = out[out.length - 1];
-    const c = pts[i];
-    const p2 = [(pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2];
-    for (const t of [0.25, 0.5, 0.75, 1]) {
-      const u = 1 - t;
-      out.push([
-        u * u * p0[0] + 2 * u * t * c[0] + t * t * p2[0],
-        u * u * p0[1] + 2 * u * t * c[1] + t * t * p2[1],
-      ]);
-    }
-  }
-  out.push(pts[pts.length - 1]);
-  return out;
+  return densifyForRender(pts);
 }
 
 function hitRoute(play, x, y) {
