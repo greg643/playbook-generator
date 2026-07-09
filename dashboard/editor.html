@@ -402,7 +402,7 @@
     }
     .modal h3 { font-size: 0.95rem; color: #fff; margin-bottom: 0.6rem; }
     .modal p { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.6rem; word-break: break-word; }
-    .modal input {
+    .modal input, .modal textarea {
       width: 100%;
       background: #0d1117;
       border: 1px solid #30363d;
@@ -410,8 +410,11 @@
       padding: 0.5rem 0.65rem;
       color: #e1e4e8;
       font-size: 0.9rem;
+      font-family: inherit;
+      resize: vertical;
     }
-    .modal input:focus { outline: none; border-color: #58a6ff; }
+    .modal input:focus, .modal textarea:focus { outline: none; border-color: #58a6ff; }
+    .modal .input-hint { font-size: 0.72rem; color: #8b949e; margin-top: 0.3rem; }
     .modal .btn-row { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
     .modal .btn-row button {
       padding: 0.45rem 0.9rem;
@@ -503,6 +506,10 @@
         <button data-end="arrow">Arrow</button>
         <button data-end="ball">Ball</button>
         <button data-end="none">None</button>
+      </div>
+      <div class="seg" id="cornerSeg" title="Corner style: smooth curves or sharp cuts">
+        <button data-corner="smooth">Smooth</button>
+        <button data-corner="sharp">Sharp</button>
       </div>
 
       <div class="tb-label">Save</div>
@@ -632,6 +639,37 @@ function svgTextEl(x, y, str, size, fill, weight) {
   return t;
 }
 
+// Split label text into lines that fit maxWidth (respects explicit newlines,
+// then wraps on spaces; a single overlong word is kept whole).
+function wrapLabelLines(text, size, weight, maxWidth) {
+  const lines = [];
+  for (const para of String(text).split('\n')) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) continue;
+    let line = words[0];
+    for (const w of words.slice(1)) {
+      if (textWidth(line + ' ' + w, size, weight) <= maxWidth) line += ' ' + w;
+      else { lines.push(line); line = w; }
+    }
+    lines.push(line);
+  }
+  return lines.length ? lines : [''];
+}
+
+// Multi-line label block centered on (x,y), auto-wrapped so it stays inside
+// the field horizontally. Returns { el, lines, lineHeight }.
+function labelBlockEl(x, y, str, size, fill, weight) {
+  const pad = 12;
+  // Widest a centered block can be without crossing the field edges.
+  const maxWidth = Math.max(120, 2 * Math.min(x - (8 + pad), (VB_W - 8 - pad) - x));
+  const lines = wrapLabelLines(str, size, weight, maxWidth);
+  const lineHeight = size * 1.15;
+  const g = svgEl('g', {});
+  const y0 = y - ((lines.length - 1) / 2) * lineHeight;
+  lines.forEach((ln, i) => g.appendChild(svgTextEl(x, y0 + i * lineHeight, ln, size, fill, weight)));
+  return { el: g, lines, lineHeight };
+}
+
 const measureCtx = document.createElement('canvas').getContext('2d');
 
 function textWidth(text, size, weight) {
@@ -748,7 +786,8 @@ function render(play, section, playIndex) {
     if (!Array.isArray(ln.points) || ln.points.length < 2) continue;
     const pts = ln.points.map(p => [fx(p[0]), fy(p[1])]);
     content.appendChild(strokePathEl(
-      straightPath(pts), ln.color || '#1F6E8C', ln.width || 13, ln.dash, ln.dashArray));
+      (ln.corner === 'smooth' ? smoothPath : straightPath)(pts),
+      ln.color || '#1F6E8C', ln.width || 13, ln.dash, ln.dashArray));
     if (ln.end === 'arrow') {
       const head = arrowHeadEl(pts, ln.color || '#1F6E8C');
       if (head) content.appendChild(head);
@@ -760,7 +799,7 @@ function render(play, section, playIndex) {
   for (const rt of play.routes || []) {
     const pts = routeFieldPoints(play, rt);
     if (pts.length < 2) continue;
-    content.appendChild(strokePathEl(smoothPath(pts), rt.color || '#FF0000', 13, rt.dash));
+    content.appendChild(strokePathEl((rt.corner === 'sharp' ? straightPath : smoothPath)(pts), rt.color || '#FF0000', 13, rt.dash));
     if (rt.end === 'arrow') {
       const head = arrowHeadEl(pts, rt.color || '#FF0000');
       if (head) content.appendChild(head);
@@ -773,7 +812,7 @@ function render(play, section, playIndex) {
 
   for (const lb of play.labels || []) {
     const size = (lb.size || 0.055) * FIELD_H;
-    content.appendChild(svgTextEl(fx(lb.x), fy(lb.y), lb.text || '', size, lb.color || '#0070C0', 700));
+    content.appendChild(labelBlockEl(fx(lb.x), fy(lb.y), lb.text || '', size, lb.color || '#0070C0', 700).el);
   }
 
   const chipSpec = section === 'defense' ? DEFENSE_CHIPS : OFFENSE_CHIPS;
@@ -830,7 +869,7 @@ const drawActions = $('drawActions');
 $('finishDrawBtn').addEventListener('click', () => finishDrawing());
 $('cancelDrawBtn').addEventListener('click', () => { drawing = null; refreshCanvas(); });
 const playName = $('playName'), toolsEl = $('tools'), swatchesEl = $('swatches');
-const dashSeg = $('dashSeg'), endSeg = $('endSeg');
+const dashSeg = $('dashSeg'), endSeg = $('endSeg'), cornerSeg = $('cornerSeg');
 const undoBtn = $('undoBtn'), redoBtn = $('redoBtn');
 const saveBtn = $('saveBtn'), saveIndicator = $('saveIndicator');
 const chkOffenseCoach = $('chkOffenseCoach'), chkOffenseWrist = $('chkOffenseWrist');
@@ -845,7 +884,7 @@ const modalOverlay = $('modalOverlay'), modalBox = $('modalBox');
 let doc = null;                 // {schema, offense:[], defense:[]}
 let cur = null;                 // {section, index} of the open play
 let tool = 'select';
-let style = { color: '#FF0000', dash: false, end: 'arrow' };
+let style = { color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth' };
 let selection = null;           // {kind:'route'|'line'|'label'|'ball', index}
 let drawing = null;             // in-progress route/line
 let drag = null;
@@ -952,9 +991,14 @@ function drawOverlay() {
     const lb = play.labels[selection.index];
     if (lb) {
       const size = (lb.size || 0.055) * FIELD_H;
-      const w = textWidth(lb.text || '', size, 700) + 28, h = size + 24;
+      const pad = 12;
+      const lx = fx(lb.x);
+      const maxWidth = Math.max(120, 2 * Math.min(lx - (8 + pad), (VB_W - 8 - pad) - lx));
+      const lines = wrapLabelLines(lb.text || '', size, 700, maxWidth);
+      const w = Math.max(...lines.map(ln => textWidth(ln, size, 700))) + 28;
+      const h = lines.length * size * 1.15 + 24;
       ov.appendChild(svgEl('rect', {
-        x: fx(lb.x) - w / 2, y: fy(lb.y) - h / 2, width: w, height: h, rx: 6,
+        x: lx - w / 2, y: fy(lb.y) - h / 2, width: w, height: h, rx: 6,
         fill: 'none', stroke: '#58a6ff', 'stroke-width': 4, 'stroke-dasharray': '10 8',
       }));
     }
@@ -962,7 +1006,7 @@ function drawOverlay() {
   if (drawing) {
     const pts = drawingFieldPoints();
     if (pts.length >= 2) {
-      const d = drawing.kind === 'route' ? smoothPath(pts) : straightPath(pts);
+      const d = (drawing.kind === 'route' ? style.corner !== 'sharp' : style.corner === 'smooth') ? smoothPath(pts) : straightPath(pts);
       const p = strokePathEl(d, style.color, 13, style.dash);
       p.setAttribute('opacity', '0.65');
       ov.appendChild(p);
@@ -1020,9 +1064,14 @@ function hitLabel(play, x, y) {
   for (let i = play.labels.length - 1; i >= 0; i--) {
     const lb = play.labels[i];
     const size = (lb.size || 0.055) * FIELD_H;
-    const hw = textWidth(lb.text || '', size, 700) / 2 + 14;
-    const hh = size / 2 + 12;
-    if (Math.abs(x - fx(lb.x)) <= hw && Math.abs(y - fy(lb.y)) <= hh) return i;
+    const pad = 12;
+    const lx = fx(lb.x);
+    const maxWidth = Math.max(120, 2 * Math.min(lx - (8 + pad), (VB_W - 8 - pad) - lx));
+    const lines = wrapLabelLines(lb.text || '', size, 700, maxWidth);
+    const widest = Math.max(...lines.map(ln => textWidth(ln, size, 700)));
+    const hw = widest / 2 + 14;
+    const hh = (lines.length * size * 1.15) / 2 + 12;
+    if (Math.abs(x - lx) <= hw && Math.abs(y - fy(lb.y)) <= hh) return i;
   }
   return null;
 }
@@ -1051,15 +1100,18 @@ function densifyForHit(pts) {
 
 function hitRoute(play, x, y) {
   for (let i = play.routes.length - 1; i >= 0; i--) {
-    if (hitPolyline(densifyForHit(routeFieldPoints(play, play.routes[i])), x, y, 20)) return i;
+    const rt = play.routes[i];
+    const rpts = routeFieldPoints(play, rt);
+    if (hitPolyline(rt.corner === 'sharp' ? rpts : densifyForHit(rpts), x, y, 20)) return i;
   }
   return null;
 }
 
 function hitLine(play, x, y) {
   for (let i = play.lines.length - 1; i >= 0; i--) {
-    const pts = play.lines[i].points.map(p => [fx(p[0]), fy(p[1])]);
-    if (hitPolyline(pts, x, y, 20)) return i;
+    const ln = play.lines[i];
+    const pts = ln.points.map(p => [fx(p[0]), fy(p[1])]);
+    if (hitPolyline(ln.corner === 'smooth' ? densifyForHit(pts) : pts, x, y, 20)) return i;
   }
   return null;
 }
@@ -1268,12 +1320,12 @@ function onDblClick(e) {
 function editLabel(li) {
   const play = currentPlay();
   if (!play || !play.labels[li]) return;
-  showModal({ title: 'Edit text', withInput: true, defaultValue: play.labels[li].text, confirmLabel: 'Save' })
+  showModal({ title: 'Edit text', withInput: true, multiline: true, defaultValue: play.labels[li].text, confirmLabel: 'Save' })
     .then(text => {
       if (text === null || !currentPlay()) return;
       pushUndo();
       const trimmed = text.trim();
-      if (trimmed) currentPlay().labels[li].text = trimmed.slice(0, 80);
+      if (trimmed) currentPlay().labels[li].text = trimmed.slice(0, 160);
       else currentPlay().labels.splice(li, 1);
       selection = null;
       markDirty();
@@ -1296,9 +1348,9 @@ function finishDrawing() {
   if (play && d.points.length >= 2) {
     pushUndo();
     if (d.kind === 'route') {
-      play.routes.push({ chip: d.chip, color: style.color, dash: style.dash, end: style.end, points: d.points });
+      play.routes.push({ chip: d.chip, color: style.color, dash: style.dash, end: style.end, corner: style.corner, points: d.points });
     } else {
-      play.lines.push({ color: style.color, dash: style.dash, end: style.end, points: d.points });
+      play.lines.push({ color: style.color, dash: style.dash, end: style.end, corner: style.corner, points: d.points });
     }
     markDirty();
   }
@@ -1334,12 +1386,12 @@ function deleteSelection() {
 }
 
 function placeText(nx, ny) {
-  showModal({ title: 'Add text', withInput: true, confirmLabel: 'Add' }).then(text => {
+  showModal({ title: 'Add text', withInput: true, multiline: true, confirmLabel: 'Add' }).then(text => {
     if (text === null || !currentPlay()) return;
     const trimmed = text.trim();
     if (!trimmed) return;
     pushUndo();
-    currentPlay().labels.push({ x: nx, y: ny, text: trimmed.slice(0, 80), color: '#0070C0', size: 0.055 });
+    currentPlay().labels.push({ x: nx, y: ny, text: trimmed.slice(0, 160), color: '#0070C0', size: 0.055 });
     markDirty();
     refreshCanvas();
   });
@@ -1450,12 +1502,14 @@ dashSeg.querySelectorAll('button').forEach(b =>
   b.addEventListener('click', () => setStyle('dash', b.dataset.dash === 'true')));
 endSeg.querySelectorAll('button').forEach(b =>
   b.addEventListener('click', () => setStyle('end', b.dataset.end)));
+cornerSeg.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => setStyle('corner', b.dataset.corner)));
 
 function setTool(t) {
   if (drawing) finishDrawing();
   tool = t;
   if (t !== 'select') selection = null;
-  if (t === 'line') { style.color = '#1F6E8C'; style.dash = true; style.end = 'none'; }  // zone-line default
+  if (t === 'line') { style.color = '#1F6E8C'; style.dash = true; style.end = 'none'; style.corner = 'sharp'; }  // zone-line default
   if (t === 'route') { style.end = style.end === 'none' ? 'arrow' : style.end; }  // routes usually end in arrows
   canvasSvg.style.cursor = t === 'select' ? 'default' : 'crosshair';
   syncToolUI();
@@ -1484,6 +1538,7 @@ function syncStyleUI() {
   swatchesEl.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.color === style.color));
   dashSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', (b.dataset.dash === 'true') === style.dash));
   endSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.end === style.end));
+  cornerSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.corner === style.corner));
 }
 
 function setHint() {
@@ -1536,6 +1591,7 @@ function normalizePlay(p, section) {
       color: typeof r.color === 'string' ? r.color : '#FF0000',
       dash: !!r.dash,
       end: ['arrow', 'ball', 'none'].includes(r.end) ? r.end : 'arrow',
+      corner: ['smooth', 'sharp'].includes(r.corner) ? r.corner : 'smooth',
       points: rpts,
     });
   }
@@ -1547,6 +1603,7 @@ function normalizePlay(p, section) {
       color: typeof l.color === 'string' ? l.color : '#1F6E8C',
       dash: !!l.dash,
       end: ['arrow', 'ball', 'none'].includes(l.end) ? l.end : 'none',
+      corner: ['smooth', 'sharp'].includes(l.corner) ? l.corner : 'sharp',
       points: lpts,
     };
     if (Number.isFinite(+l.width)) line.width = +l.width;
@@ -1557,7 +1614,7 @@ function normalizePlay(p, section) {
     if (!lb || typeof lb.text !== 'string' || !lb.text) continue;
     play.labels.push({
       x: clamp01(+lb.x || 0), y: clamp01(+lb.y || 0),
-      text: lb.text.slice(0, 80),
+      text: lb.text.slice(0, 160),
       color: typeof lb.color === 'string' ? lb.color : '#0070C0',
       size: Number.isFinite(+lb.size) ? Math.max(0.02, Math.min(0.2, +lb.size)) : 0.055,
     });
@@ -1823,7 +1880,7 @@ function closeModal(val) {
   if (modalCloser) modalCloser(val);
 }
 
-function showModal({ title, message, withInput, defaultValue, confirmLabel, danger }) {
+function showModal({ title, message, withInput, multiline, defaultValue, confirmLabel, danger }) {
   return new Promise(resolve => {
     modalCancelValue = withInput ? null : false;
     modalBox.replaceChildren();
@@ -1837,10 +1894,17 @@ function showModal({ title, message, withInput, defaultValue, confirmLabel, dang
     }
     let input = null;
     if (withInput) {
-      input = document.createElement('input');
-      input.maxLength = 80;
+      input = document.createElement(multiline ? 'textarea' : 'input');
+      input.maxLength = multiline ? 160 : 80;
+      if (multiline) input.rows = 3;
       input.value = defaultValue || '';
       modalBox.appendChild(input);
+      if (multiline) {
+        const hint = document.createElement('div');
+        hint.className = 'input-hint';
+        hint.textContent = 'Enter saves — Shift+Enter for a new line. Long text wraps on the card automatically.';
+        modalBox.appendChild(hint);
+      }
     }
     const row = document.createElement('div');
     row.className = 'btn-row';
@@ -1862,7 +1926,7 @@ function showModal({ title, message, withInput, defaultValue, confirmLabel, dang
     confirm.addEventListener('click', () => close(withInput ? input.value : true));
     if (input) {
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+        if (e.key === 'Enter' && !(multiline && e.shiftKey)) { e.preventDefault(); close(input.value); }
         else if (e.key === 'Escape') { e.preventDefault(); close(null); }
       });
     }

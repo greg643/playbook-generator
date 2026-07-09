@@ -426,8 +426,10 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
             continue
 
         if text:
-            clean = re.sub(r'[\r\n\x0b\t]+', ' ', text)
-            clean = re.sub(r'\s{2,}', ' ', clean).strip()[:80]
+            # Keep line breaks: the editor renders multi-line labels and
+            # auto-wraps long ones inside the field.
+            clean = re.sub(r'[\r\x0b]+', '\n', text)
+            clean = re.sub(r'[ \t]{2,}', ' ', clean).strip()[:160]
             if clean:
                 size_emu, color_hex = first_run_style(s)
                 frac = (size_emu / field_h) if size_emu else 0.055
@@ -490,6 +492,7 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
                 'color': seg['color'],
                 'dash': seg['dash'],
                 'end': end,
+                'corner': 'sharp',   # native connectors have crisp elbows
                 'points': [norm(p) for p in downsample(pts)],
             })
         else:
@@ -500,6 +503,7 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
                 'color': seg['color'],
                 'dash': seg['dash'],
                 'end': 'arrow' if seg['a1'] else 'none',
+                'corner': 'sharp',
                 'points': [norm(p) for p in downsample(pts)],
             }
             if seg['dash']:
