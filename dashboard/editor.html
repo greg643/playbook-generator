@@ -656,18 +656,32 @@ function wrapLabelLines(text, size, weight, maxWidth) {
   return lines.length ? lines : [''];
 }
 
-// Multi-line label block centered on (x,y), auto-wrapped so it stays inside
-// the field horizontally. Returns { el, lines, lineHeight }.
-function labelBlockEl(x, y, str, size, fill, weight) {
+// Shared layout for a wrapped label: lines, block size, and the (possibly
+// clamped) center so the whole block stays inside the field.
+function labelLayout(lb) {
+  const size = (lb.size || 0.055) * FIELD_H;
   const pad = 12;
+  const lx = fx(lb.x);
   // Widest a centered block can be without crossing the field edges.
-  const maxWidth = Math.max(120, 2 * Math.min(x - (8 + pad), (VB_W - 8 - pad) - x));
-  const lines = wrapLabelLines(str, size, weight, maxWidth);
+  const maxWidth = Math.max(120, 2 * Math.min(lx - (8 + pad), (VB_W - 8 - pad) - lx));
+  const lines = wrapLabelLines(lb.text || '', size, 700, maxWidth);
   const lineHeight = size * 1.15;
+  const blockH = lines.length * lineHeight;
+  let cy = fy(lb.y);
+  const minCy = HEADER_H + 10 + blockH / 2;
+  const maxCy = VB_H - 10 - blockH / 2;
+  cy = Math.max(minCy, Math.min(maxCy, cy));
+  const widest = Math.max(...lines.map(ln => textWidth(ln, size, 700)));
+  return { lx, cy, size, lines, lineHeight, blockH, widest };
+}
+
+function labelBlockEl(lb) {
+  const L = labelLayout(lb);
   const g = svgEl('g', {});
-  const y0 = y - ((lines.length - 1) / 2) * lineHeight;
-  lines.forEach((ln, i) => g.appendChild(svgTextEl(x, y0 + i * lineHeight, ln, size, fill, weight)));
-  return { el: g, lines, lineHeight };
+  const y0 = L.cy - ((L.lines.length - 1) / 2) * L.lineHeight;
+  L.lines.forEach((ln, i) =>
+    g.appendChild(svgTextEl(L.lx, y0 + i * L.lineHeight, ln, L.size, lb.color || '#0070C0', 700)));
+  return g;
 }
 
 const measureCtx = document.createElement('canvas').getContext('2d');
@@ -811,8 +825,7 @@ function render(play, section, playIndex) {
   for (const b of play.balls || []) content.appendChild(footballGlyph(fx(b.x), fy(b.y)));
 
   for (const lb of play.labels || []) {
-    const size = (lb.size || 0.055) * FIELD_H;
-    content.appendChild(labelBlockEl(fx(lb.x), fy(lb.y), lb.text || '', size, lb.color || '#0070C0', 700).el);
+    content.appendChild(labelBlockEl(lb));
   }
 
   const chipSpec = section === 'defense' ? DEFENSE_CHIPS : OFFENSE_CHIPS;
@@ -990,15 +1003,10 @@ function drawOverlay() {
   } else if (selection && selection.kind === 'label') {
     const lb = play.labels[selection.index];
     if (lb) {
-      const size = (lb.size || 0.055) * FIELD_H;
-      const pad = 12;
-      const lx = fx(lb.x);
-      const maxWidth = Math.max(120, 2 * Math.min(lx - (8 + pad), (VB_W - 8 - pad) - lx));
-      const lines = wrapLabelLines(lb.text || '', size, 700, maxWidth);
-      const w = Math.max(...lines.map(ln => textWidth(ln, size, 700))) + 28;
-      const h = lines.length * size * 1.15 + 24;
+      const L = labelLayout(lb);
+      const w = L.widest + 28, h = L.blockH + 24;
       ov.appendChild(svgEl('rect', {
-        x: lx - w / 2, y: fy(lb.y) - h / 2, width: w, height: h, rx: 6,
+        x: L.lx - w / 2, y: L.cy - h / 2, width: w, height: h, rx: 6,
         fill: 'none', stroke: '#58a6ff', 'stroke-width': 4, 'stroke-dasharray': '10 8',
       }));
     }
@@ -1062,16 +1070,8 @@ function hitBall(play, x, y) {
 
 function hitLabel(play, x, y) {
   for (let i = play.labels.length - 1; i >= 0; i--) {
-    const lb = play.labels[i];
-    const size = (lb.size || 0.055) * FIELD_H;
-    const pad = 12;
-    const lx = fx(lb.x);
-    const maxWidth = Math.max(120, 2 * Math.min(lx - (8 + pad), (VB_W - 8 - pad) - lx));
-    const lines = wrapLabelLines(lb.text || '', size, 700, maxWidth);
-    const widest = Math.max(...lines.map(ln => textWidth(ln, size, 700)));
-    const hw = widest / 2 + 14;
-    const hh = (lines.length * size * 1.15) / 2 + 12;
-    if (Math.abs(x - lx) <= hw && Math.abs(y - fy(lb.y)) <= hh) return i;
+    const L = labelLayout(play.labels[i]);
+    if (Math.abs(x - L.lx) <= L.widest / 2 + 14 && Math.abs(y - L.cy) <= L.blockH / 2 + 12) return i;
   }
   return null;
 }
