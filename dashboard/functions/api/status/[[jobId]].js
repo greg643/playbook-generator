@@ -7,7 +7,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const obj = await env.PLAYBOOK_BUCKET.get(`${jobId}/status.json`);
+    const obj = await env.PLAYBOOK_BUCKET.get(`jobs/${jobId}/status.json`);
 
     if (!obj) {
       return Response.json({ error: "Job not found" }, { status: 404 });

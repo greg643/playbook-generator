@@ -22,7 +22,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const obj = await env.PLAYBOOK_BUCKET.get(`${jobId}/${filename}`);
+    const obj = await env.PLAYBOOK_BUCKET.get(`jobs/${jobId}/${filename}`);
 
     if (!obj) {
       return Response.json({ error: "File not found" }, { status: 404 });

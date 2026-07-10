@@ -46,4 +46,8 @@ Requires: Python 3.11+, LibreOffice, poppler-utils (pdftoppm)
 3. **CF Pages bindings**: R2 binding `PLAYBOOK_BUCKET` → `playbook-files`
 4. **CF Pages env vars**: `GITHUB_TOKEN` (PAT with `repo` scope)
 5. **GitHub secrets**: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-6. **R2 lifecycle rule**: auto-delete objects older than 1 day
+6. **R2 lifecycle rule**: auto-delete objects older than 1 day, **scoped to the
+   `jobs/` prefix only** — all job files (uploads, play images, status, PDFs) live
+   under `jobs/<jobId>/…`. The rule must NEVER be bucket-wide: `auth/`, `users/`,
+   and `accounts/` hold the signing secret, credentials, and playbooks — permanent
+   data that would be silently destroyed by a bucket-wide expiry.

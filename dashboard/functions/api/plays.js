@@ -71,12 +71,30 @@ export async function onRequestPut(context) {
       return jsonNoStore({ error: "Invalid playbook document" }, { status: 400 });
     }
 
+    // Optional optimistic-concurrency check: the editor sends the updatedAt it
+    // loaded as baseUpdatedAt; if the stored doc has moved on, reject with 409.
+    // Absent baseUpdatedAt means save unconditionally (back-compat/overwrite).
+    const baseUpdatedAt = doc.baseUpdatedAt;
+    delete doc.baseUpdatedAt;
+    if (baseUpdatedAt !== undefined) {
+      const existing = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
+      if (existing) {
+        const stored = await existing.json();
+        if (stored && stored.updatedAt && stored.updatedAt !== baseUpdatedAt) {
+          return jsonNoStore(
+            { error: "conflict", serverUpdatedAt: stored.updatedAt },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     doc.updatedAt = new Date().toISOString();
     await env.PLAYBOOK_BUCKET.put(playbookKey(user.userId), JSON.stringify(doc), {
       httpMetadata: { contentType: "application/json" },
     });
 
-    return jsonNoStore({ ok: true });
+    return jsonNoStore({ ok: true, updatedAt: doc.updatedAt });
   } catch (err) {
     console.error("Plays PUT error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });

@@ -428,6 +428,27 @@
     .mbtn-cancel:hover { border-color: #58a6ff !important; }
     .mbtn-confirm { background: #238636; color: #fff; }
     .mbtn-confirm:hover { background: #2ea043; }
+    .splash { display: flex; gap: 2.5rem; align-items: flex-start; justify-content: center;
+      flex-wrap: wrap; max-width: 980px; margin: 0 auto; padding: 1rem; }
+    .splash-pitch { max-width: 460px; }
+    .splash-title { font-size: 2rem; line-height: 1.15; margin: 0 0 0.6rem; color: #fff; }
+    .splash-sub { color: #8b949e; margin: 0 0 1rem; }
+    .splash-points { list-style: none; padding: 0; margin: 0 0 1.2rem; }
+    .splash-points li { margin: 0.45rem 0; font-size: 0.92rem; }
+    .splash-sample { max-width: 360px; border: 1px solid #30363d; border-radius: 10px;
+      overflow: hidden; background: #fff; }
+    .splash-sample svg { display: block; width: 100%; height: auto; }
+    .splash-help { margin-top: 0.8rem; font-size: 0.88rem; }
+    .splash-help a, .auth-links a { color: #58a6ff; text-decoration: none; }
+    .splash-help a:hover, .auth-links a:hover { text-decoration: underline; }
+    .auth-links { margin: 0.9rem 0 0; text-align: center; font-size: 0.83rem; }
+    #authCard { flex: 0 0 340px; }
+    .backup-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+    .backup-row .add-btn { flex: 1; }
+    .side-btn-row { display: flex; gap: 0.4rem; }
+    .side-btn-row .add-btn { flex: 1; }
+    .renum-btn { flex: 0 0 auto !important; }
+    h2.over-cap { color: #f85149; }
     .mbtn-danger { background: #da3633; color: #fff; }
     .mbtn-danger:hover { background: #f85149; }
   </style>
@@ -438,23 +459,59 @@
     <h1>Playbook Editor</h1>
     <a class="back" href="/">&larr; PPTX upload</a>
     <div class="spacer"></div>
+    <a class="back" href="/help" target="_blank" rel="noopener">Help</a>
     <span class="email" id="userEmail"></span>
+    <button class="linkbtn" id="accountBtn" style="display:none">Account</button>
     <button class="linkbtn" id="signOutBtn" style="display:none">Sign out</button>
   </div>
 
   <div class="auth-wrap" id="authView">
-    <div class="card">
-      <h2>Sign in</h2>
-      <p class="auth-sub">Create and edit plays in the browser, then generate the same coach cards &amp; wristband PDFs.</p>
-      <label class="field">Email
-        <input type="email" id="authEmail" autocomplete="email">
-      </label>
-      <label class="field">Password
-        <input type="password" id="authPassword" autocomplete="current-password">
-      </label>
-      <div class="error-msg" id="authError"></div>
-      <button class="btn btn-primary" id="loginBtn">Sign in</button>
-      <button class="btn btn-secondary" id="registerBtn">Create account</button>
+    <div class="splash">
+      <div class="splash-pitch">
+        <h2 class="splash-title">Draw your plays.<br>Print your game day.</h2>
+        <p class="splash-sub">A playbook editor built for 6v6 flag football &mdash; design plays in the
+          browser and generate coach cards and cut-out wristband inserts in one click.</p>
+        <ul class="splash-points">
+          <li>&#9989; Fixed player chips &mdash; drag the formation, draw the routes</li>
+          <li>&#127912; Smooth or sharp-cut routes, arrows, footballs, labels</li>
+          <li>&#128203; Bench &amp; archive plays; sticky numbers the kids memorize stay put</li>
+          <li>&#128424;&#65039; 4 print-ready PDFs sized for QB wrist-coach inserts</li>
+        </ul>
+        <div class="splash-sample" id="splashSample" aria-hidden="true"></div>
+        <p class="splash-help"><a href="/help">Read the quick-start guide &rarr;</a></p>
+      </div>
+      <div class="card" id="authCard">
+        <div id="signinForm">
+          <h2>Sign in</h2>
+          <p class="auth-sub">Free account &mdash; your playbook is saved in the cloud.</p>
+          <label class="field">Email
+            <input type="email" id="authEmail" autocomplete="email">
+          </label>
+          <label class="field">Password
+            <input type="password" id="authPassword" autocomplete="current-password">
+          </label>
+          <div class="error-msg" id="authError"></div>
+          <button class="btn btn-primary" id="loginBtn">Sign in</button>
+          <button class="btn btn-secondary" id="registerBtn">Create account</button>
+          <p class="auth-links"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
+        </div>
+        <div id="recoverForm" style="display:none">
+          <h2>Reset password</h2>
+          <p class="auth-sub">Enter the recovery code you saved when you created the account.</p>
+          <label class="field">Email
+            <input type="email" id="recEmail" autocomplete="email">
+          </label>
+          <label class="field">Recovery code
+            <input type="text" id="recCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
+          </label>
+          <label class="field">New password
+            <input type="password" id="recPassword" autocomplete="new-password">
+          </label>
+          <div class="error-msg" id="recError"></div>
+          <button class="btn btn-primary" id="recoverBtn">Reset password &amp; sign in</button>
+          <p class="auth-links"><a id="backToSignin" href="#">&larr; Back to sign in</a></p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -463,12 +520,18 @@
       <div class="side-section">
         <h2 id="offenseHeading">OFFENSE (0 in playbook / 0)</h2>
         <div id="offenseList"></div>
-        <button class="add-btn" id="addOffenseBtn">+ Add play</button>
+        <div class="side-btn-row">
+          <button class="add-btn" id="addOffenseBtn">+ Add play</button>
+          <button class="add-btn renum-btn" id="renumOffenseBtn" title="Renumber: plays in the playbook get 1, 2, 3… in list order; bench plays follow">&#8635; Renumber</button>
+        </div>
       </div>
       <div class="side-section">
         <h2 id="defenseHeading">DEFENSE (0 in playbook / 0)</h2>
         <div id="defenseList"></div>
-        <button class="add-btn" id="addDefenseBtn">+ Add play</button>
+        <div class="side-btn-row">
+          <button class="add-btn" id="addDefenseBtn">+ Add play</button>
+          <button class="add-btn renum-btn" id="renumDefenseBtn" title="Renumber: plays in the playbook get A, B, C… in list order; bench plays follow">&#8635; Renumber</button>
+        </div>
       </div>
     </aside>
 
@@ -496,7 +559,7 @@
         <button class="tool-btn" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">&#8631; Redo</button>
       </div>
 
-      <div class="tb-label">Route / line style</div>
+      <div class="tb-label" id="styleMode">Style for new routes &amp; lines</div>
       <div class="swatches" id="swatches"></div>
       <div class="seg" id="dashSeg">
         <button data-dash="false">Solid</button>
@@ -516,6 +579,11 @@
       <div class="save-row">
         <button class="btn btn-primary" id="saveBtn">Save</button>
         <span id="saveIndicator" class="saved">Saved</span>
+      </div>
+      <div class="backup-row">
+        <button class="add-btn" id="exportBtn" title="Download your whole playbook as a JSON backup file">&#8681; Backup</button>
+        <button class="add-btn" id="importBtn" title="Load plays from a backup file">&#8679; Import</button>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       </div>
 
       <div class="tb-label">Generate</div>
@@ -855,7 +923,7 @@ function routeFieldPoints(play, route) {
 
 let clipSeq = 0;
 
-function render(play, section, playIndex) {
+function render(play, section, numLabel) {
   const svg = svgEl('svg', { viewBox: '0 0 ' + VB_W + ' ' + VB_H });
   const clipId = 'field-clip-' + (++clipSeq);
   const defs = svgEl('defs', {});
@@ -921,10 +989,9 @@ function render(play, section, playIndex) {
   svg.appendChild(svgEl('line', { x1: 165, y1: 0, x2: 165, y2: HEADER_H, stroke: '#000000', 'stroke-width': 8 }));
   svg.appendChild(svgEl('rect', { x: 4, y: 4, width: VB_W - 8, height: VB_H - 8, fill: 'none', stroke: '#000000', 'stroke-width': 8 }));
 
-  // playIndex is the play's 0-based position among the INCLUDED plays of its
-  // section (see includedIndex), or null for a play excluded from the playbook.
-  const numText = playIndex == null ? '–'
-    : section === 'defense' ? String.fromCharCode(65 + playIndex) : String(playIndex + 1);
+  // numLabel is the display string for the header number cell ('7', 'B', '–');
+  // legacy numeric values are rendered as given for back-compat.
+  const numText = numLabel == null ? '\u2013' : String(numLabel);
   svg.appendChild(svgTextEl(82.5, 87, numText, 130, '#000000', 400));
   const name = play.name || '';
   const nameSize = fitFont(name, 105, VB_W - 165 - 40, 400);
@@ -949,6 +1016,7 @@ $('finishDrawBtn').addEventListener('click', () => finishDrawing());
 $('cancelDrawBtn').addEventListener('click', () => { drawing = null; refreshCanvas(); });
 const playName = $('playName'), toolsEl = $('tools'), swatchesEl = $('swatches');
 const dashSeg = $('dashSeg'), endSeg = $('endSeg'), cornerSeg = $('cornerSeg');
+const styleModeEl = $('styleMode');
 const undoBtn = $('undoBtn'), redoBtn = $('redoBtn');
 const saveBtn = $('saveBtn'), saveIndicator = $('saveIndicator');
 const chkOffenseCoach = $('chkOffenseCoach'), chkOffenseWrist = $('chkOffenseWrist');
@@ -988,16 +1056,32 @@ function isIncluded(play) {
   return !!play && play.included !== false;
 }
 
-// 0-based position among the INCLUDED plays of a section, or null when the
-// play at arrayIndex is excluded. This (not the array index) is what
-// render() and PNG export use for the play number/letter.
-function includedIndex(section, arrayIndex) {
-  if (!doc) return null;
-  const arr = doc[section] || [];
-  if (!isIncluded(arr[arrayIndex])) return null;
-  let n = 0;
-  for (let k = 0; k < arrayIndex; k++) if (isIncluded(arr[k])) n++;
+// Sticky play numbers: every play carries a persistent num that survives
+// reordering, benching, and deletion of other plays — wristbands the kids
+// memorized keep meaning what they memorized. Offense renders the digit,
+// defense renders it as a letter (1 -> A).
+function lowestUnusedNum(section) {
+  const used = new Set((doc && doc[section] || []).map(p => p.num).filter(Number.isInteger));
+  let n = 1;
+  while (used.has(n)) n++;
   return n;
+}
+
+function displayNum(section, play) {
+  if (!play || !Number.isInteger(play.num)) return '\u2013';
+  if (section === 'defense') {
+    return play.num >= 1 && play.num <= 26 ? String.fromCharCode(64 + play.num) : String(play.num);
+  }
+  return String(play.num);
+}
+
+function renumberSection(section) {
+  const arr = doc[section];
+  let n = 1;
+  for (const p of arr) if (isIncluded(p)) p.num = n++;
+  for (const p of arr) if (!isIncluded(p)) p.num = n++;
+  markDirty();
+  refreshAll();
 }
 
 // ---------- Interactive canvas ----------
@@ -1030,7 +1114,7 @@ function refreshCanvas() {
   emptyHint.style.display = 'none';
   canvasSvg.style.display = 'block';
   drawActions.style.display = drawing ? 'flex' : 'none';
-  const fresh = render(play, cur.section, includedIndex(cur.section, cur.index));
+  const fresh = render(play, cur.section, displayNum(cur.section, play));
   canvasSvg.replaceChildren(...fresh.childNodes);
   drawOverlay();
 }
@@ -1570,13 +1654,15 @@ function setTool(t) {
 }
 
 function setStyle(prop, val) {
-  style[prop] = val;
   const item = selectedItem();
   if (item && (selection.kind === 'route' || selection.kind === 'line')) {
+    // Restyle only the selected route/line; defaults for NEW drawings stay put.
     pushUndo();
     item[prop] = val;
     markDirty();
     refreshCanvas();
+  } else {
+    style[prop] = val;
   }
   syncStyleUI();
 }
@@ -1586,10 +1672,21 @@ function syncToolUI() {
 }
 
 function syncStyleUI() {
-  swatchesEl.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.color === style.color));
-  dashSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', (b.dataset.dash === 'true') === style.dash));
-  endSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.end === style.end));
-  cornerSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.corner === style.corner));
+  // The controls mirror the SELECTED route/line when one is selected
+  // (clicking them restyles it); otherwise they show the defaults that the
+  // next drawing will use.
+  const item = selection && (selection.kind === 'route' || selection.kind === 'line') ? selectedItem() : null;
+  const view = item ? {
+    color: item.color || (selection.kind === 'line' ? '#1F6E8C' : '#FF0000'),
+    dash: !!item.dash,
+    end: item.end || (selection.kind === 'line' ? 'none' : 'arrow'),
+    corner: item.corner || (selection.kind === 'line' ? 'sharp' : 'smooth'),
+  } : style;
+  swatchesEl.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.color === view.color));
+  dashSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', (b.dataset.dash === 'true') === view.dash));
+  endSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.end === view.end));
+  cornerSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.corner === view.corner));
+  styleModeEl.textContent = item ? 'Styling the selected ' + selection.kind : 'Style for new routes & lines';
 }
 
 function setHint() {
@@ -1614,12 +1711,14 @@ function makePlay(section) {
 }
 
 function normalizePlay(p, section) {
+  // (num is validated here, assigned in normalizeDoc if missing)
   const play = {
     id: typeof p.id === 'string' && p.id ? p.id : crypto.randomUUID(),
     name: typeof p.name === 'string' ? p.name.slice(0, 60) : 'Untitled',
     chips: {}, routes: [], lines: [], labels: [], balls: [],
   };
   if (p.included === false) play.included = false;  // absent means included
+  if (Number.isInteger(+p.num) && +p.num >= 1 && +p.num <= 999) play.num = Math.floor(+p.num);
   const defaults = section === 'defense' ? DEFENSE_DEFAULT_POS : OFFENSE_DEFAULT_POS;
   for (const k in defaults) {
     const c = p.chips && p.chips[k];
@@ -1683,6 +1782,17 @@ function normalizeDoc(d) {
     const arr = Array.isArray(d && d[sec]) ? d[sec] : [];
     const max = sec === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
     for (const p of arr.slice(0, max)) out[sec].push(normalizePlay(p || {}, sec));
+    // Sticky numbers: strip duplicates, then hand out the lowest unused —
+    // included plays (in list order) first, bench after.
+    const seen = new Set();
+    for (const p of out[sec]) {
+      if (Number.isInteger(p.num) && !seen.has(p.num)) seen.add(p.num);
+      else delete p.num;
+    }
+    let next = 1;
+    const take = () => { while (seen.has(next)) next++; seen.add(next); return next; };
+    for (const p of out[sec]) if (p.included !== false && !Number.isInteger(p.num)) p.num = take();
+    for (const p of out[sec]) if (!Number.isInteger(p.num)) p.num = take();
   }
   return out;
 }
@@ -1705,7 +1815,9 @@ function addPlay(section) {
   if (!doc) return;
   const max = section === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
   if (doc[section].length >= max) return;
-  doc[section].push(makePlay(section));
+  const p = makePlay(section);
+  p.num = lowestUnusedNum(section);
+  doc[section].push(p);
   markDirty();
   openPlay(section, doc[section].length - 1);
 }
@@ -1715,6 +1827,7 @@ function duplicatePlay(section, i) {
   if (doc[section].length >= max) return;
   const copy = JSON.parse(JSON.stringify(doc[section][i]));
   copy.id = crypto.randomUUID();
+  copy.num = lowestUnusedNum(section);
   copy.name = (copy.name + ' copy').slice(0, 60);
   doc[section].splice(i + 1, 0, copy);
   if (cur && cur.section === section && cur.index > i) cur.index++;
@@ -1763,6 +1876,18 @@ function movePlay(section, i, delta) {
 addOffenseBtn.addEventListener('click', () => addPlay('offense'));
 addDefenseBtn.addEventListener('click', () => addPlay('defense'));
 
+async function confirmRenumber(section) {
+  const ok = await showModal({
+    title: 'Renumber ' + section + ' plays',
+    message: 'Plays in the playbook get ' + (section === 'defense' ? 'A, B, C\u2026' : '1, 2, 3\u2026') +
+      ' in list order, bench plays follow. Printed numbers will change — reprint wristbands after this.',
+    confirmLabel: 'Renumber',
+  });
+  if (ok) renumberSection(section);
+}
+$('renumOffenseBtn').addEventListener('click', () => confirmRenumber('offense'));
+$('renumDefenseBtn').addEventListener('click', () => confirmRenumber('defense'));
+
 // ---------- Sidebar ----------
 
 function renderSidebar() {
@@ -1773,9 +1898,11 @@ function renderSidebar() {
 function renderSection(section, listEl, headEl, addBtn, max) {
   const arr = doc ? doc[section] : [];
   const inPlaybook = arr.filter(isIncluded).length;
-  headEl.textContent = section.toUpperCase() + ' (' + inPlaybook + ' in playbook / ' + arr.length + ')';
+  const cap = section === 'offense' ? MAX_INCLUDED_OFFENSE : MAX_INCLUDED_DEFENSE;
+  headEl.textContent = section.toUpperCase() + ' (' + inPlaybook + ' in playbook / ' + arr.length + ')'
+    + (inPlaybook > cap ? ' — over the ' + cap + ' print limit' : '');
+  headEl.classList.toggle('over-cap', inPlaybook > cap);
   listEl.replaceChildren();
-  let incCounter = 0;  // running included-index → badge number/letter
   arr.forEach((play, i) => {
     const included = isIncluded(play);
     const row = document.createElement('div');
@@ -1791,9 +1918,8 @@ function renderSection(section, listEl, headEl, addBtn, max) {
     chk.addEventListener('change', () => togglePlayIncluded(section, i));
     const badge = document.createElement('span');
     badge.className = 'badge';
-    badge.textContent = !included ? '–'
-      : section === 'defense' ? String.fromCharCode(65 + incCounter) : String(incCounter + 1);
-    if (included) incCounter++;
+    badge.textContent = displayNum(section, play);
+    badge.title = included ? 'Play number (sticky)' : 'Play number (on the bench)';
     const name = document.createElement('span');
     name.className = 'pname';
     name.textContent = play.name || 'Untitled';
@@ -1825,6 +1951,7 @@ function togglePlayIncluded(section, i) {
   if (!play) return;
   if (isIncluded(play)) play.included = false;
   else delete play.included;  // absent means included — keeps docs minimal
+  hideGenError();  // playbook membership changed: any stale generate error no longer applies
   markDirty();
   renderSidebar();   // renumbers every badge in the section + heading counts
   refreshCanvas();   // the open play's header number can change too
@@ -1876,8 +2003,11 @@ function markDirty() {
 }
 
 // Saves are serialized: concurrent callers queue behind the in-flight PUT so a
-// stale body can never land after a newer one.
+// stale body can never land after a newer one. Each save carries the server
+// timestamp it was based on; a 409 means another session saved in between.
 let saveChain = Promise.resolve(false);
+let serverUpdatedAt = null;   // updatedAt of the doc we loaded/last saved
+let overwriteNext = false;    // user chose "overwrite" after a conflict
 
 function saveDoc() {
   const p = saveChain.then(() => doSave(), () => doSave());
@@ -1893,17 +2023,27 @@ async function doSave() {
   updateSaveIndicator();
   try {
     doc.schema = 1;
-    doc.updatedAt = new Date().toISOString();
+    const body = { ...doc };
+    if (serverUpdatedAt && !overwriteNext) body.baseUpdatedAt = serverUpdatedAt;
+    overwriteNext = false;
     const res = await fetch('/api/plays', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
+      body: JSON.stringify(body),
     });
     if (res.status === 401) {
       showAuthView('Your session expired — sign in to keep working.');
       return false;
     }
+    if (res.status === 409) {
+      saveState = 'unsaved';
+      updateSaveIndicator('Conflict — playbook changed elsewhere');
+      resolveConflict();
+      return false;
+    }
     if (!res.ok) throw new Error('Save failed');
+    const data = await res.json().catch(() => ({}));
+    if (data.updatedAt) serverUpdatedAt = data.updatedAt;
     saveState = changeCounter === at ? 'saved' : 'unsaved';
     updateSaveIndicator();
     return true;
@@ -1916,7 +2056,111 @@ async function doSave() {
   }
 }
 
+let conflictOpen = false;
+async function resolveConflict() {
+  if (conflictOpen) return;
+  conflictOpen = true;
+  try {
+    const overwrite = await showModal({
+      title: 'Playbook changed elsewhere',
+      message: 'This playbook was saved from another tab or device after you loaded it. ' +
+        'Overwrite with THIS tab\u2019s version, or discard this tab\u2019s changes and load the newer one?',
+      confirmLabel: 'Overwrite',
+      danger: true,
+    });
+    if (!doc) return;
+    if (overwrite) {
+      overwriteNext = true;
+      saveDoc();
+    } else {
+      const res = await fetch('/api/plays');
+      if (res.ok) {
+        const data = await res.json();
+        doc = normalizeDoc(data || {});
+        serverUpdatedAt = data && data.updatedAt || null;
+        for (const k in undoStacks) delete undoStacks[k];
+        saveState = 'saved';
+        updateSaveIndicator();
+        cur = firstAvailable();
+        selection = null;
+        drawing = null;
+        refreshAll();
+      }
+    }
+  } finally {
+    conflictOpen = false;
+  }
+}
+
 saveBtn.addEventListener('click', () => saveDoc());
+
+$('exportBtn').addEventListener('click', () => {
+  if (!doc) return;
+  const clean = { schema: 1, offense: doc.offense, defense: doc.defense };
+  const blob = new Blob([JSON.stringify(clean, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date();
+  const stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  a.download = 'playbook-backup-' + stamp + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$('importBtn').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', async () => {
+  const file = $('importFile').files[0];
+  $('importFile').value = '';
+  if (!file || !doc) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    await showModal({ title: 'Import failed', message: 'That file is not a valid playbook backup (could not parse JSON).', confirmLabel: 'OK' });
+    return;
+  }
+  const incoming = normalizeDoc(data || {});
+  const nOff = incoming.offense.length, nDef = incoming.defense.length;
+  if (!nOff && !nDef) {
+    await showModal({ title: 'Nothing to import', message: 'That file has no plays in it.', confirmLabel: 'OK' });
+    return;
+  }
+  const choice = await showChoiceModal({
+    title: 'Import ' + nOff + ' offense + ' + nDef + ' defense plays',
+    message: 'Replace your whole playbook with the backup, or add the plays to your bench (they arrive toggled out, with fresh numbers)?',
+    choices: [
+      { key: 'replace', label: 'Replace playbook', danger: true },
+      { key: 'bench', label: 'Add to bench', primary: true },
+      { key: 'cancel', label: 'Cancel' },
+    ],
+  });
+  if (!choice || choice === 'cancel') return;
+  if (choice === 'replace') {
+    doc = incoming;
+    for (const k in undoStacks) delete undoStacks[k];
+    cur = firstAvailable();
+    selection = null;
+    drawing = null;
+  } else {
+    let clipped = 0;
+    for (const sec of ['offense', 'defense']) {
+      const max = sec === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
+      for (const p of incoming[sec]) {
+        if (doc[sec].length >= max) { clipped++; continue; }
+        p.id = crypto.randomUUID();
+        p.included = false;
+        p.num = lowestUnusedNum(sec);
+        doc[sec].push(p);
+      }
+    }
+    if (clipped) {
+      await showModal({ title: 'Storage limit reached', message: clipped + ' play(s) were not imported — the account holds at most ' + MAX_OFFENSE + ' offense and ' + MAX_DEFENSE + ' defense plays. Delete some plays and import again.', confirmLabel: 'OK' });
+    }
+  }
+  hideGenError();
+  markDirty();
+  refreshAll();
+});
 
 window.addEventListener('beforeunload', e => {
   if (doc && saveState !== 'saved') { e.preventDefault(); e.returnValue = ''; }
@@ -1931,7 +2175,7 @@ function closeModal(val) {
   if (modalCloser) modalCloser(val);
 }
 
-function showModal({ title, message, withInput, multiline, defaultValue, confirmLabel, danger }) {
+function showModal({ title, message, withInput, multiline, inputType, defaultValue, confirmLabel, danger }) {
   return new Promise(resolve => {
     modalCancelValue = withInput ? null : false;
     modalBox.replaceChildren();
@@ -1946,6 +2190,7 @@ function showModal({ title, message, withInput, multiline, defaultValue, confirm
     let input = null;
     if (withInput) {
       input = document.createElement(multiline ? 'textarea' : 'input');
+      if (!multiline && inputType) input.type = inputType;
       input.maxLength = multiline ? 160 : 80;
       if (multiline) input.rows = 3;
       input.value = defaultValue || '';
@@ -1991,13 +2236,88 @@ modalOverlay.addEventListener('click', e => {
   if (e.target === modalOverlay) closeModal(modalCancelValue);
 });
 
+// Multi-choice modal: returns the chosen key, or null on cancel/backdrop.
+function showChoiceModal({ title, message, choices }) {
+  return new Promise(resolve => {
+    modalCancelValue = null;
+    modalBox.replaceChildren();
+    const h = document.createElement('h3');
+    h.textContent = title;
+    modalBox.appendChild(h);
+    if (message) {
+      const p = document.createElement('p');
+      p.textContent = message;
+      modalBox.appendChild(p);
+    }
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    row.style.flexWrap = 'wrap';
+    const close = val => {
+      modalOverlay.classList.remove('active');
+      modalCloser = null;
+      resolve(val);
+    };
+    modalCloser = close;
+    for (const c of choices) {
+      const b = document.createElement('button');
+      b.className = c.danger ? 'mbtn-danger' : c.primary ? 'mbtn-confirm' : 'mbtn-cancel';
+      b.textContent = c.label;
+      b.addEventListener('click', () => close(c.key));
+      row.appendChild(b);
+    }
+    modalBox.appendChild(row);
+    modalOverlay.classList.add('active');
+    row.querySelector('button').focus();
+  });
+}
+
+// Show a recovery code with a copy button; resolves when acknowledged.
+function showRecoveryCode(code, context) {
+  return new Promise(resolve => {
+    modalCancelValue = true;
+    modalBox.replaceChildren();
+    const h = document.createElement('h3');
+    h.textContent = 'Save your recovery code';
+    modalBox.appendChild(h);
+    const p = document.createElement('p');
+    p.textContent = (context || 'This code is the ONLY way to reset your password.') +
+      ' Write it down or store it in a password manager — it will not be shown again.';
+    modalBox.appendChild(p);
+    const codeBox = document.createElement('div');
+    codeBox.textContent = code;
+    codeBox.style.cssText = 'font-family:ui-monospace,Menlo,monospace;font-size:1.05rem;' +
+      'background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:0.6rem;' +
+      'text-align:center;letter-spacing:0.05em;user-select:all;margin:0.4rem 0;';
+    modalBox.appendChild(codeBox);
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    const copy = document.createElement('button');
+    copy.className = 'mbtn-cancel';
+    copy.textContent = 'Copy code';
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(code); copy.textContent = 'Copied \u2713'; }
+      catch { copy.textContent = 'Select & copy manually'; }
+    });
+    const done = document.createElement('button');
+    done.className = 'mbtn-confirm';
+    done.textContent = 'I saved it';
+    const close = () => { modalOverlay.classList.remove('active'); modalCloser = null; resolve(true); };
+    modalCloser = close;
+    done.addEventListener('click', close);
+    row.append(copy, done);
+    modalBox.appendChild(row);
+    modalOverlay.classList.add('active');
+    done.focus();
+  });
+}
+
 // ---------- PNG export (2152x2000, white background) ----------
 // Renders offscreen from data, so plays not currently open export correctly.
 // `index` is the play's included-index (0-based position among included plays
 // of its section — see includedIndex), or null for an excluded play ('–' header).
 
-async function exportPlayPNG(play, section, index) {
-  const svg = render(play, section, index);
+async function exportPlayPNG(play, section, numLabel) {
+  const svg = render(play, section, numLabel);
   svg.setAttribute('width', '2152');
   svg.setAttribute('height', '2000');
   const xml = new XMLSerializer().serializeToString(svg);
@@ -2084,6 +2404,25 @@ generateBtn.addEventListener('click', async () => {
       defensePlays.length + ' are in the playbook. Toggle some out and try again.');
     return;
   }
+  const badNums = (plays, cap) => {
+    const seen = new Set();
+    for (const p of plays) {
+      if (!Number.isInteger(p.num) || p.num < 1 || p.num > cap || seen.has(p.num)) return true;
+      seen.add(p.num);
+    }
+    return false;
+  };
+  if (needOffense && badNums(offensePlays, MAX_INCLUDED_OFFENSE)) {
+    showGenError('Offense play numbers must be unique and between 1 and ' + MAX_INCLUDED_OFFENSE +
+      ' to print. Use the sidebar\u2019s Renumber button, or bench plays whose numbers are too high.');
+    return;
+  }
+  if (needDefense && badNums(defensePlays, MAX_INCLUDED_DEFENSE)) {
+    showGenError('Defense play letters must be unique and between A and ' +
+      String.fromCharCode(64 + MAX_INCLUDED_DEFENSE) +
+      ' to print. Use the sidebar\u2019s Renumber button, or bench plays whose letters are too high.');
+    return;
+  }
   generating = true;
   generateBtn.disabled = true;
   try {
@@ -2092,20 +2431,20 @@ generateBtn.addEventListener('click', async () => {
     showProgress('Rendering play images…');
     // Export from a frozen copy: the canvas stays interactive during the async
     // export loop, and a mid-export edit must not tear the rendered set.
-    const frozenOffense = offensePlays.map(snapshot);
-    const frozenDefense = defensePlays.map(snapshot);
+    const frozenOffense = offensePlays.map(snapshot).sort((a, b) => a.num - b.num);
+    const frozenDefense = defensePlays.map(snapshot).sort((a, b) => a.num - b.num);
     const form = new FormData();
     form.append('options', JSON.stringify(options));
     if (needOffense) {
-      for (let i = 0; i < frozenOffense.length; i++) {
-        const blob = await exportPlayPNG(frozenOffense[i], 'offense', i);
-        form.append('plays', blob, String(i + 1).padStart(2, '0') + '.png');
+      for (const p of frozenOffense) {
+        const blob = await exportPlayPNG(p, 'offense', displayNum('offense', p));
+        form.append('plays', blob, String(p.num).padStart(2, '0') + '.png');
       }
     }
     if (needDefense) {
-      for (let i = 0; i < frozenDefense.length; i++) {
-        const blob = await exportPlayPNG(frozenDefense[i], 'defense', i);
-        form.append('plays', blob, 'D' + (i + 1) + '.png');
+      for (const p of frozenDefense) {
+        const blob = await exportPlayPNG(p, 'defense', displayNum('defense', p));
+        form.append('plays', blob, 'D' + p.num + '.png');
       }
     }
     showProgress('Uploading play images…');
@@ -2200,6 +2539,7 @@ function showAuthView(msg) {
   editorView.classList.remove('active');
   authView.classList.add('active');
   signOutBtn.style.display = 'none';
+  $('accountBtn').style.display = 'none';
   userEmail.textContent = '';
   if (msg) showAuthError(msg);
   else hideAuthError();
@@ -2211,6 +2551,8 @@ function discardLocalDoc() {
   clearTimeout(saveTimer);
   doc = null;
   docOwner = null;
+  serverUpdatedAt = null;
+  overwriteNext = false;
   cur = null;
   selection = null;
   drawing = null;
@@ -2220,6 +2562,7 @@ function discardLocalDoc() {
 async function enterEditor(email) {
   userEmail.textContent = email || '';
   signOutBtn.style.display = '';
+  $('accountBtn').style.display = '';
   authView.classList.remove('active');
   editorView.classList.add('active');
   hideAuthError();
@@ -2246,6 +2589,7 @@ async function enterEditor(email) {
   }
   doc = normalizeDoc(data || {});
   docOwner = email;
+  serverUpdatedAt = data && data.updatedAt || null;
   saveState = 'saved';
   updateSaveIndicator();
   cur = firstAvailable();
@@ -2272,6 +2616,10 @@ async function authSubmit(path) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Sign-in failed');
     authPassword.value = '';
+    if (data.recoveryCode) {
+      await showRecoveryCode(data.recoveryCode,
+        'Your account was created. This code is the ONLY way to reset your password if you forget it.');
+    }
     await enterEditor(data.email || email);
   } catch (err) {
     showAuthError(err.message);
@@ -2279,6 +2627,109 @@ async function authSubmit(path) {
     loginBtn.disabled = registerBtn.disabled = false;
   }
 }
+
+// ---- Password recovery flow ----
+const signinForm = $('signinForm'), recoverForm = $('recoverForm');
+const recEmail = $('recEmail'), recCode = $('recCode'), recPassword = $('recPassword');
+const recError = $('recError'), recoverBtn = $('recoverBtn');
+
+$('forgotLink').addEventListener('click', e => {
+  e.preventDefault();
+  recEmail.value = authEmail.value;
+  signinForm.style.display = 'none';
+  recoverForm.style.display = '';
+  recError.classList.remove('active');
+});
+$('backToSignin').addEventListener('click', e => {
+  e.preventDefault();
+  recoverForm.style.display = 'none';
+  signinForm.style.display = '';
+});
+
+recoverBtn.addEventListener('click', async () => {
+  const email = recEmail.value.trim().toLowerCase();
+  const recoveryCode = recCode.value.trim();
+  const newPassword = recPassword.value;
+  recError.classList.remove('active');
+  const fail = msg => { recError.textContent = msg; recError.classList.add('active'); };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Enter a valid email address');
+  if (!recoveryCode) return fail('Enter your recovery code');
+  if (newPassword.length < 8) return fail('New password must be at least 8 characters');
+  recoverBtn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/recover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, recoveryCode, newPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Recovery failed');
+    recCode.value = recPassword.value = '';
+    recoverForm.style.display = 'none';
+    signinForm.style.display = '';
+    if (data.recoveryCode) {
+      await showRecoveryCode(data.recoveryCode,
+        'Password reset. Your OLD recovery code no longer works — this is your new one.');
+    }
+    await enterEditor(data.email || email);
+  } catch (err) {
+    fail(err.message);
+  } finally {
+    recoverBtn.disabled = false;
+  }
+});
+
+// ---- Account menu ----
+$('accountBtn').addEventListener('click', async () => {
+  const choice = await showChoiceModal({
+    title: 'Account',
+    message: userEmail.textContent,
+    choices: [
+      { key: 'code', label: 'Get new recovery code' },
+      { key: 'delete', label: 'Delete account', danger: true },
+      { key: 'cancel', label: 'Close' },
+    ],
+  });
+  if (choice === 'code') {
+    const sure = await showModal({
+      title: 'New recovery code',
+      message: 'This replaces your current recovery code — the old one stops working. Continue?',
+      confirmLabel: 'Generate',
+    });
+    if (!sure) return;
+    try {
+      const res = await fetch('/api/auth/recovery-code', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      await showRecoveryCode(data.recoveryCode, 'Here is your new recovery code.');
+    } catch (err) {
+      await showModal({ title: 'Could not generate code', message: err.message, confirmLabel: 'OK' });
+    }
+  } else if (choice === 'delete') {
+    const pw = await showModal({
+      title: 'Delete account',
+      message: 'This permanently deletes your account AND your whole playbook. Type your password to confirm.',
+      withInput: true,
+      inputType: 'password',
+      confirmLabel: 'Delete forever',
+      danger: true,
+    });
+    if (pw === null || pw === '') return;
+    try {
+      const res = await fetch('/api/auth/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      discardLocalDoc();
+      showAuthView('Account deleted.');
+    } catch (err) {
+      await showModal({ title: 'Could not delete account', message: err.message, confirmLabel: 'OK' });
+    }
+  }
+});
 
 loginBtn.addEventListener('click', () => authSubmit('/api/auth/login'));
 registerBtn.addEventListener('click', () => authSubmit('/api/auth/register'));
@@ -2307,6 +2758,28 @@ signOutBtn.addEventListener('click', async () => {
 
 syncToolUI();
 syncStyleUI();
+
+// Splash sample: a real play rendered by the same renderer that drives the
+// editor and the PDFs — the landing pitch shows the actual product output.
+(function renderSplashSample() {
+  const demo = {
+    id: 'splash-demo', name: 'Dagger',
+    chips: { '1': { x: 0.09, y: 0.66 }, '2': { x: 0.21, y: 0.66 }, '3': { x: 0.33, y: 0.66 },
+             '4': { x: 0.45, y: 0.66 }, '5': { x: 0.10, y: 0.88 }, 'QB': { x: 0.62, y: 0.66 } },
+    routes: [
+      { chip: '2', color: '#0070C0', dash: false, end: 'arrow', corner: 'smooth', points: [[0.21, 0.66], [0.21, 0.40], [0.21, 0.10]] },
+      { chip: '1', color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth', points: [[0.09, 0.66], [0.09, 0.32], [0.55, 0.30]] },
+      { chip: '3', color: '#000000', dash: false, end: 'arrow', corner: 'smooth', points: [[0.33, 0.66], [0.40, 0.52], [0.62, 0.48]] },
+      { chip: '5', color: '#00B050', dash: false, end: 'arrow', corner: 'smooth', points: [[0.10, 0.88], [0.05, 0.80], [0.02, 0.72]] },
+    ],
+    lines: [{ color: '#1F6E8C', dash: true, end: 'none', corner: 'sharp', points: [[0, 0.55], [1, 0.55]], width: 10, dashArray: '28 18' }],
+    labels: [{ x: 0.38, y: 0.24, text: '10 YDS', color: '#0070C0', size: 0.055 }],
+    balls: [],
+  };
+  try {
+    $('splashSample').appendChild(render(demo, 'offense', '7'));
+  } catch { /* the splash must never block sign-in */ }
+})();
 
 (async function init() {
   try {

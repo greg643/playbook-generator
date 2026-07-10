@@ -40,16 +40,16 @@ def update_status(s3, bucket, job_id, status_dict, request_fields=None):
     body = {**(request_fields or {}), **status_dict}
     s3.put_object(
         Bucket=bucket,
-        Key=f"{job_id}/status.json",
+        Key=f"jobs/{job_id}/status.json",
         Body=json.dumps(body),
         ContentType="application/json",
     )
 
 
 def download_play_images(s3, bucket, job_id, plays_dir):
-    """Download every object under <job_id>/plays/ from R2 (paginated)."""
+    """Download every object under jobs/<job_id>/plays/ from R2 (paginated)."""
     count = 0
-    list_kwargs = {"Bucket": bucket, "Prefix": f"{job_id}/plays/"}
+    list_kwargs = {"Bucket": bucket, "Prefix": f"jobs/{job_id}/plays/"}
     while True:
         listing = s3.list_objects_v2(**list_kwargs)
         for obj in listing.get("Contents", []):
@@ -87,7 +87,7 @@ def main():
         request_data = None
         for attempt in range(3):
             try:
-                request_obj = s3.get_object(Bucket=bucket, Key=f"{job_id}/status.json")
+                request_obj = s3.get_object(Bucket=bucket, Key=f"jobs/{job_id}/status.json")
                 request_data = json.loads(request_obj["Body"].read())
                 break
             except s3.exceptions.NoSuchKey:
@@ -112,7 +112,7 @@ def main():
             output_dir.mkdir()
 
             if mode == "images":
-                # Editor flow: play PNGs were uploaded to <job_id>/plays/ by /api/generate
+                # Editor flow: play PNGs were uploaded to jobs/<job_id>/plays/ by /api/generate
                 options = request_data.get("options", {})
                 offense_coach_card = options.get("offense_coach_card", options.get("offense", True))
                 offense_wristband = options.get("offense_wristband", options.get("offense", True))
@@ -167,7 +167,7 @@ def main():
 
                 # Download PPTX from R2
                 print("Downloading PPTX from R2...")
-                s3.download_file(bucket, f"{job_id}/input.pptx", str(pptx_path))
+                s3.download_file(bucket, f"jobs/{job_id}/input.pptx", str(pptx_path))
                 print(f"  Downloaded {pptx_path.stat().st_size} bytes")
 
                 # Run the pipeline
@@ -207,7 +207,7 @@ def main():
             uploaded = []
 
             for pdf in pdf_files:
-                key = f"{job_id}/{pdf.name}"
+                key = f"jobs/{job_id}/{pdf.name}"
                 print(f"  Uploading {pdf.name} ({pdf.stat().st_size} bytes)...")
                 s3.upload_file(
                     str(pdf),

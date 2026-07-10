@@ -1,7 +1,12 @@
+import { requireUser } from "../_lib/auth.js";
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
+    const { user, response } = await requireUser(context);
+    if (!user) return response;
+
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
       return Response.json(
@@ -45,13 +50,13 @@ export async function onRequestPost(context) {
 
     // Upload PPTX to R2
     const fileBuffer = await file.arrayBuffer();
-    await env.PLAYBOOK_BUCKET.put(`${jobId}/input.pptx`, fileBuffer, {
+    await env.PLAYBOOK_BUCKET.put(`jobs/${jobId}/input.pptx`, fileBuffer, {
       httpMetadata: { contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
     });
 
     // Write initial status with options
     await env.PLAYBOOK_BUCKET.put(
-      `${jobId}/status.json`,
+      `jobs/${jobId}/status.json`,
       JSON.stringify({
         status: "processing",
         createdAt: new Date().toISOString(),
@@ -82,7 +87,7 @@ export async function onRequestPost(context) {
       console.error("GitHub dispatch failed:", ghResponse.status, errorText);
       // Update status to error
       await env.PLAYBOOK_BUCKET.put(
-        `${jobId}/status.json`,
+        `jobs/${jobId}/status.json`,
         JSON.stringify({ status: "error", message: "Failed to start processing" }),
         { httpMetadata: { contentType: "application/json" } }
       );

@@ -511,6 +511,14 @@ class PlaybookGenerator:
                 group_col = group_idx % groups_across
                 group_x = start_x + (group_col * (group_width + group_spacing))
                 group_y = start_y - (group_row * (group_height + group_spacing))
+
+                # Dashed cutting guide (same size/style as defense wristband)
+                c.setStrokeColorRGB(0.3, 0.3, 0.3)
+                c.setLineWidth(0.5)
+                c.setDash([3, 3])
+                c.rect(group_x, group_y - group_height, group_width, group_height)
+                c.setDash([])
+
                 for play_idx in range(len(page_images)):
                     row = play_idx // group_cols
                     col = play_idx % group_cols

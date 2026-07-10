@@ -78,13 +78,13 @@ export async function onRequestPost(context) {
     const jobId = crypto.randomUUID();
 
     for (const file of files) {
-      await env.PLAYBOOK_BUCKET.put(`${jobId}/plays/${file.name}`, await file.arrayBuffer(), {
+      await env.PLAYBOOK_BUCKET.put(`jobs/${jobId}/plays/${file.name}`, await file.arrayBuffer(), {
         httpMetadata: { contentType: "image/png" },
       });
     }
 
     await env.PLAYBOOK_BUCKET.put(
-      `${jobId}/status.json`,
+      `jobs/${jobId}/status.json`,
       JSON.stringify({
         status: "processing",
         createdAt: new Date().toISOString(),
@@ -115,7 +115,7 @@ export async function onRequestPost(context) {
       const errorText = await ghResponse.text();
       console.error("GitHub dispatch failed:", ghResponse.status, errorText);
       await env.PLAYBOOK_BUCKET.put(
-        `${jobId}/status.json`,
+        `jobs/${jobId}/status.json`,
         JSON.stringify({ status: "error", message: "Failed to start processing" }),
         { httpMetadata: { contentType: "application/json" } }
       );

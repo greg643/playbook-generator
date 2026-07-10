@@ -176,9 +176,13 @@
     .error-msg.active { display: block; }
 
     /* Editor link */
+    .pill-links {
+      display: flex;
+      gap: 0.5rem;
+      margin: -1.4rem 0 1.8rem;
+    }
     .editor-link {
       display: inline-block;
-      margin: -1.4rem 0 1.8rem;
       padding: 0.3rem 0.85rem;
       background: #161b22;
       border: 1px solid #30363d;
@@ -204,15 +208,49 @@
       text-decoration: none;
     }
     .reset-link a:hover { text-decoration: underline; }
+
+    /* Auth */
+    .drop-zone.disabled {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .auth-notice {
+      margin-bottom: 1.25rem;
+      padding: 0.75rem;
+      background: rgba(88, 166, 255, 0.08);
+      border: 1px solid #58a6ff;
+      border-radius: 8px;
+      color: #e1e4e8;
+      font-size: 0.85rem;
+      text-align: center;
+      display: none;
+    }
+    .auth-notice.active { display: block; }
+    .auth-notice a { color: #58a6ff; text-decoration: none; }
+    .auth-notice a:hover { text-decoration: underline; }
+    .signed-in {
+      display: none;
+      margin-top: 1rem;
+      text-align: center;
+      color: #8b949e;
+      font-size: 0.8rem;
+    }
+    .signed-in.active { display: block; }
   </style>
 </head>
 <body>
 
   <h1>Playbook Generator</h1>
   <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
-  <a class="editor-link" href="/editor">&#9999;&#65039; Play Editor (beta)</a>
+  <div class="pill-links">
+    <a class="editor-link" href="/editor">&#9999;&#65039; Play Editor (beta)</a>
+    <a class="editor-link" href="/help">&#128214; Help</a>
+  </div>
 
   <div class="card">
+    <div class="auth-notice" id="authNotice">
+      Sign in to upload &mdash; the <a href="/editor">play editor</a> account works here too
+    </div>
     <div class="drop-zone" id="dropZone">
       <div class="icon">&#128196;</div>
       <p>Drag &amp; drop a <strong>.pptx</strong> file here, or click to browse</p>
@@ -254,6 +292,8 @@
     <div class="reset-link" id="resetLink">
       <a onclick="resetUI()">Generate another playbook</a>
     </div>
+
+    <p class="signed-in" id="signedInLine"></p>
   </div>
 
 <script>
@@ -268,6 +308,8 @@
   const dlGrid = document.getElementById('dlGrid');
   const errorMsg = document.getElementById('errorMsg');
   const resetLink = document.getElementById('resetLink');
+  const authNotice = document.getElementById('authNotice');
+  const signedInLine = document.getElementById('signedInLine');
 
   const chkOffenseCoach = document.getElementById('chkOffenseCoach');
   const chkOffenseWrist = document.getElementById('chkOffenseWrist');
@@ -276,6 +318,7 @@
 
   let selectedFile = null;
   let pollTimer = null;
+  let signedIn = false;
 
   const FRIENDLY_NAMES = {
     'offense_coach_card.pdf': 'Offense Coach Card',
@@ -306,13 +349,14 @@
   });
 
   function selectFile(file) {
+    if (!signedIn) return;
     selectedFile = file;
     fileName.textContent = file.name;
     generateBtn.disabled = false;
   }
 
   generateBtn.addEventListener('click', async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !signedIn) return;
     generateBtn.disabled = true;
     showProgress('Uploading...');
     hideError();
@@ -426,6 +470,24 @@
     resetLink.classList.remove('active');
     if (pollTimer) clearInterval(pollTimer);
   }
+
+  // ---------- Init ----------
+
+  (async function initAuth() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        signedIn = true;
+        signedInLine.textContent = `Signed in as ${data.email}`;
+        signedInLine.classList.add('active');
+        return;
+      }
+    } catch { /* fall through */ }
+    dropZone.classList.add('disabled');
+    generateBtn.disabled = true;
+    authNotice.classList.add('active');
+  })();
 </script>
 
 </body>

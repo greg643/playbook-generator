@@ -5,6 +5,7 @@ import {
   emailKey,
   hashPassword,
   createSessionCookie,
+  createRecoveryFields,
 } from "../../_lib/auth.js";
 
 const PBKDF2_ITERATIONS = 100000;
@@ -45,6 +46,8 @@ export async function onRequestPost(context) {
     let salt = "";
     for (const b of saltBytes) salt += b.toString(16).padStart(2, "0");
 
+    const { recoveryCode, fields: recoveryFields } = await createRecoveryFields();
+
     const userId = crypto.randomUUID();
     const record = {
       userId,
@@ -52,6 +55,7 @@ export async function onRequestPost(context) {
       salt,
       iterations: PBKDF2_ITERATIONS,
       hash: await hashPassword(password, salt, PBKDF2_ITERATIONS),
+      ...recoveryFields,
       createdAt: new Date().toISOString(),
     };
 
@@ -60,7 +64,7 @@ export async function onRequestPost(context) {
     });
 
     const cookie = await createSessionCookie(userId, email, env);
-    return jsonNoStore({ email }, { headers: { "Set-Cookie": cookie } });
+    return jsonNoStore({ email, recoveryCode }, { headers: { "Set-Cookie": cookie } });
   } catch (err) {
     console.error("Register error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });

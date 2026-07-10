@@ -93,6 +93,53 @@ export async function hashPassword(password, saltHex, iterations) {
   return bytesToHex(new Uint8Array(bits));
 }
 
+export function generateSaltHex() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+}
+
+const RECOVERY_ITERATIONS = 100000;
+
+// Recovery codes are 20 hex chars shown as XXXX-XXXX-XXXX-XXXX-XXXX.
+// Verification is case- and dash-insensitive: normalize before hashing.
+export function generateRecoveryCode() {
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  const hex = bytesToHex(bytes).toUpperCase();
+  const groups = [];
+  for (let i = 0; i < hex.length; i += 4) groups.push(hex.slice(i, i + 4));
+  return groups.join("-");
+}
+
+export function normalizeRecoveryCode(code) {
+  return String(code || "").toLowerCase().replace(/[^0-9a-f]/g, "");
+}
+
+// Fresh recovery code plus the PBKDF2 fields to persist on the user record.
+export async function createRecoveryFields() {
+  const recoveryCode = generateRecoveryCode();
+  const recoverySalt = generateSaltHex();
+  const recoveryHash = await hashPassword(
+    normalizeRecoveryCode(recoveryCode),
+    recoverySalt,
+    RECOVERY_ITERATIONS
+  );
+  return {
+    recoveryCode,
+    fields: { recoverySalt, recoveryIterations: RECOVERY_ITERATIONS, recoveryHash },
+  };
+}
+
+// Constant-time compare of two hex digest strings.
+export function constantTimeEqualHex(a, b) {
+  let diff = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i % b.length);
+  }
+  return diff === 0;
+}
+
 async function hmacSign(secret, payload) {
   const key = await crypto.subtle.importKey(
     "raw",

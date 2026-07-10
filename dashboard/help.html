@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Help &mdash; Playbook Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e1e4e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    /* Pill links back to the apps (same look as the editor link on the home page) */
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .pill {
+      display: inline-block;
+      padding: 0.3rem 0.85rem;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      color: #58a6ff;
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .pill:hover { border-color: #58a6ff; }
+
+    /* Table of contents */
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-bottom: 2rem;
+      max-width: 720px;
+    }
+    .toc a {
+      padding: 0.25rem 0.7rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      font-size: 0.8rem;
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .toc a:hover { border-color: #58a6ff; color: #58a6ff; }
+
+    /* Section cards */
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1.5rem 1.75rem;
+      width: 100%;
+      max-width: 720px;
+      scroll-margin-top: 1.5rem;
+    }
+    .card + .card { margin-top: 1rem; }
+
+    h2 {
+      font-size: 1.15rem;
+      color: #fff;
+      margin-bottom: 0.75rem;
+    }
+    h3 {
+      font-size: 0.95rem;
+      color: #58a6ff;
+      margin: 1rem 0 0.4rem;
+    }
+
+    p { font-size: 0.9rem; line-height: 1.6; color: #e1e4e8; }
+    p + p { margin-top: 0.6rem; }
+    .muted { color: #8b949e; font-size: 0.85rem; }
+
+    ul {
+      margin: 0.5rem 0 0.25rem;
+      padding-left: 1.25rem;
+    }
+    li {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 0.4rem;
+    }
+    li:last-child { margin-bottom: 0; }
+
+    a { color: #58a6ff; }
+
+    strong { color: #fff; font-weight: 600; }
+
+    kbd {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.78em;
+      line-height: 1.4;
+      padding: 0.05em 0.4em;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      color: #e1e4e8;
+      white-space: nowrap;
+    }
+
+    /* The four PDF outputs */
+    .out-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    @media (max-width: 560px) { .out-grid { grid-template-columns: 1fr; } }
+    .out {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      padding: 0.6rem 0.75rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+    }
+    .out .out-icon { font-size: 1.1rem; line-height: 1.3; }
+    .out .out-name { font-size: 0.82rem; font-weight: 600; color: #fff; }
+    .out .out-desc { font-size: 0.78rem; color: #8b949e; line-height: 1.45; }
+
+    .callout {
+      margin-top: 0.9rem;
+      padding: 0.75rem 0.9rem;
+      background: rgba(88, 166, 255, 0.06);
+      border: 1px solid rgba(88, 166, 255, 0.35);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
+    .callout.warn {
+      background: rgba(210, 153, 34, 0.07);
+      border-color: rgba(210, 153, 34, 0.45);
+    }
+
+    footer {
+      margin-top: 2rem;
+      color: #8b949e;
+      font-size: 0.8rem;
+      text-align: center;
+    }
+    footer a { color: #58a6ff; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <h1>Playbook Generator Help</h1>
+  <p class="subtitle">Build a flag football playbook, print coach cards &amp; wristbands, keep your account safe</p>
+
+  <div class="nav-links">
+    <a class="pill" href="/">&#128196; PPTX upload</a>
+    <a class="pill" href="/editor">&#9999;&#65039; Play Editor</a>
+  </div>
+
+  <nav class="toc">
+    <a href="#overview">What this is</a>
+    <a href="#editor">Editor quick start</a>
+    <a href="#editing">Editing</a>
+    <a href="#numbering">Playbook &amp; numbering</a>
+    <a href="#printing">Generating &amp; printing</a>
+    <a href="#account">Account &amp; safety</a>
+    <a href="#pptx">PPTX upload format</a>
+  </nav>
+
+  <section class="card" id="overview">
+    <h2>What this is</h2>
+    <p>Two ways to make a playbook, one set of outputs:</p>
+    <ul>
+      <li><strong>Upload a PowerPoint</strong> &mdash; drop a <strong>.pptx</strong> on the <a href="/">home page</a> and the pipeline extracts each play automatically.</li>
+      <li><strong>Play Editor</strong> &mdash; draw plays right in the browser at <a href="/editor">/editor</a>. No PowerPoint needed: drag the player chips, draw routes and zone lines, add text, and generate from there.</li>
+    </ul>
+    <p>Either way, generation runs in the cloud and produces the same four print-ready PDFs:</p>
+    <div class="out-grid">
+      <div class="out">
+        <span class="out-icon">&#127944;</span>
+        <span><span class="out-name">Offense Coach Card</span><br>
+        <span class="out-desc">Full-page 4&times;4 grid of your offense plays (up to 16) for the sideline.</span></span>
+      </div>
+      <div class="out">
+        <span class="out-icon">&#128737;&#65039;</span>
+        <span><span class="out-name">Defense Coach Card</span><br>
+        <span class="out-desc">Full-page grid of your defensive formations (up to 6).</span></span>
+      </div>
+      <div class="out">
+        <span class="out-icon">&#9200;</span>
+        <span><span class="out-name">Offense Wristband</span><br>
+        <span class="out-desc">Cut-out card groups sized for QB wristband insert windows.</span></span>
+      </div>
+      <div class="out">
+        <span class="out-icon">&#9200;</span>
+        <span><span class="out-name">Defense Wristband</span><br>
+        <span class="out-desc">Same-size defense reference cards for player wristbands.</span></span>
+      </div>
+    </div>
+    <p class="callout">Wristband cards are sized for standard <strong>1.07 &times; 1.02 in</strong> wristband insert windows &mdash; the kind on most youth football play wristbands.</p>
+  </section>
+
+  <section class="card" id="editor">
+    <h2>Editor quick start</h2>
+    <ul>
+      <li><strong>Add a play</strong> &mdash; click <strong>+ Add play</strong> under OFFENSE or DEFENSE in the sidebar. New plays start with the standard formation already placed.</li>
+      <li><strong>Move players</strong> &mdash; with the <strong>Select</strong> tool, drag any chip. Routes stay attached to their chip when it moves.</li>
+      <li><strong>Draw a route</strong> &mdash; pick the <strong>Route</strong> tool, click near the chip the route starts from, then click each waypoint. Press <kbd>Enter</kbd> or double-click to finish; <kbd>Esc</kbd> cancels without saving the route.</li>
+      <li><strong>Lines</strong> &mdash; the <strong>Line</strong> tool works the same way (click waypoints, <kbd>Enter</kbd> or double-click to finish) and defaults to a dashed zone-line style with no arrow.</li>
+      <li><strong>Text</strong> &mdash; pick <strong>Text</strong> and click the field. <kbd>Enter</kbd> saves, <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line, and long text wraps on the card automatically.</li>
+      <li><strong>Ball</strong> &mdash; click the field to place a football marker.</li>
+      <li><strong>Erase</strong> &mdash; click any route, line, label, or ball to remove it.</li>
+    </ul>
+    <p class="muted">The hint line under the field always shows what the current tool does.</p>
+  </section>
+
+  <section class="card" id="editing">
+    <h2>Editing</h2>
+    <ul>
+      <li><strong>Select &amp; reshape</strong> &mdash; with <strong>Select</strong>, click a route or line to select it, then drag its round handles to reshape it.</li>
+      <li><strong>Add a bend</strong> &mdash; double-click anywhere on a selected route or line segment to insert a new handle there.</li>
+      <li><strong>Remove a bend</strong> &mdash; double-click an existing handle to remove it.</li>
+      <li><strong>Restyle</strong> &mdash; while a route or line is selected, the style controls apply to it directly: color swatches, <strong>Solid/Dashed</strong>, route end (<strong>Arrow / Ball / None</strong>), and corners (<strong>Smooth / Sharp</strong>).</li>
+      <li><strong>Edit text</strong> &mdash; double-click a label with <strong>Select</strong> to change its wording.</li>
+      <li><strong>Delete</strong> &mdash; press <kbd>Delete</kbd> or <kbd>Backspace</kbd> to remove the selection.</li>
+      <li><strong>Undo / redo</strong> &mdash; <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>) redoes. History is kept per play.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="numbering">
+    <h2>Playbook &amp; numbering</h2>
+    <ul>
+      <li><strong>In-playbook toggle</strong> &mdash; the checkbox on each sidebar row controls whether a play prints. Unchecked plays stay on the bench: kept in your account, shown faded, but left out of the PDFs.</li>
+      <li><strong>Sticky numbers</strong> &mdash; a play keeps its number (offense <strong>1&ndash;16</strong>) or letter (defense <strong>A&ndash;F</strong>) once assigned, even as you bench or reorder other plays &mdash; so wristbands you printed earlier stay valid.</li>
+      <li><strong>Renumber</strong> &mdash; when you want a clean sequence again, the <strong>Renumber</strong> button reassigns numbers in sidebar order.</li>
+      <li><strong>Print caps</strong> &mdash; the printed cards hold at most <strong>16 offense</strong> and <strong>6 defense</strong> plays in the playbook at once.</li>
+      <li><strong>Storage caps</strong> &mdash; your account can keep up to <strong>64 offense</strong> and <strong>24 defense</strong> plays total (in playbook + benched), so you can archive plays between seasons.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="printing">
+    <h2>Generating &amp; printing</h2>
+    <ul>
+      <li>Check the outputs you want (any of the four PDFs), then hit <strong>Generate</strong>. Jobs usually take <strong>about 1&ndash;2 minutes</strong>; the page polls automatically and shows download buttons when everything is ready.</li>
+      <li><strong>Coach cards</strong> are full-page grids &mdash; print one per coach.</li>
+      <li><strong>Wristband sheets</strong> print six identical cut-out groups per page with dashed <strong>cut guides</strong> around each group. Cut along the guides and each group slides into a wristband insert window (<strong>1.07 &times; 1.02 in</strong> per card).</li>
+    </ul>
+    <p class="callout warn">Print at <strong>100% scale</strong> (turn off &ldquo;fit to page&rdquo;) so the wristband cut-outs keep their exact size.</p>
+  </section>
+
+  <section class="card" id="account">
+    <h2>Account &amp; safety</h2>
+    <h3>Recovery code &mdash; save it!</h3>
+    <p>When you create an account you get a one-time <strong>recovery code</strong> (looks like <kbd>XXXX-XXXX-XXXX-XXXX-XXXX</kbd>). Save it somewhere safe &mdash; it is the <strong>only</strong> way back into your account if you forget your password, and it is shown only when issued.</p>
+    <h3>Password reset</h3>
+    <p>Forgot your password? Use your email plus your recovery code to set a new one. Each successful reset issues a <strong>fresh</strong> recovery code &mdash; save the new one, the old one no longer works. You can also rotate your recovery code anytime while signed in.</p>
+    <h3>Backups</h3>
+    <p>You can <strong>export</strong> your whole playbook as a JSON file at any time, and <strong>import</strong> it back later. It&rsquo;s a good habit before big edits &mdash; and it&rsquo;s how you move plays between accounts.</p>
+    <h3>Deleting your account</h3>
+    <p>Account deletion permanently removes your account and stored playbook, and requires your password to confirm. Export a JSON backup first if you might ever want the plays back.</p>
+  </section>
+
+  <section class="card" id="pptx">
+    <h2>PPTX upload format</h2>
+    <p>The PowerPoint pipeline reads your deck slide by slide. For clean results it expects:</p>
+    <ul>
+      <li><strong>Section slides</strong> &mdash; a nearly-empty slide whose text says <strong>OFFENSE</strong> starts the offense section; one saying <strong>DEFENSE</strong> starts the defense section. Play slides before the first section header are ignored.</li>
+      <li><strong>Field rectangle</strong> &mdash; each play slide draws the play inside one large rectangle shape (the field). The slide image is cropped to that rectangle for the cards.</li>
+      <li><strong>Numbered text boxes</strong> &mdash; text boxes near the top of the field become the play header: a short one with the play number (<strong>1&ndash;16</strong>, or <strong>A&ndash;F</strong> for defense) and a longer one with the play name.</li>
+      <li>Slides containing <strong>PRINT IMAGES</strong>, <strong>APPENDIX</strong>, or <strong>TEMPLATE</strong> are skipped automatically.</li>
+    </ul>
+    <p class="muted">If a slide is skipped unexpectedly, check that it has a field rectangle and comes after an OFFENSE or DEFENSE section slide.</p>
+  </section>
+
+  <footer>
+    <a href="/">PPTX upload</a> &middot; <a href="/editor">Play Editor</a> &middot; <a href="#overview">Back to top</a>
+  </footer>
+
+</body>
+</html>
