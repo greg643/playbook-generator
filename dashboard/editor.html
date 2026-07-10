@@ -445,6 +445,8 @@
     #authCard { flex: 0 0 340px; }
     .backup-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
     .backup-row .add-btn { flex: 1; }
+    .tb-sub { color: #8b949e; font-size: 0.62rem; text-transform: uppercase;
+      letter-spacing: 0.08em; margin: 0.45rem 0 0.15rem; }
     .side-btn-row { display: flex; gap: 0.4rem; }
     .side-btn-row .add-btn { flex: 1; }
     .renum-btn { flex: 0 0 auto !important; }
@@ -559,18 +561,23 @@
         <button class="tool-btn" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">&#8631; Redo</button>
       </div>
 
-      <div class="tb-label" id="styleMode">Style for new routes &amp; lines</div>
+      <div class="tb-label" id="styleMode">Style for new arrows &amp; lines</div>
+      <div class="tb-sub">Color</div>
       <div class="swatches" id="swatches"></div>
+      <div class="tb-sub">Line type</div>
       <div class="seg" id="dashSeg">
         <button data-dash="false">Solid</button>
         <button data-dash="true">Dashed</button>
       </div>
-      <div class="seg" id="endSeg" title="Route end">
+      <div class="tb-sub">Line termination</div>
+      <div class="seg" id="endSeg">
         <button data-end="arrow">Arrow</button>
         <button data-end="ball">Ball</button>
+        <button data-end="block">Block</button>
         <button data-end="none">None</button>
       </div>
-      <div class="seg" id="cornerSeg" title="Corner style: smooth curves or sharp cuts">
+      <div class="tb-sub">Curve style</div>
+      <div class="seg" id="cornerSeg">
         <button data-corner="smooth">Smooth</button>
         <button data-corner="sharp">Sharp</button>
       </div>
@@ -847,6 +854,17 @@ function polylineLength(pts) {
   return L;
 }
 
+function blockCapAt(tip, dir, color) {
+  const [ux, uy] = dir;
+  const px = -uy, py = ux;
+  const HW = 26;  // half-width of the T bar
+  return svgEl('line', {
+    x1: tip[0] + px * HW, y1: tip[1] + py * HW,
+    x2: tip[0] - px * HW, y2: tip[1] - py * HW,
+    stroke: color, 'stroke-width': 13, 'stroke-linecap': 'round',
+  });
+}
+
 function arrowHeadAt(tip, dir, color) {
   const [ux, uy] = dir;
   const px = -uy, py = ux;
@@ -892,6 +910,8 @@ function appendStrokeWithEnd(parent, pts, { color, width, dash, dashArray, end, 
     parent.appendChild(arrowHeadAt(base[base.length - 1], tailDirection(base, 40), color));
   } else if (end === 'ball') {
     parent.appendChild(footballGlyph(base[base.length - 1][0], base[base.length - 1][1]));
+  } else if (end === 'block') {
+    parent.appendChild(blockCapAt(base[base.length - 1], tailDirection(base, 40), color));
   }
 }
 
@@ -1375,6 +1395,18 @@ function onPointerDown(e) {
     if (!drawing) drawing = { kind: 'line', points: [[nx, ny]], hover: [nx, ny] };
     else addDrawingPoint(nx, ny);
     refreshCanvas();
+  } else if (tool === 'block') {
+    const key = nearestChip(play, x, y);
+    if (!key) return;
+    const c = play.chips[key];
+    if (dist(x, y, fx(c.x), fy(c.y)) > 300) return;
+    pushUndo();
+    play.routes.push({
+      chip: key, color: style.color, dash: false, end: 'block', corner: 'sharp',
+      points: [[c.x, c.y], [nx, ny]],
+    });
+    markDirty();
+    refreshCanvas();
   } else if (tool === 'text') {
     placeText(nx, ny);
   } else if (tool === 'ball') {
@@ -1604,12 +1636,13 @@ document.addEventListener('keydown', e => {
 // ---------- Tools & style UI ----------
 
 const TOOL_DEFS = [
-  ['select', 'Select'], ['route', 'Route'], ['line', 'Line'],
-  ['text', 'Text'], ['ball', 'Ball'], ['erase', 'Erase'],
+  ['select', 'Select'], ['route', 'Arrow'], ['line', 'Line'],
+  ['block', 'Block'], ['text', 'Text'], ['ball', 'Ball'], ['erase', 'Erase'],
 ];
 const HINTS = {
   select: 'Drag chips, text and balls. Click a route or line to select it — drag its handles to reshape, double-click a segment to add a bend, double-click a handle to remove it, restyle with the controls, or press Delete.',
-  route: 'Click near a chip to start, then click waypoints. Double-click or press Enter to finish.',
+  route: 'Click near a player to start the arrow, then click waypoints. Double-click or press Enter to finish.',
+  block: 'Click where the block happens — a T is drawn from the nearest player. One click per block.',
   line: 'Click waypoints for a zone line. Double-click or press Enter to finish.',
   text: 'Click the field to place a text label. Double-click a label with Select to edit it.',
   ball: 'Click the field to place a football.',
@@ -1645,6 +1678,7 @@ function setTool(t) {
   tool = t;
   if (t !== 'select') selection = null;
   if (t === 'line') { style.color = '#1F6E8C'; style.dash = true; style.end = 'none'; style.corner = 'sharp'; }  // zone-line default
+  if (t === 'block') { style.color = '#000000'; }  // blocks are conventionally black
   if (t === 'route') { style.end = style.end === 'none' ? 'arrow' : style.end; }  // routes usually end in arrows
   canvasSvg.style.cursor = t === 'select' ? 'default' : 'crosshair';
   syncToolUI();
@@ -1740,7 +1774,7 @@ function normalizePlay(p, section) {
       chip: typeof r.chip === 'string' ? r.chip : '1',
       color: typeof r.color === 'string' ? r.color : '#FF0000',
       dash: !!r.dash,
-      end: ['arrow', 'ball', 'none'].includes(r.end) ? r.end : 'arrow',
+      end: ['arrow', 'ball', 'none', 'block'].includes(r.end) ? r.end : 'arrow',
       corner: ['smooth', 'sharp'].includes(r.corner) ? r.corner : 'smooth',
       points: rpts,
     });
@@ -1752,7 +1786,7 @@ function normalizePlay(p, section) {
     const line = {
       color: typeof l.color === 'string' ? l.color : '#1F6E8C',
       dash: !!l.dash,
-      end: ['arrow', 'ball', 'none'].includes(l.end) ? l.end : 'none',
+      end: ['arrow', 'ball', 'none', 'block'].includes(l.end) ? l.end : 'none',
       corner: ['smooth', 'sharp'].includes(l.corner) ? l.corner : 'sharp',
       points: lpts,
     };
@@ -1968,6 +2002,23 @@ function refreshAll() {
   syncPlayName();
   refreshCanvas();
   setHint();
+  syncGenerateChecks();
+}
+
+// Output checkboxes are only selectable when that section has a play in the
+// playbook — an empty section's outputs can't be generated anyway.
+function syncGenerateChecks() {
+  const hasOff = !!doc && doc.offense.some(isIncluded);
+  const hasDef = !!doc && doc.defense.some(isIncluded);
+  for (const [box, ok] of [[chkOffenseCoach, hasOff], [chkOffenseWrist, hasOff],
+                           [chkDefenseCoach, hasDef], [chkDefenseWrist, hasDef]]) {
+    box.disabled = !ok;
+    if (!ok) box.checked = false;
+    box.parentElement.title = ok ? '' :
+      'Add a' + (box === chkOffenseCoach || box === chkOffenseWrist ? 'n offense' : ' defense') +
+      ' play to the playbook first';
+    box.parentElement.style.opacity = ok ? '' : '0.5';
+  }
 }
 
 playName.addEventListener('input', () => {
