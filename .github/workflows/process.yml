@@ -8,8 +8,12 @@ jobs:
   process:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -22,7 +26,7 @@ jobs:
       - name: Detect job mode
         id: detect
         run: |
-          MODE=$(python -c "import os,json,boto3; print(json.loads(boto3.client('s3',endpoint_url=os.environ['R2_ENDPOINT'],aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'],aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY'],region_name='auto').get_object(Bucket=os.environ['R2_BUCKET'],Key='jobs/'+os.environ['JOB_ID']+'/status.json')['Body'].read()).get('mode','pptx'))" || echo pptx)
+          MODE=$(python -c "import os,json,boto3; mode=json.loads(boto3.client('s3',endpoint_url=os.environ['R2_ENDPOINT'],aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'],aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY'],region_name='auto').get_object(Bucket=os.environ['R2_BUCKET'],Key='jobs/'+os.environ['JOB_ID']+'/status.json')['Body'].read()).get('mode','pptx'); assert mode in {'pptx','images'}, 'invalid job mode'; print(mode)")
           echo "Job mode: $MODE"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
         env:
@@ -32,16 +36,25 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           JOB_ID: ${{ github.event.client_payload.job_id }}
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y poppler-utils
-
-      - name: Install LibreOffice (PPTX jobs only)
+      - name: Install PPTX system dependencies
         if: steps.detect.outputs.mode != 'images'
-        run: sudo apt-get install -y libreoffice-impress
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils libreoffice-impress
 
       - name: Process playbook
-        run: python pipeline/process_job.py "${{ github.event.client_payload.job_id }}"
+        run: python pipeline/process_job.py "$JOB_ID"
         env:
+          JOB_ID: ${{ github.event.client_payload.job_id }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+      - name: Mark unsuccessful job as failed
+        if: ${{ always() && (failure() || cancelled()) }}
+        continue-on-error: true
+        run: python pipeline/mark_job_failed.py "$JOB_ID"
+        env:
+          JOB_ID: ${{ github.event.client_payload.job_id }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}

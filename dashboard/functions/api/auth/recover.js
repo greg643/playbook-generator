@@ -9,17 +9,24 @@ import {
   normalizeRecoveryCode,
   constantTimeEqualHex,
   generateSaltHex,
+  PASSWORD_ITERATIONS,
+  requestBodyTooLarge,
+  utf8ByteLength,
 } from "../../_lib/auth.js";
+import { putJsonIfCurrent } from "../../_lib/r2.js";
 
-const PBKDF2_ITERATIONS = 100000;
+const MAX_BODY_BYTES = 10000;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
+    if (requestBodyTooLarge(request, MAX_BODY_BYTES)) {
+      return jsonNoStore({ error: "Request too large" }, { status: 413 });
+    }
     const bodyText = await request.text();
-    if (bodyText.length > 10000) {
-      return jsonNoStore({ error: "Request too large" }, { status: 400 });
+    if (utf8ByteLength(bodyText) > MAX_BODY_BYTES) {
+      return jsonNoStore({ error: "Request too large" }, { status: 413 });
     }
 
     let body;
@@ -34,8 +41,11 @@ export async function onRequestPost(context) {
     if (!isValidEmail(email)) {
       return jsonNoStore({ error: "Invalid email address" }, { status: 400 });
     }
-    if (typeof newPassword !== "string" || newPassword.length < 8) {
-      return jsonNoStore({ error: "Password must be at least 8 characters" }, { status: 400 });
+    if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 1024) {
+      return jsonNoStore(
+        { error: "Password must be between 8 and 1024 characters" },
+        { status: 400 }
+      );
     }
 
     const key = await emailKey(email);
@@ -47,7 +57,11 @@ export async function onRequestPost(context) {
     const record = await obj.json();
     const code = normalizeRecoveryCode(body.recoveryCode);
     if (
-      !code ||
+      code.length !== 20 ||
+      !record ||
+      typeof record.userId !== "string" ||
+      normalizeEmail(record.email) !== email ||
+      record.disabledAt ||
       typeof record.recoveryHash !== "string" ||
       typeof record.recoverySalt !== "string" ||
       typeof record.recoveryIterations !== "number"
@@ -62,17 +76,37 @@ export async function onRequestPost(context) {
 
     // Set the new password and rotate the recovery code.
     record.salt = generateSaltHex();
-    record.iterations = PBKDF2_ITERATIONS;
+    record.iterations = PASSWORD_ITERATIONS;
     record.hash = await hashPassword(newPassword, record.salt, record.iterations);
     const { recoveryCode, fields } = await createRecoveryFields();
     Object.assign(record, fields);
+    record.sessionVersion =
+      (Number.isSafeInteger(record.sessionVersion) && record.sessionVersion >= 1
+        ? record.sessionVersion
+        : 1) + 1;
+    record.passwordChangedAt = new Date().toISOString();
 
-    await env.PLAYBOOK_BUCKET.put(key, JSON.stringify(record), {
-      httpMetadata: { contentType: "application/json" },
-    });
+    // Consume the recovery code exactly once. A simultaneous recovery request
+    // using the same code loses the ETag precondition and cannot overwrite the
+    // first password change.
+    const updated = await putJsonIfCurrent(env, key, record, obj);
+    if (updated === null) {
+      return jsonNoStore(
+        { error: "Recovery code was already used; try the newly issued code" },
+        { status: 409 }
+      );
+    }
 
-    const cookie = await createSessionCookie(record.userId, record.email, env);
-    return jsonNoStore({ email: record.email, recoveryCode }, { headers: { "Set-Cookie": cookie } });
+    const cookie = await createSessionCookie(
+      record.userId,
+      record.email,
+      env,
+      record.sessionVersion
+    );
+    return jsonNoStore(
+      { email: record.email, userId: record.userId, recoveryCode },
+      { headers: { "Set-Cookie": cookie } }
+    );
   } catch (err) {
     console.error("Recover error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });

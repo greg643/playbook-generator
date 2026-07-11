@@ -18,9 +18,57 @@ import json
 import time
 import tempfile
 import traceback
+import uuid
+import re
 from pathlib import Path
 
 import boto3
+from botocore.exceptions import ClientError
+
+
+class JobCancelled(RuntimeError):
+    """Raised when account deletion has cancelled an in-flight job."""
+
+
+PLAY_IMAGE_NAME_RE = re.compile(r"(?:0[1-9]|1[0-6]|D[1-6])\.png")
+MAX_PLAY_IMAGES = 22
+MAX_PLAY_IMAGE_BYTES = 4 * 1024 * 1024
+
+
+def job_is_cancelled(s3, bucket, job_id):
+    try:
+        s3.head_object(Bucket=bucket, Key=f"jobs/{job_id}/cancelled.json")
+        return True
+    except ClientError as exc:
+        code = str(exc.response.get("Error", {}).get("Code", ""))
+        if code in {"404", "NoSuchKey", "NotFound"}:
+            return False
+        raise
+
+
+def ensure_job_active(s3, bucket, job_id):
+    if job_is_cancelled(s3, bucket, job_id):
+        raise JobCancelled("Job was cancelled because its account was deleted")
+
+
+def scrub_job_payload(s3, bucket, job_id):
+    """Delete user content while retaining owner/status/cancellation metadata."""
+    prefix = f"jobs/{job_id}/"
+    preserved = {
+        f"{prefix}owner.json",
+        f"{prefix}status.json",
+        f"{prefix}cancelled.json",
+    }
+    while True:
+        listing = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1000)
+        keys = [
+            {"Key": item["Key"]}
+            for item in listing.get("Contents", [])
+            if item["Key"] not in preserved
+        ]
+        if not keys:
+            return
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True})
 
 
 def get_r2_client():
@@ -49,16 +97,34 @@ def update_status(s3, bucket, job_id, status_dict, request_fields=None):
 def download_play_images(s3, bucket, job_id, plays_dir):
     """Download every object under jobs/<job_id>/plays/ from R2 (paginated)."""
     count = 0
-    list_kwargs = {"Bucket": bucket, "Prefix": f"jobs/{job_id}/plays/"}
+    prefix = f"jobs/{job_id}/plays/"
+    list_kwargs = {"Bucket": bucket, "Prefix": prefix}
+    names = set()
     while True:
         listing = s3.list_objects_v2(**list_kwargs)
         for obj in listing.get("Contents", []):
             name = obj["Key"].rsplit("/", 1)[-1]
             if not name:
                 continue
+            if (
+                obj["Key"] != prefix + name
+                or PLAY_IMAGE_NAME_RE.fullmatch(name) is None
+                or name in names
+            ):
+                raise ValueError("Job contains an unsupported play image name")
+            if count >= MAX_PLAY_IMAGES:
+                raise ValueError(f"Job contains too many play images (max {MAX_PLAY_IMAGES})")
+            declared_size = obj.get("Size")
+            if declared_size is not None and (
+                declared_size <= 0 or declared_size > MAX_PLAY_IMAGE_BYTES
+            ):
+                raise ValueError("Job contains an invalid play image size")
             dest = plays_dir / name
             s3.download_file(bucket, obj["Key"], str(dest))
+            if dest.stat().st_size <= 0 or dest.stat().st_size > MAX_PLAY_IMAGE_BYTES:
+                raise ValueError("Job contains an invalid play image size")
             print(f"  Downloaded {name} ({dest.stat().st_size} bytes)")
+            names.add(name)
             count += 1
         if listing.get("IsTruncated"):
             list_kwargs["ContinuationToken"] = listing["NextContinuationToken"]
@@ -73,6 +139,12 @@ def main():
         sys.exit(1)
 
     job_id = sys.argv[1]
+    try:
+        parsed_job_id = uuid.UUID(job_id)
+    except (ValueError, AttributeError) as exc:
+        raise SystemExit("Invalid job ID") from exc
+    if str(parsed_job_id) != job_id.lower():
+        raise SystemExit("Invalid job ID")
     bucket = os.environ["R2_BUCKET"]
     s3 = get_r2_client()
 
@@ -98,8 +170,15 @@ def main():
                 time.sleep(2 * (attempt + 1))
         if request_data is None:
             raise RuntimeError("Could not read the job request (status.json) from R2")
-        request_fields = {k: request_data[k] for k in ("mode", "options", "createdAt") if k in request_data}
+        request_fields = {
+            k: request_data[k]
+            for k in ("mode", "options", "createdAt", "ownerId")
+            if k in request_data
+        }
         mode = request_data.get("mode", "pptx")
+        if mode not in {"pptx", "images"}:
+            raise ValueError("Unsupported job mode")
+        ensure_job_active(s3, bucket, job_id)
         print(f"Job mode: {mode}")
 
         # Update status to processing
@@ -130,6 +209,7 @@ def main():
                 count = download_play_images(s3, bucket, job_id, plays_dir)
                 if count == 0:
                     raise RuntimeError("No play images found for this job")
+                ensure_job_active(s3, bucket, job_id)
 
                 # Generate PDFs straight from the play images (no LibreOffice step)
                 update_status(s3, bucket, job_id, {"status": "processing", "step": "generating"}, request_fields)
@@ -169,6 +249,7 @@ def main():
                 print("Downloading PPTX from R2...")
                 s3.download_file(bucket, f"jobs/{job_id}/input.pptx", str(pptx_path))
                 print(f"  Downloaded {pptx_path.stat().st_size} bytes")
+                ensure_job_active(s3, bucket, job_id)
 
                 # Run the pipeline
                 update_status(s3, bucket, job_id, {"status": "processing", "step": "generating"}, request_fields)
@@ -200,6 +281,10 @@ def main():
                     os.chdir(original_cwd)
                     sys.argv = original_argv
 
+            # Account deletion can arrive while LibreOffice/report generation
+            # is running. Never upload its results after a cancellation marker.
+            ensure_job_active(s3, bucket, job_id)
+
             # Upload PDFs to R2
             update_status(s3, bucket, job_id, {"status": "processing", "step": "uploading"}, request_fields)
 
@@ -207,6 +292,7 @@ def main():
             uploaded = []
 
             for pdf in pdf_files:
+                ensure_job_active(s3, bucket, job_id)
                 key = f"jobs/{job_id}/{pdf.name}"
                 print(f"  Uploading {pdf.name} ({pdf.stat().st_size} bytes)...")
                 s3.upload_file(
@@ -216,15 +302,18 @@ def main():
                     ExtraArgs={"ContentType": "application/pdf"},
                 )
                 uploaded.append(pdf.name)
+                ensure_job_active(s3, bucket, job_id)
 
             if not uploaded:
                 raise RuntimeError("Pipeline produced no PDF files")
 
             # Write final success status
+            ensure_job_active(s3, bucket, job_id)
             update_status(s3, bucket, job_id, {
                 "status": "complete",
                 "files": uploaded,
             }, request_fields)
+            ensure_job_active(s3, bucket, job_id)
             print(f"Job {job_id} complete. Uploaded: {uploaded}")
 
     except Exception as e:
@@ -234,7 +323,13 @@ def main():
         print(tb)
 
         # Build a user-friendly message with detail
-        if "LibreOffice" in str(e) or "soffice" in str(e):
+        if isinstance(e, JobCancelled):
+            friendly = "This job was cancelled because its account was deleted."
+            try:
+                scrub_job_payload(s3, bucket, job_id)
+            except Exception as scrub_error:
+                print(f"Failed to scrub cancelled job payload: {scrub_error}")
+        elif "LibreOffice" in str(e) or "soffice" in str(e):
             friendly = "LibreOffice conversion failed. The PPTX file may be corrupted or in an unsupported format."
         elif "pdftoppm" in str(e):
             friendly = "PDF to image conversion failed. This is a server-side dependency issue."
@@ -246,14 +341,15 @@ def main():
             friendly = "No play images were found for this job. Please try generating again from the editor."
         elif "No slide images" in str(e) or "no PDF files" in str(e).lower():
             friendly = "Pipeline produced no output. The playbook may not have recognizable offense/defense sections."
-        else:
+        elif isinstance(e, ValueError):
             friendly = str(e)
+        else:
+            friendly = "Processing failed unexpectedly. Please try again or check the input file."
 
         try:
             update_status(s3, bucket, job_id, {
                 "status": "error",
                 "message": friendly,
-                "detail": error_msg,
             }, request_fields)
         except Exception:
             print("Failed to update error status in R2")

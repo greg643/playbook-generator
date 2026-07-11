@@ -14,23 +14,10 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import io
 
-try:
-    from PIL import Image, ImageDraw
-except ImportError:
-    print("Pillow not installed. Installing...")
-    import subprocess
-    subprocess.check_call(['pip', 'install', 'Pillow'])
-    from PIL import Image, ImageDraw
-
-try:
-    from pptx import Presentation
-    from pptx.util import Inches, Pt
-except ImportError:
-    print("python-pptx not installed. Installing...")
-    import subprocess
-    subprocess.check_call(['pip', 'install', 'python-pptx'])
-    from pptx import Presentation
-    from pptx.util import Inches, Pt
+from PIL import Image, ImageDraw
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from input_safety import validate_pptx_archive
 
 
 # XML namespaces
@@ -717,7 +704,6 @@ def overlay_ink_on_slides(
 
 if __name__ == '__main__':
     import sys
-    import tempfile
 
     if len(sys.argv) < 2:
         print("Usage: python ink_overlay.py <playbook.pptx> [slides_dir] [approach]")
@@ -727,16 +713,11 @@ if __name__ == '__main__':
     slides_dir = sys.argv[2] if len(sys.argv) > 2 else './slides'
     approach = sys.argv[3] if len(sys.argv) > 3 else 'B'
 
-    # Unzip PPTX to a temp directory
-    pptx_unzipped_path = tempfile.mkdtemp(prefix="pptx_unzipped_")
-    import zipfile as _zf
-    with _zf.ZipFile(pptx_path, 'r') as z:
-        z.extractall(pptx_unzipped_path)
-
+    validate_pptx_archive(pptx_path)
     print(f"Using approach {approach}")
     output_paths = overlay_ink_on_slides(
         pptx_path,
-        pptx_unzipped_path,
+        "",  # Overlay readers access members directly through ZipFile.
         slides_dir,
         approach=approach
     )

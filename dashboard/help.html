@@ -198,7 +198,7 @@
     <h2>What this is</h2>
     <p>Two ways to make a playbook, one set of outputs:</p>
     <ul>
-      <li><strong>Upload a PowerPoint</strong> &mdash; drop a <strong>.pptx</strong> on the <a href="/">home page</a> and the pipeline extracts each play automatically.</li>
+      <li><strong>Upload a PowerPoint</strong> &mdash; drop a <strong>.pptx</strong> on the <a href="/">home page</a> and the pipeline extracts each play automatically. Deck format: start each section with a separator slide whose text mentions &ldquo;Offense&rdquo; or &ldquo;Defense&rdquo; in any capitalization (&ldquo;6v6 Offense&rdquo; works); every play slide needs a rectangle shape marking the field. A deck with only one section produces just that section&rsquo;s PDFs.</li>
       <li><strong>Play Editor</strong> &mdash; draw plays right in the browser at <a href="/editor">/editor</a>. No PowerPoint needed: drag the player chips, draw routes and zone lines, add text, and generate from there.</li>
     </ul>
     <p>Either way, generation runs in the cloud and produces the same four print-ready PDFs:</p>
@@ -232,7 +232,8 @@
     <ul>
       <li><strong>Add a play</strong> &mdash; click <strong>+ Add play</strong> under OFFENSE or DEFENSE in the sidebar. New plays start with the standard formation already placed.</li>
       <li><strong>Move players</strong> &mdash; with the <strong>Select</strong> tool, drag any chip. Routes stay attached to their chip when it moves.</li>
-      <li><strong>Draw a route</strong> &mdash; pick the <strong>Route</strong> tool, click near the chip the route starts from, then click each waypoint. Press <kbd>Enter</kbd> or double-click to finish; <kbd>Esc</kbd> cancels without saving the route.</li>
+      <li><strong>Draw an arrow route</strong> &mdash; pick the <strong>Arrow</strong> tool, click near the chip the route starts from, then click each waypoint. Press <kbd>Enter</kbd> or double-click to finish; <kbd>Esc</kbd> cancels without saving the route.</li>
+      <li><strong>Add a block</strong> &mdash; pick <strong>Block</strong> and click where the block happens. The editor draws a T-ended block from the nearest player; each click adds one block.</li>
       <li><strong>Lines</strong> &mdash; the <strong>Line</strong> tool works the same way (click waypoints, <kbd>Enter</kbd> or double-click to finish) and defaults to a dashed zone-line style with no arrow.</li>
       <li><strong>Text</strong> &mdash; pick <strong>Text</strong> and click the field. <kbd>Enter</kbd> saves, <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line, and long text wraps on the card automatically.</li>
       <li><strong>Ball</strong> &mdash; click the field to place a football marker.</li>
@@ -247,7 +248,7 @@
       <li><strong>Select &amp; reshape</strong> &mdash; with <strong>Select</strong>, click a route or line to select it, then drag its round handles to reshape it.</li>
       <li><strong>Add a bend</strong> &mdash; double-click anywhere on a selected route or line segment to insert a new handle there.</li>
       <li><strong>Remove a bend</strong> &mdash; double-click an existing handle to remove it.</li>
-      <li><strong>Restyle</strong> &mdash; while a route or line is selected, the style controls apply to it directly: color swatches, <strong>Solid/Dashed</strong>, route end (<strong>Arrow / Ball / None</strong>), and corners (<strong>Smooth / Sharp</strong>).</li>
+      <li><strong>Restyle</strong> &mdash; while a route or line is selected, the style controls apply to it directly: color swatches, <strong>Solid/Dashed</strong>, route end (<strong>Arrow / Ball / Block / None</strong>), and corners (<strong>Smooth / Sharp</strong>).</li>
       <li><strong>Edit text</strong> &mdash; double-click a label with <strong>Select</strong> to change its wording.</li>
       <li><strong>Delete</strong> &mdash; press <kbd>Delete</kbd> or <kbd>Backspace</kbd> to remove the selection.</li>
       <li><strong>Undo / redo</strong> &mdash; <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>) redoes. History is kept per play.</li>

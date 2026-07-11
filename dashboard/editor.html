@@ -137,6 +137,7 @@
       border: 1px solid transparent;
     }
     .play-row:hover { background: #161b22; }
+    .play-row:focus-within { outline: 2px solid #58a6ff; outline-offset: -2px; }
     .play-row.active { background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.4); }
     .inc-check {
       flex-shrink: 0;
@@ -164,13 +165,18 @@
     .play-row .pname {
       flex: 1;
       min-width: 0;
+      border: 0;
+      background: none;
+      color: inherit;
       font-size: 0.83rem;
+      text-align: left;
+      cursor: pointer;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .row-btns { display: none; gap: 1px; flex-shrink: 0; }
-    .play-row:hover .row-btns, .play-row.active .row-btns { display: flex; }
+    .play-row:hover .row-btns, .play-row.active .row-btns, .play-row:focus-within .row-btns { display: flex; }
     .icon-btn {
       background: none;
       border: none;
@@ -453,6 +459,59 @@
     h2.over-cap { color: #f85149; }
     .mbtn-danger { background: #da3633; color: #fff; }
     .mbtn-danger:hover { background: #f85149; }
+
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid #58a6ff;
+      outline-offset: 2px;
+    }
+    .reset-action {
+      appearance: none;
+      border: 0;
+      padding: 0;
+      background: none;
+      color: #58a6ff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    .reset-action:hover { text-decoration: underline; }
+
+    @media (max-width: 820px) {
+      body { height: auto; min-height: 100vh; overflow: auto; }
+      .topbar { flex-wrap: wrap; gap: 0.55rem; padding: 0.65rem 0.75rem; }
+      .topbar .email { max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .auth-wrap { padding: 2rem 0.75rem; }
+      .splash { gap: 1.5rem; padding: 0; }
+      .editor.active { display: flex; flex-direction: column; }
+      .sidebar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1rem;
+        border-right: 0;
+        border-bottom: 1px solid #30363d;
+        overflow: visible;
+      }
+      .side-section + .side-section { margin-top: 0; }
+      .canvas-col { min-height: 56vh; padding: 0.75rem; overflow: visible; }
+      #canvas { max-height: 72vh; }
+      .toolbar { border-left: 0; border-top: 1px solid #30363d; overflow: visible; }
+      .modal-overlay { padding: 0.75rem; }
+    }
+
+    @media (max-width: 520px) {
+      .topbar h1 { width: 100%; }
+      .topbar .spacer { display: none; }
+      .topbar .email { order: 3; max-width: 100%; flex: 1 0 100%; }
+      .sidebar { grid-template-columns: 1fr; }
+      .canvas-col { min-height: 48vh; }
+      .modal .btn-row { align-items: stretch; flex-direction: column; }
+      .modal .btn-row button { width: 100%; }
+      .card { padding: 1.35rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body>
@@ -492,7 +551,7 @@
           <label class="field">Password
             <input type="password" id="authPassword" autocomplete="current-password">
           </label>
-          <div class="error-msg" id="authError"></div>
+          <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
           <button class="btn btn-primary" id="loginBtn">Sign in</button>
           <button class="btn btn-secondary" id="registerBtn">Create account</button>
           <p class="auth-links"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
@@ -509,7 +568,7 @@
           <label class="field">New password
             <input type="password" id="recPassword" autocomplete="new-password">
           </label>
-          <div class="error-msg" id="recError"></div>
+          <div class="error-msg" id="recError" role="alert" aria-live="assertive"></div>
           <button class="btn btn-primary" id="recoverBtn">Reset password &amp; sign in</button>
           <p class="auth-links"><a id="backToSignin" href="#">&larr; Back to sign in</a></p>
         </div>
@@ -518,10 +577,10 @@
   </div>
 
   <div class="editor" id="editorView">
-    <aside class="sidebar">
+    <aside class="sidebar" aria-label="Play list">
       <div class="side-section">
         <h2 id="offenseHeading">OFFENSE (0 in playbook / 0)</h2>
-        <div id="offenseList"></div>
+        <div id="offenseList" aria-labelledby="offenseHeading"></div>
         <div class="side-btn-row">
           <button class="add-btn" id="addOffenseBtn">+ Add play</button>
           <button class="add-btn renum-btn" id="renumOffenseBtn" title="Renumber: plays in the playbook get 1, 2, 3… in list order; bench plays follow">&#8635; Renumber</button>
@@ -529,7 +588,7 @@
       </div>
       <div class="side-section">
         <h2 id="defenseHeading">DEFENSE (0 in playbook / 0)</h2>
-        <div id="defenseList"></div>
+        <div id="defenseList" aria-labelledby="defenseHeading"></div>
         <div class="side-btn-row">
           <button class="add-btn" id="addDefenseBtn">+ Add play</button>
           <button class="add-btn renum-btn" id="renumDefenseBtn" title="Renumber: plays in the playbook get A, B, C… in list order; bench plays follow">&#8635; Renumber</button>
@@ -537,12 +596,12 @@
       </div>
     </aside>
 
-    <main class="canvas-col" id="canvasCol">
+    <main class="canvas-col" id="canvasCol" aria-label="Play drawing area">
       <div class="empty-hint" id="emptyHint" style="display:none">
         No plays yet. Click <strong>+ Add play</strong> in the sidebar to create your first
         offense or defense play &mdash; new plays start with the standard formation.
       </div>
-      <p class="canvas-hint" id="canvasHint"></p>
+      <p class="canvas-hint" id="canvasHint" aria-live="polite"></p>
       <div class="draw-actions" id="drawActions" style="display:none">
         <span class="draw-actions-label">Drawing&hellip;</span>
         <button type="button" id="finishDrawBtn" class="draw-btn draw-btn-finish">&#10003; Finish <kbd>Enter</kbd></button>
@@ -550,12 +609,12 @@
       </div>
     </main>
 
-    <aside class="toolbar">
+    <aside class="toolbar" aria-label="Editor controls">
       <div class="tb-label">Play name</div>
       <input id="playName" maxlength="60" placeholder="Play name" autocomplete="off" disabled>
 
       <div class="tb-label">Tools</div>
-      <div class="tools" id="tools"></div>
+      <div class="tools" id="tools" role="group" aria-label="Drawing tools"></div>
       <div class="undo-row">
         <button class="tool-btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)">&#8630; Undo</button>
         <button class="tool-btn" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">&#8631; Redo</button>
@@ -563,21 +622,21 @@
 
       <div class="tb-label" id="styleMode">Style for new arrows &amp; lines</div>
       <div class="tb-sub">Color</div>
-      <div class="swatches" id="swatches"></div>
+      <div class="swatches" id="swatches" role="group" aria-label="Line color"></div>
       <div class="tb-sub">Line type</div>
-      <div class="seg" id="dashSeg">
+      <div class="seg" id="dashSeg" role="group" aria-label="Line type">
         <button data-dash="false">Solid</button>
         <button data-dash="true">Dashed</button>
       </div>
       <div class="tb-sub">Line termination</div>
-      <div class="seg" id="endSeg">
+      <div class="seg" id="endSeg" role="group" aria-label="Line termination">
         <button data-end="arrow">Arrow</button>
         <button data-end="ball">Ball</button>
         <button data-end="block">Block</button>
         <button data-end="none">None</button>
       </div>
       <div class="tb-sub">Curve style</div>
-      <div class="seg" id="cornerSeg">
+      <div class="seg" id="cornerSeg" role="group" aria-label="Curve style">
         <button data-corner="smooth">Smooth</button>
         <button data-corner="sharp">Sharp</button>
       </div>
@@ -585,7 +644,7 @@
       <div class="tb-label">Save</div>
       <div class="save-row">
         <button class="btn btn-primary" id="saveBtn">Save</button>
-        <span id="saveIndicator" class="saved">Saved</span>
+        <span id="saveIndicator" class="saved" role="status" aria-live="polite">Saved</span>
       </div>
       <div class="backup-row">
         <button class="add-btn" id="exportBtn" title="Download your whole playbook as a JSON backup file">&#8681; Backup</button>
@@ -594,7 +653,7 @@
       </div>
 
       <div class="tb-label">Generate</div>
-      <div class="gen-checks">
+      <div class="gen-checks" role="group" aria-label="PDF outputs">
         <label><input type="checkbox" id="chkOffenseCoach" checked> Offense Coach Card</label>
         <label><input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband</label>
         <label><input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card</label>
@@ -602,28 +661,28 @@
       </div>
       <button class="btn btn-primary" id="generateBtn">Generate PDFs</button>
 
-      <div class="progress-section" id="progressSection">
+      <div class="progress-section" id="progressSection" role="status" aria-live="polite">
         <div class="progress-bar-container">
           <div class="progress-bar indeterminate" id="progressBar"></div>
         </div>
         <p class="status-text" id="statusText">Working&hellip;</p>
       </div>
 
-      <div class="downloads" id="downloads">
+      <div class="downloads" id="downloads" aria-live="polite">
         <h3>Your PDFs are ready</h3>
         <div class="dl-grid" id="dlGrid"></div>
       </div>
 
-      <div class="error-msg" id="genError"></div>
+      <div class="error-msg" id="genError" role="alert" aria-live="assertive"></div>
 
       <div class="reset-link" id="resetLink">
-        <a id="resetGenLink">Generate again</a>
+        <button type="button" class="reset-action" id="resetGenLink">Generate again</button>
       </div>
     </aside>
   </div>
 
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal" id="modalBox"></div>
+  <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal" id="modalBox" role="dialog" aria-modal="true" tabindex="-1"></div>
   </div>
 
 <script>
@@ -638,6 +697,7 @@ const FIELD_X = 8, FIELD_W = 1060, FIELD_H = 822;
 // playbook itself (included plays) is separately capped at generate time:
 // 16 offense / 6 defense, the most the printed cards can hold.
 const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
+const MAX_IMPORT_BYTES = 1000000;
 const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
 
 const OFFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'QB'];
@@ -1051,7 +1111,12 @@ const modalOverlay = $('modalOverlay'), modalBox = $('modalBox');
 let doc = null;                 // {schema, offense:[], defense:[]}
 let cur = null;                 // {section, index} of the open play
 let tool = 'select';
-let style = { color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth' };
+const toolStyles = {
+  route: { color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth' },
+  line: { color: '#1F6E8C', dash: true, end: 'none', corner: 'sharp' },
+  block: { color: '#000000', dash: false, end: 'block', corner: 'sharp' },
+};
+let style = { ...toolStyles.route };
 let selection = null;           // {kind:'route'|'line'|'label'|'ball', index}
 let drawing = null;             // in-progress route/line
 let drag = null;
@@ -1608,8 +1673,8 @@ redoBtn.addEventListener('click', () => historyStep('redo'));
 // ---------- Keyboard ----------
 
 document.addEventListener('keydown', e => {
-  if (modalOverlay.classList.contains('active')) {
-    if (e.key === 'Escape') closeModal(modalCancelValue);
+  if (activeModal) {
+    handleModalKeydown(e);
     return;
   }
   const t = e.target;
@@ -1651,18 +1716,23 @@ const HINTS = {
 
 for (const [id, label] of TOOL_DEFS) {
   const b = document.createElement('button');
+  b.type = 'button';
   b.className = 'tool-btn';
   b.dataset.tool = id;
   b.textContent = label;
+  b.setAttribute('aria-pressed', 'false');
   b.addEventListener('click', () => setTool(id));
   toolsEl.appendChild(b);
 }
 for (const c of ROUTE_COLORS) {
   const b = document.createElement('button');
+  b.type = 'button';
   b.className = 'swatch';
   b.dataset.color = c;
   b.style.background = c;
   b.title = c;
+  b.setAttribute('aria-label', 'Line color ' + c);
+  b.setAttribute('aria-pressed', 'false');
   b.addEventListener('click', () => setStyle('color', c));
   swatchesEl.appendChild(b);
 }
@@ -1677,9 +1747,9 @@ function setTool(t) {
   if (drawing) finishDrawing();
   tool = t;
   if (t !== 'select') selection = null;
-  if (t === 'line') { style.color = '#1F6E8C'; style.dash = true; style.end = 'none'; style.corner = 'sharp'; }  // zone-line default
-  if (t === 'block') { style.color = '#000000'; }  // blocks are conventionally black
-  if (t === 'route') { style.end = style.end === 'none' ? 'arrow' : style.end; }  // routes usually end in arrows
+  // Each drawing tool remembers its own style. Switching Line -> Arrow must
+  // not accidentally create a dashed teal route with a sharp corner.
+  if (toolStyles[t]) style = { ...toolStyles[t] };
   canvasSvg.style.cursor = t === 'select' ? 'default' : 'crosshair';
   syncToolUI();
   syncStyleUI();
@@ -1697,12 +1767,17 @@ function setStyle(prop, val) {
     refreshCanvas();
   } else {
     style[prop] = val;
+    if (toolStyles[tool]) toolStyles[tool][prop] = val;
   }
   syncStyleUI();
 }
 
 function syncToolUI() {
-  toolsEl.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+  toolsEl.querySelectorAll('.tool-btn').forEach(b => {
+    const active = b.dataset.tool === tool;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
 }
 
 function syncStyleUI() {
@@ -1716,11 +1791,16 @@ function syncStyleUI() {
     end: item.end || (selection.kind === 'line' ? 'none' : 'arrow'),
     corner: item.corner || (selection.kind === 'line' ? 'sharp' : 'smooth'),
   } : style;
-  swatchesEl.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.color === view.color));
-  dashSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', (b.dataset.dash === 'true') === view.dash));
-  endSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.end === view.end));
-  cornerSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.corner === view.corner));
-  styleModeEl.textContent = item ? 'Styling the selected ' + selection.kind : 'Style for new routes & lines';
+  const syncPressed = (buttons, match) => buttons.forEach(b => {
+    const active = match(b);
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
+  syncPressed(swatchesEl.querySelectorAll('.swatch'), b => b.dataset.color === view.color);
+  syncPressed(dashSeg.querySelectorAll('button'), b => (b.dataset.dash === 'true') === view.dash);
+  syncPressed(endSeg.querySelectorAll('button'), b => b.dataset.end === view.end);
+  syncPressed(cornerSeg.querySelectorAll('button'), b => b.dataset.corner === view.corner);
+  styleModeEl.textContent = item ? 'Styling the selected ' + selection.kind : 'Style for new arrows & lines';
 }
 
 function setHint() {
@@ -1947,6 +2027,8 @@ function renderSection(section, listEl, headEl, addBtn, max) {
     chk.type = 'checkbox';
     chk.className = 'inc-check';
     chk.title = 'In playbook';
+    chk.setAttribute('aria-label', (included ? 'Remove ' : 'Add ') + (play.name || 'Untitled') +
+      (included ? ' from the playbook' : ' to the playbook'));
     chk.checked = included;
     chk.addEventListener('click', e => e.stopPropagation());  // don't open the play
     chk.addEventListener('change', () => togglePlayIncluded(section, i));
@@ -1954,14 +2036,18 @@ function renderSection(section, listEl, headEl, addBtn, max) {
     badge.className = 'badge';
     badge.textContent = displayNum(section, play);
     badge.title = included ? 'Play number (sticky)' : 'Play number (on the bench)';
-    const name = document.createElement('span');
+    const name = document.createElement('button');
+    name.type = 'button';
     name.className = 'pname';
     name.textContent = play.name || 'Untitled';
     name.title = play.name || '';
+    name.setAttribute('aria-label', 'Open ' + section + ' play ' + displayNum(section, play) +
+      ', ' + (play.name || 'Untitled') + (included ? ', in playbook' : ', on bench'));
     const btns = document.createElement('span');
     btns.className = 'row-btns';
     const mk = (txt, title, fn, disabled) => {
       const b = document.createElement('button');
+      b.type = 'button';
       b.className = 'icon-btn';
       b.textContent = txt;
       b.title = title;
@@ -1989,6 +2075,7 @@ function togglePlayIncluded(section, i) {
   markDirty();
   renderSidebar();   // renumbers every badge in the section + heading counts
   refreshCanvas();   // the open play's header number can change too
+  syncGenerateChecks();
 }
 
 function syncPlayName() {
@@ -2005,21 +2092,30 @@ function refreshAll() {
   syncGenerateChecks();
 }
 
+const outputChecks = [chkOffenseCoach, chkOffenseWrist, chkDefenseCoach, chkDefenseWrist];
+
 // Output checkboxes are only selectable when that section has a play in the
-// playbook — an empty section's outputs can't be generated anyway.
+// playbook. Keep their checked values while disabled so a temporary 1 -> 0 -> 1
+// membership transition restores the user's choices (and a first play restores
+// the checked defaults from the empty-account state).
 function syncGenerateChecks() {
   const hasOff = !!doc && doc.offense.some(isIncluded);
   const hasDef = !!doc && doc.defense.some(isIncluded);
   for (const [box, ok] of [[chkOffenseCoach, hasOff], [chkOffenseWrist, hasOff],
                            [chkDefenseCoach, hasDef], [chkDefenseWrist, hasDef]]) {
     box.disabled = !ok;
-    if (!ok) box.checked = false;
     box.parentElement.title = ok ? '' :
       'Add a' + (box === chkOffenseCoach || box === chkOffenseWrist ? 'n offense' : ' defense') +
       ' play to the playbook first';
     box.parentElement.style.opacity = ok ? '' : '0.5';
   }
+  generateBtn.disabled = generating || !doc || !outputChecks.some(box => !box.disabled && box.checked);
 }
+
+outputChecks.forEach(box => box.addEventListener('change', () => {
+  hideGenError();
+  syncGenerateChecks();
+}));
 
 playName.addEventListener('input', () => {
   const play = currentPlay();
@@ -2067,22 +2163,32 @@ function saveDoc() {
 }
 
 async function doSave() {
-  if (!doc) return false;
+  const savingDoc = doc;
+  const savingOwner = docOwner;
+  if (!savingDoc || !savingOwner || activeUserId !== savingOwner) return false;
   clearTimeout(saveTimer);
   const at = changeCounter;
   saveState = 'saving';
   updateSaveIndicator();
   try {
-    doc.schema = 1;
-    const body = { ...doc };
-    if (serverUpdatedAt && !overwriteNext) body.baseUpdatedAt = serverUpdatedAt;
+    savingDoc.schema = 1;
+    const body = { ...savingDoc, ownerId: savingOwner };
+    // null is meaningful: it says this tab loaded an absent document. The
+    // server then conditionally creates it, so two first saves cannot silently
+    // overwrite one another.
+    if (!overwriteNext) body.baseUpdatedAt = serverUpdatedAt;
     overwriteNext = false;
     const res = await fetch('/api/plays', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (doc !== savingDoc || docOwner !== savingOwner || activeUserId !== savingOwner) {
+      return false;
+    }
     if (res.status === 401) {
+      saveState = 'unsaved';
+      updateSaveIndicator('Session expired — unsaved changes kept');
       showAuthView('Your session expired — sign in to keep working.');
       return false;
     }
@@ -2092,17 +2198,39 @@ async function doSave() {
       resolveConflict();
       return false;
     }
-    if (!res.ok) throw new Error('Save failed');
+    if (!res.ok) {
+      const problem = await res.json().catch(() => ({}));
+      const err = new Error(
+        typeof problem.error === 'string' && problem.error
+          ? problem.error.slice(0, 160)
+          : 'Save failed'
+      );
+      // Validation/authorship failures cannot heal through retries. Network,
+      // throttling, and server failures can, so keep the autosave retry there.
+      err.permanent = res.status >= 400 && res.status < 500 &&
+        ![408, 425, 429].includes(res.status);
+      const retryAfter = Number.parseInt(res.headers.get('retry-after'), 10);
+      err.retryAfterMs = Number.isFinite(retryAfter)
+        ? Math.max(1000, Math.min(retryAfter * 1000, 60000))
+        : 4000;
+      throw err;
+    }
     const data = await res.json().catch(() => ({}));
     if (data.updatedAt) serverUpdatedAt = data.updatedAt;
     saveState = changeCounter === at ? 'saved' : 'unsaved';
     updateSaveIndicator();
     return true;
-  } catch {
-    if (!doc) return false;
+  } catch (err) {
+    if (doc !== savingDoc || docOwner !== savingOwner || activeUserId !== savingOwner) {
+      return false;
+    }
     saveState = 'unsaved';
-    updateSaveIndicator('Save failed — retrying…');
-    saveTimer = setTimeout(() => saveDoc(), 4000);
+    if (err && err.permanent) {
+      updateSaveIndicator('Save rejected — ' + err.message);
+    } else {
+      updateSaveIndicator('Save failed — retrying…');
+      saveTimer = setTimeout(() => saveDoc(), err && err.retryAfterMs || 4000);
+    }
     return false;
   }
 }
@@ -2111,24 +2239,39 @@ let conflictOpen = false;
 async function resolveConflict() {
   if (conflictOpen) return;
   conflictOpen = true;
+  const conflictedDoc = doc;
   try {
-    const overwrite = await showModal({
+    const choice = await showChoiceModal({
       title: 'Playbook changed elsewhere',
-      message: 'This playbook was saved from another tab or device after you loaded it. ' +
-        'Overwrite with THIS tab\u2019s version, or discard this tab\u2019s changes and load the newer one?',
-      confirmLabel: 'Overwrite',
-      danger: true,
+      message: 'This playbook was saved from another tab or device after you loaded it. Choose what should happen to the changes in this tab.',
+      cancelValue: 'keep',
+      choices: [
+        { key: 'keep', label: 'Keep editing', primary: true },
+        { key: 'reload', label: 'Discard local changes' },
+        { key: 'overwrite', label: 'Overwrite server', danger: true },
+      ],
     });
-    if (!doc) return;
-    if (overwrite) {
+    // The dialog may have waited behind a recovery-code acknowledgement. Do
+    // not apply an old conflict decision after sign-out or an account switch.
+    if (!doc || doc !== conflictedDoc) return;
+    if (choice === 'overwrite') {
       overwriteNext = true;
       saveDoc();
-    } else {
-      const res = await fetch('/api/plays');
-      if (res.ok) {
+    } else if (choice === 'reload') {
+      try {
+        const res = await fetch('/api/plays');
+        if (res.status === 401) {
+          showAuthView('Your session expired — sign in to keep working.');
+          return;
+        }
+        if (!res.ok) throw new Error('Could not load the newer playbook');
         const data = await res.json();
-        doc = normalizeDoc(data || {});
-        serverUpdatedAt = data && data.updatedAt || null;
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('The server returned an invalid playbook');
+        }
+        if (!doc || doc !== conflictedDoc) return;
+        doc = normalizeDoc(data);
+        serverUpdatedAt = data.updatedAt || null;
         for (const k in undoStacks) delete undoStacks[k];
         saveState = 'saved';
         updateSaveIndicator();
@@ -2136,7 +2279,17 @@ async function resolveConflict() {
         selection = null;
         drawing = null;
         refreshAll();
+      } catch (err) {
+        if (!doc || doc !== conflictedDoc) return;
+        saveState = 'unsaved';
+        updateSaveIndicator('Conflict — local changes kept');
+        await showModal({ title: 'Could not reload', message: err.message, confirmLabel: 'OK' });
       }
+    } else {
+      // Cancel, Escape and backdrop clicks all map to "keep": no fetch, no
+      // mutation, and no chance of silently replacing local work.
+      saveState = 'unsaved';
+      updateSaveIndicator('Conflict — local changes kept');
     }
   } finally {
     conflictOpen = false;
@@ -2163,6 +2316,14 @@ $('importFile').addEventListener('change', async () => {
   const file = $('importFile').files[0];
   $('importFile').value = '';
   if (!file || !doc) return;
+  if (file.size > MAX_IMPORT_BYTES) {
+    await showModal({
+      title: 'Import failed',
+      message: 'That backup is too large. Playbook backups must be 1 MB or smaller.',
+      confirmLabel: 'OK',
+    });
+    return;
+  }
   let data;
   try {
     data = JSON.parse(await file.text());
@@ -2214,151 +2375,202 @@ $('importFile').addEventListener('change', async () => {
 });
 
 window.addEventListener('beforeunload', e => {
-  if (doc && saveState !== 'saved') { e.preventDefault(); e.returnValue = ''; }
+  if ((doc && saveState !== 'saved') || (activeModal && !activeModal.dismissible)) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
 });
 
 // ---------- Modal (no window.alert/confirm/prompt) ----------
 
-let modalCloser = null;
-let modalCancelValue = null;
+const modalQueue = [];
+let activeModal = null;
 
-function closeModal(val) {
-  if (modalCloser) modalCloser(val);
+function modalHeading(title, message) {
+  const h = document.createElement('h3');
+  h.id = 'modalTitle';
+  h.textContent = title;
+  modalBox.appendChild(h);
+  modalBox.setAttribute('aria-labelledby', h.id);
+  modalBox.removeAttribute('aria-describedby');
+  if (message) {
+    const p = document.createElement('p');
+    p.id = 'modalDescription';
+    p.textContent = message;
+    modalBox.appendChild(p);
+    modalBox.setAttribute('aria-describedby', p.id);
+  }
+}
+
+function enqueueModal({ cancelValue = null, dismissible = true, render }) {
+  return new Promise(resolve => {
+    modalQueue.push({ cancelValue, dismissible, render, resolve });
+    showNextModal();
+  });
+}
+
+function showNextModal() {
+  if (activeModal || !modalQueue.length) return;
+  const request = modalQueue.shift();
+  const returnFocus = document.activeElement;
+  const close = value => {
+    if (!activeModal || activeModal.request !== request) return;
+    modalOverlay.classList.remove('active');
+    modalOverlay.setAttribute('aria-hidden', 'true');
+    modalBox.replaceChildren();
+    activeModal = null;
+    request.resolve(value);
+    if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
+      returnFocus.focus();
+    }
+    queueMicrotask(showNextModal);
+  };
+  activeModal = { request, close, cancelValue: request.cancelValue, dismissible: request.dismissible };
+  modalBox.replaceChildren();
+  modalOverlay.classList.add('active');
+  modalOverlay.setAttribute('aria-hidden', 'false');
+  const focusTarget = request.render(close);
+  (focusTarget || modalBox).focus();
+  if (focusTarget && typeof focusTarget.select === 'function') focusTarget.select();
+}
+
+function handleModalKeydown(e) {
+  if (!activeModal) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    if (activeModal.dismissible) activeModal.close(activeModal.cancelValue);
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const focusable = Array.from(modalBox.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+  ));
+  if (!focusable.length) {
+    e.preventDefault();
+    modalBox.focus();
+    return;
+  }
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !modalBox.contains(document.activeElement))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (document.activeElement === last || !modalBox.contains(document.activeElement))) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 function showModal({ title, message, withInput, multiline, inputType, defaultValue, confirmLabel, danger }) {
-  return new Promise(resolve => {
-    modalCancelValue = withInput ? null : false;
-    modalBox.replaceChildren();
-    const h = document.createElement('h3');
-    h.textContent = title;
-    modalBox.appendChild(h);
-    if (message) {
-      const p = document.createElement('p');
-      p.textContent = message;
-      modalBox.appendChild(p);
-    }
-    let input = null;
-    if (withInput) {
-      input = document.createElement(multiline ? 'textarea' : 'input');
-      if (!multiline && inputType) input.type = inputType;
-      input.maxLength = multiline ? 160 : 80;
-      if (multiline) input.rows = 3;
-      input.value = defaultValue || '';
-      modalBox.appendChild(input);
-      if (multiline) {
-        const hint = document.createElement('div');
-        hint.className = 'input-hint';
-        hint.textContent = 'Enter saves — Shift+Enter for a new line. Long text wraps on the card automatically.';
-        modalBox.appendChild(hint);
+  return enqueueModal({
+    cancelValue: withInput ? null : false,
+    render(close) {
+      modalHeading(title, message);
+      let input = null;
+      if (withInput) {
+        input = document.createElement(multiline ? 'textarea' : 'input');
+        if (!multiline && inputType) input.type = inputType;
+        input.maxLength = multiline ? 160 : 80;
+        if (multiline) input.rows = 3;
+        input.value = defaultValue || '';
+        modalBox.appendChild(input);
+        if (multiline) {
+          const hint = document.createElement('div');
+          hint.className = 'input-hint';
+          hint.textContent = 'Enter saves — Shift+Enter for a new line. Long text wraps on the card automatically.';
+          modalBox.appendChild(hint);
+        }
       }
-    }
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    const cancel = document.createElement('button');
-    cancel.className = 'mbtn-cancel';
-    cancel.textContent = 'Cancel';
-    const confirm = document.createElement('button');
-    confirm.className = danger ? 'mbtn-danger' : 'mbtn-confirm';
-    confirm.textContent = confirmLabel || 'OK';
-    row.append(cancel, confirm);
-    modalBox.appendChild(row);
-    const close = val => {
-      modalOverlay.classList.remove('active');
-      modalCloser = null;
-      resolve(val);
-    };
-    modalCloser = close;
-    cancel.addEventListener('click', () => close(modalCancelValue));
-    confirm.addEventListener('click', () => close(withInput ? input.value : true));
-    if (input) {
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !(multiline && e.shiftKey)) { e.preventDefault(); close(input.value); }
-        else if (e.key === 'Escape') { e.preventDefault(); close(null); }
-      });
-    }
-    modalOverlay.classList.add('active');
-    (input || confirm).focus();
-    if (input) input.select();
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'mbtn-cancel';
+      cancel.textContent = 'Cancel';
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = danger ? 'mbtn-danger' : 'mbtn-confirm';
+      confirm.textContent = confirmLabel || 'OK';
+      row.append(cancel, confirm);
+      modalBox.appendChild(row);
+      cancel.addEventListener('click', () => close(withInput ? null : false));
+      confirm.addEventListener('click', () => close(withInput ? input.value : true));
+      if (input) {
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter' && !(multiline && e.shiftKey)) { e.preventDefault(); close(input.value); }
+        });
+      }
+      return input || confirm;
+    },
   });
 }
 
 modalOverlay.addEventListener('click', e => {
-  if (e.target === modalOverlay) closeModal(modalCancelValue);
+  if (e.target === modalOverlay && activeModal && activeModal.dismissible) {
+    activeModal.close(activeModal.cancelValue);
+  }
 });
 
-// Multi-choice modal: returns the chosen key, or null on cancel/backdrop.
-function showChoiceModal({ title, message, choices }) {
-  return new Promise(resolve => {
-    modalCancelValue = null;
-    modalBox.replaceChildren();
-    const h = document.createElement('h3');
-    h.textContent = title;
-    modalBox.appendChild(h);
-    if (message) {
-      const p = document.createElement('p');
-      p.textContent = message;
-      modalBox.appendChild(p);
-    }
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    row.style.flexWrap = 'wrap';
-    const close = val => {
-      modalOverlay.classList.remove('active');
-      modalCloser = null;
-      resolve(val);
-    };
-    modalCloser = close;
-    for (const c of choices) {
-      const b = document.createElement('button');
-      b.className = c.danger ? 'mbtn-danger' : c.primary ? 'mbtn-confirm' : 'mbtn-cancel';
-      b.textContent = c.label;
-      b.addEventListener('click', () => close(c.key));
-      row.appendChild(b);
-    }
-    modalBox.appendChild(row);
-    modalOverlay.classList.add('active');
-    row.querySelector('button').focus();
+// Multi-choice modal: returns the chosen key, or cancelValue on Escape/backdrop.
+function showChoiceModal({ title, message, choices, cancelValue = null }) {
+  return enqueueModal({
+    cancelValue,
+    render(close) {
+      modalHeading(title, message);
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      row.style.flexWrap = 'wrap';
+      for (const c of choices) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = c.danger ? 'mbtn-danger' : c.primary ? 'mbtn-confirm' : 'mbtn-cancel';
+        b.textContent = c.label;
+        b.addEventListener('click', () => close(c.key));
+        row.appendChild(b);
+      }
+      modalBox.appendChild(row);
+      return row.querySelector('button');
+    },
   });
 }
 
-// Show a recovery code with a copy button; resolves when acknowledged.
+// Recovery codes are queued like every other dialog, but deliberately cannot
+// be dismissed with Escape or the backdrop: the promise resolves only after
+// the user explicitly acknowledges the one-time secret.
 function showRecoveryCode(code, context) {
-  return new Promise(resolve => {
-    modalCancelValue = true;
-    modalBox.replaceChildren();
-    const h = document.createElement('h3');
-    h.textContent = 'Save your recovery code';
-    modalBox.appendChild(h);
-    const p = document.createElement('p');
-    p.textContent = (context || 'This code is the ONLY way to reset your password.') +
-      ' Write it down or store it in a password manager — it will not be shown again.';
-    modalBox.appendChild(p);
-    const codeBox = document.createElement('div');
-    codeBox.textContent = code;
-    codeBox.style.cssText = 'font-family:ui-monospace,Menlo,monospace;font-size:1.05rem;' +
-      'background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:0.6rem;' +
-      'text-align:center;letter-spacing:0.05em;user-select:all;margin:0.4rem 0;';
-    modalBox.appendChild(codeBox);
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    const copy = document.createElement('button');
-    copy.className = 'mbtn-cancel';
-    copy.textContent = 'Copy code';
-    copy.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(code); copy.textContent = 'Copied \u2713'; }
-      catch { copy.textContent = 'Select & copy manually'; }
-    });
-    const done = document.createElement('button');
-    done.className = 'mbtn-confirm';
-    done.textContent = 'I saved it';
-    const close = () => { modalOverlay.classList.remove('active'); modalCloser = null; resolve(true); };
-    modalCloser = close;
-    done.addEventListener('click', close);
-    row.append(copy, done);
-    modalBox.appendChild(row);
-    modalOverlay.classList.add('active');
-    done.focus();
+  return enqueueModal({
+    dismissible: false,
+    render(close) {
+      modalHeading('Save your recovery code',
+        (context || 'This code is the ONLY way to reset your password.') +
+        ' Write it down or store it in a password manager — it will not be shown again.');
+      const codeBox = document.createElement('div');
+      codeBox.textContent = code;
+      codeBox.tabIndex = 0;
+      codeBox.setAttribute('aria-label', 'Recovery code');
+      codeBox.style.cssText = 'font-family:ui-monospace,Menlo,monospace;font-size:1.05rem;' +
+        'background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:0.6rem;' +
+        'text-align:center;letter-spacing:0.05em;user-select:all;margin:0.4rem 0;';
+      modalBox.appendChild(codeBox);
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'mbtn-cancel';
+      copy.textContent = 'Copy code';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(code); copy.textContent = 'Copied \u2713'; }
+        catch { copy.textContent = 'Select & copy manually'; }
+      });
+      const done = document.createElement('button');
+      done.type = 'button';
+      done.className = 'mbtn-confirm';
+      done.textContent = 'I saved it';
+      done.addEventListener('click', () => close(true));
+      row.append(copy, done);
+      modalBox.appendChild(row);
+      return done;
+    },
   });
 }
 
@@ -2395,6 +2607,70 @@ async function exportPlayPNG(play, section, numLabel) {
 
 let generating = false;
 let pollTimer = null;
+let generationEpoch = 0;
+let generationRequest = null;
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const POLL_REQUEST_TIMEOUT_MS = 15000;
+const MAX_POLL_FAILURES = 3;
+const JOB_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isGenerationCurrent(epoch) {
+  return generating && generationEpoch === epoch;
+}
+
+function invalidateGeneration({ clearUI = false, resetPreferences = false } = {}) {
+  generationEpoch++;
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = null;
+  if (generationRequest) generationRequest.abort();
+  generationRequest = null;
+  generating = false;
+  if (resetPreferences) outputChecks.forEach(box => { box.checked = true; });
+  if (clearUI) {
+    progressSection.classList.remove('active');
+    downloads.classList.remove('active');
+    resetLink.classList.remove('active');
+    hideGenError();
+    dlGrid.replaceChildren();
+  }
+  syncGenerateChecks();
+}
+
+async function generationFetch(url, options, epoch, timeoutMs) {
+  if (!isGenerationCurrent(epoch)) throw new Error('Generation was cancelled');
+  const controller = new AbortController();
+  generationRequest = controller;
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (timedOut) throw new Error('The server request timed out');
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+    if (generationRequest === controller) generationRequest = null;
+  }
+}
+
+function finishGeneration(epoch) {
+  if (!isGenerationCurrent(epoch)) return false;
+  generationEpoch++;
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = null;
+  if (generationRequest) generationRequest.abort();
+  generationRequest = null;
+  generating = false;
+  syncGenerateChecks();
+  return true;
+}
+
+function failGeneration(epoch, message) {
+  if (!finishGeneration(epoch)) return;
+  showGenError(message);
+  resetLink.classList.add('active');
+}
 
 function showProgress(msg) {
   progressSection.classList.add('active');
@@ -2414,10 +2690,10 @@ function hideGenError() {
 generateBtn.addEventListener('click', async () => {
   if (generating || !doc) return;
   const options = {
-    offense_coach_card: chkOffenseCoach.checked,
-    offense_wristband: chkOffenseWrist.checked,
-    defense_coach_card: chkDefenseCoach.checked,
-    defense_wristband: chkDefenseWrist.checked,
+    offense_coach_card: !chkOffenseCoach.disabled && chkOffenseCoach.checked,
+    offense_wristband: !chkOffenseWrist.disabled && chkOffenseWrist.checked,
+    defense_coach_card: !chkDefenseCoach.disabled && chkDefenseCoach.checked,
+    defense_wristband: !chkDefenseWrist.disabled && chkDefenseWrist.checked,
   };
   hideGenError();
   downloads.classList.remove('active');
@@ -2474,11 +2750,13 @@ generateBtn.addEventListener('click', async () => {
       ' to print. Use the sidebar\u2019s Renumber button, or bench plays whose letters are too high.');
     return;
   }
+  const epoch = ++generationEpoch;
   generating = true;
-  generateBtn.disabled = true;
+  syncGenerateChecks();
   try {
     showProgress('Saving…');
     if (!await saveDoc()) throw new Error('Could not save your playbook');
+    if (!isGenerationCurrent(epoch)) return;
     showProgress('Rendering play images…');
     // Export from a frozen copy: the canvas stays interactive during the async
     // export loop, and a mid-export edit must not tear the rendered set.
@@ -2489,54 +2767,87 @@ generateBtn.addEventListener('click', async () => {
     if (needOffense) {
       for (const p of frozenOffense) {
         const blob = await exportPlayPNG(p, 'offense', displayNum('offense', p));
+        if (!isGenerationCurrent(epoch)) return;
         form.append('plays', blob, String(p.num).padStart(2, '0') + '.png');
       }
     }
     if (needDefense) {
       for (const p of frozenDefense) {
         const blob = await exportPlayPNG(p, 'defense', displayNum('defense', p));
+        if (!isGenerationCurrent(epoch)) return;
         form.append('plays', blob, 'D' + p.num + '.png');
       }
     }
     showProgress('Uploading play images…');
-    const res = await fetch('/api/generate', { method: 'POST', body: form });
+    const res = await generationFetch('/api/generate', { method: 'POST', body: form }, epoch, 120000);
+    if (!isGenerationCurrent(epoch)) return;
     if (res.status === 401) {
       showAuthView('Your session expired — sign in again.');
-      throw new Error('Not signed in');
+      return;
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Generate failed');
+    if (!data || typeof data.jobId !== 'string' || !JOB_ID_RE.test(data.jobId)) {
+      throw new Error('Generate started, but the server returned an invalid job ID');
+    }
     showProgress('Processing your playbook…');
-    startPolling(data.jobId);
+    startPolling(data.jobId, epoch);
   } catch (err) {
-    showGenError(err.message);
-    generating = false;
-    generateBtn.disabled = false;
+    if (isGenerationCurrent(epoch)) failGeneration(epoch, err.message || 'Generate failed');
   }
 });
 
-function startPolling(jobId) {
-  let elapsed = 0;
-  clearInterval(pollTimer);
-  pollTimer = setInterval(async () => {
-    elapsed += 3;
+function startPolling(jobId, epoch) {
+  const startedAt = Date.now();
+  let failures = 0;
+
+  const schedule = () => {
+    if (!isGenerationCurrent(epoch)) return;
+    pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+  };
+
+  const poll = async () => {
+    pollTimer = null;
+    if (!isGenerationCurrent(epoch)) return;
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
+      failGeneration(epoch, 'Processing took too long. Please try again; if this keeps happening, use a smaller playbook.');
+      return;
+    }
     try {
-      const res = await fetch('/api/status/' + jobId);
-      const data = await res.json();
+      const res = await generationFetch('/api/status/' + encodeURIComponent(jobId), {}, epoch, POLL_REQUEST_TIMEOUT_MS);
+      if (!isGenerationCurrent(epoch)) return;
+      if (res.status === 401) {
+        showAuthView('Your session expired — sign in again.');
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const err = new Error(data && data.error || 'Could not check processing status (' + res.status + ')');
+        err.fatal = res.status >= 400 && res.status < 500;
+        throw err;
+      }
+      if (!data || typeof data !== 'object' || Array.isArray(data) ||
+          !['processing', 'complete', 'error'].includes(data.status)) {
+        const err = new Error('The server returned an invalid processing status');
+        err.fatal = true;
+        throw err;
+      }
+      failures = 0;
       if (data.status === 'complete') {
-        clearInterval(pollTimer);
+        if (!Array.isArray(data.files) || !data.files.length ||
+            !data.files.every(f => typeof f === 'string' && f.length > 0 && f.length <= 200)) {
+          const err = new Error('Processing completed without a valid file list');
+          err.fatal = true;
+          throw err;
+        }
+        if (!finishGeneration(epoch)) return;
         progressSection.classList.remove('active');
-        showDownloads(jobId, data.files || []);
-        generating = false;
-        generateBtn.disabled = false;
+        showDownloads(jobId, data.files);
       } else if (data.status === 'error') {
-        clearInterval(pollTimer);
         let errText = data.message || 'Processing failed';
         if (data.detail) errText += '\n\nDetail: ' + data.detail;
-        showGenError(errText);
-        resetLink.classList.add('active');
-        generating = false;
-        generateBtn.disabled = false;
+        failGeneration(epoch, errText);
       } else {
         const msgs = {
           downloading: 'Preparing play images…',
@@ -2544,11 +2855,21 @@ function startPolling(jobId) {
           uploading: 'Uploading results…',
         };
         statusText.textContent = msgs[data.step] || 'Processing… (' + elapsed + 's)';
+        schedule();
       }
-    } catch {
-      statusText.textContent = 'Processing… (' + elapsed + 's)';
+    } catch (err) {
+      if (!isGenerationCurrent(epoch)) return;
+      failures++;
+      if (err.fatal || failures >= MAX_POLL_FAILURES) {
+        failGeneration(epoch, err.message || 'Could not check processing status');
+      } else {
+        statusText.textContent = 'Connection issue — retrying… (' + elapsed + 's)';
+        schedule();
+      }
     }
-  }, 3000);
+  };
+
+  schedule();
 }
 
 function showDownloads(jobId, files) {
@@ -2556,7 +2877,7 @@ function showDownloads(jobId, files) {
   files.forEach(f => {
     const a = document.createElement('a');
     a.className = 'dl-btn';
-    a.href = '/api/download/' + jobId + '/' + f;
+    a.href = '/api/download/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(f);
     const icon = document.createElement('span');
     icon.className = 'dl-icon';
     icon.textContent = FRIENDLY_ICONS[f] || '\u{1F4C4}';
@@ -2569,13 +2890,88 @@ function showDownloads(jobId, files) {
 }
 
 resetGenLink.addEventListener('click', () => {
-  downloads.classList.remove('active');
-  resetLink.classList.remove('active');
-  progressSection.classList.remove('active');
-  hideGenError();
+  invalidateGeneration({ clearUI: true });
 });
 
 // ---------- Auth ----------
+
+let authEpoch = 0;
+let playbookLoadRequest = null;
+let activeUserId = null;
+let authBusy = false;
+let accountRequestBusy = false;
+
+function setAuthBusy(busy) {
+  authBusy = busy;
+  loginBtn.disabled = busy;
+  registerBtn.disabled = busy;
+  $('recoverBtn').disabled = busy;
+  for (const id of ['forgotLink', 'backToSignin']) {
+    const link = $(id);
+    link.setAttribute('aria-disabled', String(busy));
+    link.style.pointerEvents = busy ? 'none' : '';
+  }
+}
+
+function setAccountRequestBusy(busy) {
+  accountRequestBusy = busy;
+  signOutBtn.disabled = busy;
+  $('accountBtn').disabled = busy;
+}
+
+function startAuthTransition() {
+  authEpoch++;
+  if (playbookLoadRequest) playbookLoadRequest.abort();
+  playbookLoadRequest = null;
+  activeUserId = null;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  return authEpoch;
+}
+
+async function verifyAuthenticatedAccount(expectedUserId, epoch) {
+  const res = await fetch('/api/auth/me', { cache: 'no-store' });
+  if (epoch !== authEpoch) return null;
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.userId !== expectedUserId || typeof data.email !== 'string') {
+    throw new Error('Could not verify the signed-in account');
+  }
+  return data;
+}
+
+async function requestDeletionUntilSettled(
+  password,
+  epoch,
+  expectedUserId,
+  sawPending = false,
+  email = ''
+) {
+  while (epoch === authEpoch) {
+    const res = await fetch('/api/auth/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(email
+        ? { email, password, userId: expectedUserId }
+        : { password, userId: expectedUserId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (epoch !== authEpoch) return false;
+    if (res.ok) return true;
+    if (res.status === 401 && sawPending) return true;
+    if (res.status === 503 && data.deletionPending === true) {
+      sawPending = true;
+      const retry = await showModal({
+        title: 'Account cleanup is pending',
+        message: 'Account access is already disabled, but storage cleanup was interrupted. Retry cleanup now?',
+        confirmLabel: 'Retry cleanup',
+      });
+      if (epoch !== authEpoch || !retry) return false;
+      continue;
+    }
+    throw new Error(data.error || 'Account deletion failed');
+  }
+  return false;
+}
 
 function showAuthError(msg) {
   authError.textContent = msg;
@@ -2587,6 +2983,8 @@ function hideAuthError() {
 }
 
 function showAuthView(msg) {
+  startAuthTransition();
+  invalidateGeneration({ clearUI: true });
   editorView.classList.remove('active');
   authView.classList.add('active');
   signOutBtn.style.display = 'none';
@@ -2596,7 +2994,7 @@ function showAuthView(msg) {
   else hideAuthError();
 }
 
-let docOwner = null;  // email the in-memory doc was loaded for
+let docOwner = null;  // immutable user ID the in-memory doc was loaded for
 
 function discardLocalDoc() {
   clearTimeout(saveTimer);
@@ -2607,17 +3005,28 @@ function discardLocalDoc() {
   cur = null;
   selection = null;
   drawing = null;
+  drag = null;
   for (const k in undoStacks) delete undoStacks[k];
+  invalidateGeneration({ clearUI: true, resetPreferences: true });
+  refreshAll();
 }
 
-async function enterEditor(email) {
+async function enterEditor(email, userId, expectedEpoch = null) {
+  const epoch = expectedEpoch === null ? startAuthTransition() : expectedEpoch;
+  if (epoch !== authEpoch) return;
+  invalidateGeneration({ clearUI: true });
+  if (typeof userId !== 'string' || !userId) {
+    showAuthView('Could not verify the account — sign in again.');
+    return;
+  }
+  activeUserId = userId;
   userEmail.textContent = email || '';
   signOutBtn.style.display = '';
   $('accountBtn').style.display = '';
   authView.classList.remove('active');
   editorView.classList.add('active');
   hideAuthError();
-  if (doc && saveState !== 'saved' && docOwner === email) {
+  if (doc && saveState !== 'saved' && docOwner === userId) {
     // Same user re-authenticated with unsaved local work: keep it and push it up.
     saveDoc();
     refreshAll();
@@ -2626,20 +3035,27 @@ async function enterEditor(email) {
   // Anything held locally belongs to a different account (or nobody) — drop it
   // rather than risk writing one user's playbook into another's account.
   discardLocalDoc();
+  const controller = new AbortController();
+  playbookLoadRequest = controller;
   let data = null;
   try {
-    const res = await fetch('/api/plays');
+    const res = await fetch('/api/plays', { signal: controller.signal });
+    if (epoch !== authEpoch || activeUserId !== userId) return;
     if (res.status === 401) { showAuthView(); return; }
     if (!res.ok) throw new Error('load failed');
     data = await res.json();
-  } catch {
+  } catch (err) {
+    if (epoch !== authEpoch || activeUserId !== userId || err.name === 'AbortError') return;
     // Fail closed: editing an empty doc here would let autosave overwrite the
     // account's stored playbook.
     showAuthView('Could not load your playbook — check your connection and sign in again.');
     return;
+  } finally {
+    if (playbookLoadRequest === controller) playbookLoadRequest = null;
   }
+  if (epoch !== authEpoch || activeUserId !== userId) return;
   doc = normalizeDoc(data || {});
-  docOwner = email;
+  docOwner = userId;
   serverUpdatedAt = data && data.updatedAt || null;
   saveState = 'saved';
   updateSaveIndicator();
@@ -2648,6 +3064,7 @@ async function enterEditor(email) {
 }
 
 async function authSubmit(path) {
+  if (authBusy) return;
   const email = authEmail.value.trim().toLowerCase();
   const password = authPassword.value;
   hideAuthError();
@@ -2657,7 +3074,8 @@ async function authSubmit(path) {
     showAuthError('Password must be at least 8 characters');
     return;
   }
-  loginBtn.disabled = registerBtn.disabled = true;
+  const epoch = startAuthTransition();
+  setAuthBusy(true);
   try {
     const res = await fetch(path, {
       method: 'POST',
@@ -2665,17 +3083,40 @@ async function authSubmit(path) {
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json().catch(() => ({}));
+    if (epoch !== authEpoch) return;
+    if (res.status === 423 && data.deletionPending === true && path.endsWith('/login')) {
+      const finish = await showModal({
+        title: 'Finish deleting this account?',
+        message: 'A previous deletion attempt disabled account access but did not finish storage cleanup.',
+        confirmLabel: 'Finish deletion',
+        danger: true,
+      });
+      if (!finish || epoch !== authEpoch) {
+        showAuthError('Account deletion is still pending. Sign in again when you are ready to finish it.');
+        return;
+      }
+      if (await requestDeletionUntilSettled(password, epoch, data.userId, true, email)) {
+        discardLocalDoc();
+        showAuthView('Account deleted.');
+      } else if (epoch === authEpoch) {
+        showAuthError('Account deletion is still pending. Sign in again to retry.');
+      }
+      return;
+    }
     if (!res.ok) throw new Error(data.error || 'Sign-in failed');
     authPassword.value = '';
     if (data.recoveryCode) {
       await showRecoveryCode(data.recoveryCode,
         'Your account was created. This code is the ONLY way to reset your password if you forget it.');
     }
-    await enterEditor(data.email || email);
+    if (epoch !== authEpoch) return;
+    const verified = await verifyAuthenticatedAccount(data.userId, epoch);
+    if (!verified || epoch !== authEpoch) return;
+    await enterEditor(verified.email || data.email || email, verified.userId, epoch);
   } catch (err) {
-    showAuthError(err.message);
+    if (epoch === authEpoch) showAuthError(err.message);
   } finally {
-    loginBtn.disabled = registerBtn.disabled = false;
+    setAuthBusy(false);
   }
 }
 
@@ -2686,6 +3127,7 @@ const recError = $('recError'), recoverBtn = $('recoverBtn');
 
 $('forgotLink').addEventListener('click', e => {
   e.preventDefault();
+  if (authBusy) return;
   recEmail.value = authEmail.value;
   signinForm.style.display = 'none';
   recoverForm.style.display = '';
@@ -2693,11 +3135,13 @@ $('forgotLink').addEventListener('click', e => {
 });
 $('backToSignin').addEventListener('click', e => {
   e.preventDefault();
+  if (authBusy) return;
   recoverForm.style.display = 'none';
   signinForm.style.display = '';
 });
 
 recoverBtn.addEventListener('click', async () => {
+  if (authBusy) return;
   const email = recEmail.value.trim().toLowerCase();
   const recoveryCode = recCode.value.trim();
   const newPassword = recPassword.value;
@@ -2706,7 +3150,8 @@ recoverBtn.addEventListener('click', async () => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Enter a valid email address');
   if (!recoveryCode) return fail('Enter your recovery code');
   if (newPassword.length < 8) return fail('New password must be at least 8 characters');
-  recoverBtn.disabled = true;
+  const epoch = startAuthTransition();
+  setAuthBusy(true);
   try {
     const res = await fetch('/api/auth/recover', {
       method: 'POST',
@@ -2714,6 +3159,7 @@ recoverBtn.addEventListener('click', async () => {
       body: JSON.stringify({ email, recoveryCode, newPassword }),
     });
     const data = await res.json().catch(() => ({}));
+    if (epoch !== authEpoch) return;
     if (!res.ok) throw new Error(data.error || 'Recovery failed');
     recCode.value = recPassword.value = '';
     recoverForm.style.display = 'none';
@@ -2722,16 +3168,22 @@ recoverBtn.addEventListener('click', async () => {
       await showRecoveryCode(data.recoveryCode,
         'Password reset. Your OLD recovery code no longer works — this is your new one.');
     }
-    await enterEditor(data.email || email);
+    if (epoch !== authEpoch) return;
+    const verified = await verifyAuthenticatedAccount(data.userId, epoch);
+    if (!verified || epoch !== authEpoch) return;
+    await enterEditor(verified.email || data.email || email, verified.userId, epoch);
   } catch (err) {
-    fail(err.message);
+    if (epoch === authEpoch) fail(err.message);
   } finally {
-    recoverBtn.disabled = false;
+    setAuthBusy(false);
   }
 });
 
 // ---- Account menu ----
 $('accountBtn').addEventListener('click', async () => {
+  if (accountRequestBusy) return;
+  const menuEpoch = authEpoch;
+  const menuUserId = activeUserId;
   const choice = await showChoiceModal({
     title: 'Account',
     message: userEmail.textContent,
@@ -2741,6 +3193,7 @@ $('accountBtn').addEventListener('click', async () => {
       { key: 'cancel', label: 'Close' },
     ],
   });
+  if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
   if (choice === 'code') {
     const sure = await showModal({
       title: 'New recovery code',
@@ -2748,13 +3201,20 @@ $('accountBtn').addEventListener('click', async () => {
       confirmLabel: 'Generate',
     });
     if (!sure) return;
+    if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
+    setAccountRequestBusy(true);
     try {
       const res = await fetch('/api/auth/recovery-code', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
+      if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
       if (!res.ok) throw new Error(data.error || 'Failed');
       await showRecoveryCode(data.recoveryCode, 'Here is your new recovery code.');
     } catch (err) {
-      await showModal({ title: 'Could not generate code', message: err.message, confirmLabel: 'OK' });
+      if (menuEpoch === authEpoch && menuUserId === activeUserId) {
+        await showModal({ title: 'Could not generate code', message: err.message, confirmLabel: 'OK' });
+      }
+    } finally {
+      setAccountRequestBusy(false);
     }
   } else if (choice === 'delete') {
     const pw = await showModal({
@@ -2766,18 +3226,19 @@ $('accountBtn').addEventListener('click', async () => {
       danger: true,
     });
     if (pw === null || pw === '') return;
+    if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
+    setAccountRequestBusy(true);
     try {
-      const res = await fetch('/api/auth/delete-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed');
+      const completed = await requestDeletionUntilSettled(pw, menuEpoch, menuUserId);
+      if (!completed || menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
       discardLocalDoc();
       showAuthView('Account deleted.');
     } catch (err) {
-      await showModal({ title: 'Could not delete account', message: err.message, confirmLabel: 'OK' });
+      if (menuEpoch === authEpoch && menuUserId === activeUserId) {
+        await showModal({ title: 'Could not delete account', message: err.message, confirmLabel: 'OK' });
+      }
+    } finally {
+      setAccountRequestBusy(false);
     }
   }
 });
@@ -2788,6 +3249,7 @@ authPassword.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.
 authEmail.addEventListener('keydown', e => { if (e.key === 'Enter') authPassword.focus(); });
 
 signOutBtn.addEventListener('click', async () => {
+  if (accountRequestBusy) return;
   if (doc && saveState !== 'saved') {
     const ok = await saveDoc();
     if (!ok) {
@@ -2800,7 +3262,9 @@ signOutBtn.addEventListener('click', async () => {
       if (!anyway) return;
     }
   }
+  const epoch = startAuthTransition();
   try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
+  if (epoch !== authEpoch) return;
   discardLocalDoc();
   showAuthView();
 });
@@ -2833,15 +3297,18 @@ syncStyleUI();
 })();
 
 (async function init() {
+  const epoch = startAuthTransition();
   try {
     const res = await fetch('/api/auth/me');
+    if (epoch !== authEpoch) return;
     if (res.ok) {
       const data = await res.json();
-      await enterEditor(data.email);
+      if (epoch !== authEpoch) return;
+      await enterEditor(data.email, data.userId, epoch);
       return;
     }
   } catch { /* fall through */ }
-  showAuthView();
+  if (epoch === authEpoch) showAuthView();
 })();
 </script>
 

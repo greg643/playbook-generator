@@ -1,4 +1,11 @@
-import { jsonNoStore, requireUser, emailKey, createRecoveryFields } from "../../_lib/auth.js";
+import {
+  jsonNoStore,
+  requireUser,
+  createRecoveryFields,
+  hasRecentAuthentication,
+  emailKey,
+} from "../../_lib/auth.js";
+import { putJsonIfCurrent } from "../../_lib/r2.js";
 
 export async function onRequestPost(context) {
   const { env } = context;
@@ -7,20 +14,26 @@ export async function onRequestPost(context) {
     const { user, response } = await requireUser(context);
     if (!user) return response;
 
-    const key = await emailKey(user.email);
-    const obj = await env.PLAYBOOK_BUCKET.get(key);
-    if (!obj) {
-      // Valid session but the account record is gone (e.g. deleted).
-      return jsonNoStore({ error: "Not signed in" }, { status: 401 });
+    if (!hasRecentAuthentication(user)) {
+      return jsonNoStore(
+        { error: "Please sign in again before replacing your recovery code" },
+        { status: 403 }
+      );
     }
 
-    const record = await obj.json();
+    const record = { ...user.account };
     const { recoveryCode, fields } = await createRecoveryFields();
     Object.assign(record, fields);
+    record.recoveryChangedAt = new Date().toISOString();
 
-    await env.PLAYBOOK_BUCKET.put(key, JSON.stringify(record), {
-      httpMetadata: { contentType: "application/json" },
-    });
+    const key = await emailKey(user.email);
+    const updated = await putJsonIfCurrent(env, key, record, user.accountObject);
+    if (updated === null) {
+      return jsonNoStore(
+        { error: "Account changed while replacing the recovery code; please try again" },
+        { status: 409 }
+      );
+    }
 
     return jsonNoStore({ recoveryCode });
   } catch (err) {

@@ -20,7 +20,8 @@ import sys
 import subprocess
 import shutil
 import json
-import zipfile
+import tempfile
+import re
 from pathlib import Path
 from PIL import Image
 from pptx import Presentation
@@ -28,7 +29,26 @@ from pptx.util import Emu
 
 # Import the ink overlay module
 from ink_overlay import overlay_ink_on_slides
+from input_safety import MAX_SLIDES, validate_pptx_archive, validate_print_play_counts
 
+
+MAX_SOURCE_IMAGE_DIMENSION = 10000
+MAX_SOURCE_IMAGE_PIXELS = 40_000_000
+MAX_TOTAL_SOURCE_IMAGE_PIXELS = 250_000_000
+MAX_RENDER_IMAGE_DIMENSION = 1800
+OUTPUT_FILENAMES = {
+    "offense_coach_card": "offense_coach_card.pdf",
+    "offense_wristband": "offense_wristband.pdf",
+    "defense_coach_card": "defense_coach_card.pdf",
+    "defense_wristband": "defense_wristband.pdf",
+}
+
+# Deck-format rule shown to users on the upload page and echoed in errors.
+SECTION_HINT = (
+    "Start each section with a separator slide (a slide without a play) whose "
+    "text mentions 'Offense' or 'Defense' in any capitalization — '6v6 Offense' "
+    "works. Every play slide needs a rectangle shape marking the field."
+)
 # ─── STEP 1: Analyze the PPTX ────────────────────────────────────────────────
 
 def analyze_playbook(pptx_path):
@@ -36,7 +56,10 @@ def analyze_playbook(pptx_path):
     Walk through slides, detect OFFENSE/DEFENSE sections, identify play slides.
     Returns list of dicts: {slide_index, section, play_number, crop_box_inches}
     """
+    validate_pptx_archive(pptx_path)
     prs = Presentation(pptx_path)
+    if len(prs.slides) > MAX_SLIDES:
+        raise ValueError(f"PPTX has too many slides (max {MAX_SLIDES})")
     slide_width = prs.slide_width  # EMU
     slide_height = prs.slide_height
 
@@ -49,44 +72,38 @@ def analyze_playbook(pptx_path):
         shapes = list(slide.shapes)
         shape_count = len(shapes)
 
-        # Section headers have very few shapes — check for section keywords
-        if shape_count <= 5:
-            all_text = " ".join(
-                s.text_frame.text for s in shapes if s.has_text_frame
-            ).upper()
-            if "OFFENSE" in all_text:
-                current_section = "OFFENSE"
-                offense_count = 0
-                print(f"  Slide {i+1}: Section header → OFFENSE")
-                continue
-            elif "DEFENSE" in all_text:
-                current_section = "DEFENSE"
-                defense_count = 0
-                print(f"  Slide {i+1}: Section header → DEFENSE")
-                continue
-            else:
-                # Some other header/spacer — skip
-                print(f"  Slide {i+1}: Skipping (header/spacer, {shape_count} shapes: {all_text[:50]})")
-                continue
+        all_text = " ".join(
+            s.text_frame.text for s in shapes if s.has_text_frame
+        ).upper()
+        crop_box = find_field_rectangle(shapes)
+
+        # Section separators mention OFFENSE or DEFENSE anywhere in their text,
+        # in any capitalization ("6v6 Offense", "OFFENSE PLAYS"). A slide with a
+        # field rectangle is never a separator, so a play that merely mentions a
+        # section stays a play; a slide mentioning both words is ambiguous and
+        # is not a separator either. A repeated section later in the deck
+        # continues numbering rather than overwriting 01.png/D1.png from an
+        # earlier section.
+        mentions_offense = "OFFENSE" in all_text
+        mentions_defense = "DEFENSE" in all_text
+        if crop_box is None and mentions_offense != mentions_defense:
+            current_section = "OFFENSE" if mentions_offense else "DEFENSE"
+            print(f"  Slide {i+1}: Section header → {current_section}")
+            continue
 
         if current_section is None:
             # Haven't hit a section yet — skip template slides etc.
-            all_text = " ".join(
-                s.text_frame.text for s in shapes if s.has_text_frame
-            ).upper()
             print(f"  Slide {i+1}: Skipping (before any section, {shape_count} shapes)")
             continue
 
-        # This is a play slide — find the main field rectangle
-        crop_box = find_field_rectangle(shapes)
+        # This is a possible play slide — require an explicit field rectangle.
+        # Guessing from the largest arbitrary shape can turn logos/photos into
+        # play crops and makes malformed decks appear successful.
         if crop_box is None:
             print(f"  Slide {i+1}: Skipping (no field rectangle found)")
             continue
 
         # Check for special/non-play slides by looking at text
-        all_text = " ".join(
-            s.text_frame.text for s in shapes if s.has_text_frame
-        ).upper()
         skip_keywords = ["PRINT IMAGES", "APPENDIX", "TEMPLATE"]
         if any(kw in all_text for kw in skip_keywords):
             print(f"  Slide {i+1}: Skipping (special slide: {all_text[:40]})")
@@ -153,6 +170,17 @@ def analyze_playbook(pptx_path):
         })
         print(f"  Slide {i+1}: {current_section} #{play_num} → {filename} ({play_id} {play_name})")
 
+    if not plays:
+        if current_section is None:
+            raise ValueError(
+                "No OFFENSE or DEFENSE section slides were found in this deck. "
+                + SECTION_HINT
+            )
+        raise ValueError(
+            "Sections were found, but no play slides with a field rectangle "
+            "were detected after them. " + SECTION_HINT
+        )
+
     return plays, slide_width, slide_height
 
 
@@ -179,17 +207,7 @@ def find_field_rectangle(shapes):
         s = rectangles[0][1]
         return (s.left, s.top, s.left + s.width, s.top + s.height)
 
-    # Final fallback: largest shape overall
-    best = None
-    best_area = 0
-    for s in shapes:
-        if s.width and s.height:
-            area = s.width * s.height
-            if area > best_area:
-                best_area = area
-                best = (s.left, s.top, s.left + s.width, s.top + s.height)
-
-    return best
+    return None
 
 
 # ─── STEP 2: Convert PPTX to slide images ────────────────────────────────────
@@ -262,8 +280,7 @@ def crop_plays(plays, slide_images, slide_width_emu, slide_height_emu, output_di
     output_dir.mkdir(exist_ok=True)
 
     if not slide_images:
-        print("ERROR: No slide images found!")
-        return
+        raise RuntimeError("No slide images were produced from the PowerPoint file")
 
     # Get image dimensions from first image to compute EMU→pixel ratio
     sample = Image.open(slide_images[0])
@@ -273,6 +290,7 @@ def crop_plays(plays, slide_images, slide_width_emu, slide_height_emu, output_di
     emu_to_px_x = img_w / slide_width_emu
     emu_to_px_y = img_h / slide_height_emu
 
+    saved = []
     for play in plays:
         si = play["slide_index"]
 
@@ -287,8 +305,9 @@ def crop_plays(plays, slide_images, slide_width_emu, slide_height_emu, output_di
                 break
 
         if slide_file is None:
-            print(f"  WARNING: No image for slide {slide_num}, skipping {play['filename']}")
-            continue
+            raise RuntimeError(
+                f"PowerPoint rendering omitted slide {slide_num}; refusing to create an incomplete playbook"
+            )
 
         img = Image.open(slide_file)
 
@@ -311,9 +330,13 @@ def crop_plays(plays, slide_images, slide_width_emu, slide_height_emu, output_di
 
         out_path = output_dir / play["filename"]
         cropped.save(out_path, "PNG")
+        saved.append(out_path)
         print(f"  {play['filename']:10s} ← Slide {slide_num} ({play['play_id']} {play['play_name']})")
 
-    print(f"\n Saved {len(plays)} play images to {output_dir}/")
+    if len(saved) != len(plays):
+        raise RuntimeError("Not every detected play was rendered")
+    print(f"\n Saved {len(saved)} play images to {output_dir}/")
+    return saved
 
 
 # ─── STEP 4: PlaybookGenerator (from your existing script) ───────────────────
@@ -343,25 +366,77 @@ class PlaybookGenerator:
             return background
         return img.convert('RGB') if img.mode != 'RGB' else img
 
+    def _image_inventory(self):
+        """Return canonical play slots and reject files we would otherwise ignore."""
+        inventory = {}
+        offense_re = re.compile(r"^(?:0?([1-9])|(1[0-6]))\.(?:png|jpg)$", re.IGNORECASE)
+        defense_re = re.compile(r"^D([1-6])\.(?:png|jpg)$", re.IGNORECASE)
+
+        for path in sorted(self.images_dir.iterdir()):
+            if not path.is_file() or path.suffix.lower() not in {".png", ".jpg"}:
+                continue
+            offense_match = offense_re.match(path.name)
+            defense_match = defense_re.match(path.name)
+            if offense_match:
+                number = int(offense_match.group(1) or offense_match.group(2))
+                slot = ("offense", number)
+            elif defense_match:
+                slot = ("defense", int(defense_match.group(1)))
+            else:
+                raise ValueError(f"Unsupported play image filename: {path.name}")
+            if slot in inventory:
+                raise ValueError(
+                    f"Duplicate play image slot {slot[0]} {slot[1]}: "
+                    f"{inventory[slot].name} and {path.name}"
+                )
+            inventory[slot] = path
+        return inventory
+
+    def _load_bounded_image(self, path, total_pixels):
+        try:
+            with Image.open(path) as source:
+                if source.format not in {"PNG", "JPEG"}:
+                    raise ValueError(f"Unsupported image format for {path.name}")
+                width, height = source.size
+                pixels = width * height
+                if width <= 0 or height <= 0:
+                    raise ValueError(f"Invalid image dimensions for {path.name}")
+                if width > MAX_SOURCE_IMAGE_DIMENSION or height > MAX_SOURCE_IMAGE_DIMENSION:
+                    raise ValueError(
+                        f"Play image dimensions are too large for {path.name} "
+                        f"(max {MAX_SOURCE_IMAGE_DIMENSION}px per side)"
+                    )
+                if pixels > MAX_SOURCE_IMAGE_PIXELS:
+                    raise ValueError(f"Play image has too many pixels: {path.name}")
+                if total_pixels + pixels > MAX_TOTAL_SOURCE_IMAGE_PIXELS:
+                    raise ValueError("Combined play images exceed the pixel safety limit")
+                source.load()
+                image = self.fix_image_transparency(source).copy()
+        except (OSError, Image.DecompressionBombError) as exc:
+            raise ValueError(f"Could not decode play image: {path.name}") from exc
+
+        if max(image.size) > MAX_RENDER_IMAGE_DIMENSION:
+            image.thumbnail(
+                (MAX_RENDER_IMAGE_DIMENSION, MAX_RENDER_IMAGE_DIMENSION),
+                Image.Resampling.LANCZOS,
+            )
+        return image, total_pixels + pixels
+
     def load_images(self):
         offense_images = []
         defense_images = []
+        inventory = self._image_inventory()
+        total_pixels = 0
         for i in range(1, 17):
-            for name in [f"{i:02d}.png", f"{i:02d}.jpg", f"{i}.png", f"{i}.jpg"]:
-                img_path = self.images_dir / name
-                if img_path.exists():
-                    img = Image.open(img_path)
-                    img = self.fix_image_transparency(img)
-                    offense_images.append(img)
-                    break
+            img_path = inventory.get(("offense", i))
+            if img_path:
+                img, total_pixels = self._load_bounded_image(img_path, total_pixels)
+                offense_images.append(img)
         for i in range(1, 7):  # Support up to D6
-            for name in [f"D{i}.png", f"D{i}.jpg", f"d{i}.png", f"d{i}.jpg"]:
-                img_path = self.images_dir / name
-                if img_path.exists():
-                    img = Image.open(img_path)
-                    img = self.fix_image_transparency(img)
-                    defense_images.append(img)
-                    break
+            img_path = inventory.get(("defense", i))
+            if img_path:
+                img, total_pixels = self._load_bounded_image(img_path, total_pixels)
+                defense_images.append(img)
         return offense_images, defense_images
 
     def create_coach_card_offense(self, images):
@@ -631,9 +706,46 @@ class PlaybookGenerator:
     def generate_all(self, gen_offense=True, gen_defense=True,
                       offense_coach_card=True, offense_wristband=True,
                       defense_coach_card=True, defense_wristband=True):
+        expected = set()
+        if offense_coach_card:
+            expected.add(OUTPUT_FILENAMES["offense_coach_card"])
+        if offense_wristband:
+            expected.add(OUTPUT_FILENAMES["offense_wristband"])
+        if defense_coach_card:
+            expected.add(OUTPUT_FILENAMES["defense_coach_card"])
+        if defense_wristband:
+            expected.add(OUTPUT_FILENAMES["defense_wristband"])
+        if not expected:
+            raise ValueError("Select at least one output")
+
+        # Known outputs are application-owned. Removing them prevents a prior
+        # local run from making a missing output look successful.
+        for filename in OUTPUT_FILENAMES.values():
+            (self.output_dir / filename).unlink(missing_ok=True)
+
         print("\nLoading play images...")
         offense_images, defense_images = self.load_images()
         print(f"Found {len(offense_images)} offense plays and {len(defense_images)} defense formations")
+
+        # A one-section deck still produces what it can: outputs requested for
+        # a section with no plays are skipped instead of failing the whole job.
+        offense_outputs = {OUTPUT_FILENAMES["offense_coach_card"], OUTPUT_FILENAMES["offense_wristband"]}
+        defense_outputs = {OUTPUT_FILENAMES["defense_coach_card"], OUTPUT_FILENAMES["defense_wristband"]}
+        if not (gen_offense and offense_images):
+            for name in sorted(expected & offense_outputs):
+                print(f"  No offense plays — skipping {name}")
+            expected -= offense_outputs
+        if not (gen_defense and defense_images):
+            for name in sorted(expected & defense_outputs):
+                print(f"  No defense plays — skipping {name}")
+            expected -= defense_outputs
+        if not expected:
+            raise ValueError(
+                "No plays were found for any of the selected outputs (for "
+                "example, defense outputs selected but the deck has no DEFENSE "
+                "section). Adjust the output checkboxes, or fix the deck: "
+                + SECTION_HINT
+            )
 
         if gen_offense and offense_images:
             print("\nGenerating offense materials...")
@@ -648,9 +760,26 @@ class PlaybookGenerator:
             if defense_wristband:
                 self.create_wristband_sheet_defense(defense_images)
 
+        # Only application-owned names count: a pre-existing unrelated PDF in
+        # the output directory (CLI runs) must not fail the verification.
+        produced = {
+            name for name in OUTPUT_FILENAMES.values()
+            if (self.output_dir / name).exists()
+        }
+        if produced != expected:
+            missing = sorted(expected - produced)
+            unexpected = sorted(produced - expected)
+            details = []
+            if missing:
+                details.append("missing: " + ", ".join(missing))
+            if unexpected:
+                details.append("unexpected: " + ", ".join(unexpected))
+            raise RuntimeError("Generated output set did not match the request (" + "; ".join(details) + ")")
+
         print(f"\nDone! Output in: {self.output_dir}/")
         for pdf in sorted(self.output_dir.glob("*.pdf")):
             print(f"  {pdf.name}")
+        return sorted(produced)
 
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────
@@ -702,8 +831,12 @@ def main():
             mode = sys.argv[idx + 1].lower()
     render_dpi = 600 if mode == "screenshot" else 400
 
-    work_dir = Path("_playbook_work")
-    work_dir.mkdir(exist_ok=True)
+    # Each invocation gets an isolated workspace.  Runs are intentionally kept
+    # under _playbook_work for local inspection, but no run can reuse another
+    # deck's slides, ink overlays, or numbered play images.
+    work_root = Path("_playbook_work")
+    work_root.mkdir(exist_ok=True)
+    work_dir = Path(tempfile.mkdtemp(prefix="run-", dir=work_root))
     plays_dir = work_dir / "plays"
     plays_dir.mkdir(exist_ok=True)
 
@@ -718,6 +851,7 @@ def main():
     # Step 1: Analyze
     print("STEP 1: Analyzing playbook structure...")
     plays, slide_w, slide_h = analyze_playbook(pptx_path)
+    validate_print_play_counts(plays)
     offense_plays = [p for p in plays if p["section"] == "OFFENSE"]
     defense_plays = [p for p in plays if p["section"] == "DEFENSE"]
     print(f"\n  Found {len(offense_plays)} offense plays, {len(defense_plays)} defense plays")
@@ -743,14 +877,11 @@ def main():
             print(f"\nSTEP 2.5: Ink overlays already applied ({len(ink_files)} files), skipping...")
         else:
             print("\nSTEP 2.5: Overlaying ink annotations (hand-drawn routes)...")
-            pptx_unzipped_dir = work_dir / "pptx_unzipped"
-            pptx_unzipped_dir.mkdir(exist_ok=True)
-            import zipfile
-            with zipfile.ZipFile(pptx_path, 'r') as z:
-                z.extractall(str(pptx_unzipped_dir))
             ink_output = overlay_ink_on_slides(
                 pptx_path=str(Path(pptx_path).resolve()),
-                pptx_unzipped_path=str(pptx_unzipped_dir),
+                # The overlay implementation reads directly from ZipFile; no
+                # extraction is needed (and avoiding it removes a zip-bomb sink).
+                pptx_unzipped_path="",
                 slides_dir=str(slides_dir),
                 approach='B',
                 use_fallback_if_failed=True,

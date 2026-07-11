@@ -33,6 +33,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from playbook_pipeline import analyze_playbook  # noqa: E402
 from ink_overlay import extract_ink_strokes, NS  # noqa: E402
+from play_geometry import merge_block_caps  # noqa: E402
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -249,38 +250,6 @@ def downsample(pts, max_n=MAX_ROUTE_POINTS, eps_hint=None):
     return out
 
 
-
-
-def merge_block_caps(routes, lines):
-    """A blocking 'T' in the deck arrives as a short stub plus a detached
-    perpendicular cap line; fold the cap into the stub as end='block'."""
-    def seg_dir(pts):
-        (x1, y1), (x2, y2) = pts[0], pts[-1]
-        d = math.hypot(x2 - x1, y2 - y1) or 1.0
-        return (x2 - x1) / d, (y2 - y1) / d
-
-    remaining = []
-    for ln in lines:
-        pts = ln['points']
-        if len(pts) == 2 and ln.get('end', 'none') == 'none':
-            (x1, y1), (x2, y2) = pts
-            cap_len = math.hypot(x2 - x1, y2 - y1)
-            if cap_len <= 0.09:
-                mid = ((x1 + x2) / 2, (y1 + y2) / 2)
-                cd = seg_dir(pts)
-                matched = False
-                for rt in routes:
-                    tip = rt['points'][-1]
-                    if math.hypot(mid[0] - tip[0], mid[1] - tip[1]) <= 0.035 and rt.get('end') != 'ball':
-                        rd = seg_dir(rt['points'][-2:])
-                        if abs(rd[0] * cd[0] + rd[1] * cd[1]) < 0.45:  # near-perpendicular
-                            rt['end'] = 'block'
-                            matched = True
-                            break
-                if matched:
-                    continue
-        remaining.append(ln)
-    return routes, remaining
 
 
 # ── shape collection ─────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ export async function onRequestGet(context) {
     if (!user) {
       return jsonNoStore({ error: "Not signed in" }, { status: 401 });
     }
-    return jsonNoStore({ email: user.email });
+    return jsonNoStore({ email: user.email, userId: user.userId });
   } catch (err) {
     console.error("Me error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });

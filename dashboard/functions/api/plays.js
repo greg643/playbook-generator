@@ -1,4 +1,11 @@
-import { jsonNoStore, requireUser } from "../_lib/auth.js";
+import {
+  jsonNoStore,
+  isAccountActive,
+  requestBodyTooLarge,
+  requireUser,
+  utf8ByteLength,
+} from "../_lib/auth.js";
+import { putJsonIfCurrent } from "../_lib/r2.js";
 
 const MAX_DOC_BYTES = 1000000;
 // Storage caps (an archive/"bench" beyond what one PDF holds); the generate
@@ -49,9 +56,12 @@ export async function onRequestPut(context) {
     const { user, response } = await requireUser(context);
     if (!user) return response;
 
+    if (requestBodyTooLarge(request, MAX_DOC_BYTES)) {
+      return jsonNoStore({ error: "Playbook too large (max 1 MB)" }, { status: 413 });
+    }
     const bodyText = await request.text();
-    if (new TextEncoder().encode(bodyText).length > MAX_DOC_BYTES) {
-      return jsonNoStore({ error: "Playbook too large (max 1 MB)" }, { status: 400 });
+    if (utf8ByteLength(bodyText) > MAX_DOC_BYTES) {
+      return jsonNoStore({ error: "Playbook too large (max 1 MB)" }, { status: 413 });
     }
 
     let doc;
@@ -71,13 +81,22 @@ export async function onRequestPut(context) {
       return jsonNoStore({ error: "Invalid playbook document" }, { status: 400 });
     }
 
+    // Bind the browser's in-memory document to the authenticated account. A
+    // session can change while an old autosave is queued (for example after
+    // expiry followed by sign-in to a different account); never let that old
+    // body land in the new account.
+    if (doc.ownerId !== user.userId) {
+      return jsonNoStore({ error: "Playbook account changed" }, { status: 403 });
+    }
+    delete doc.ownerId;
+
     // Optional optimistic-concurrency check: the editor sends the updatedAt it
     // loaded as baseUpdatedAt; if the stored doc has moved on, reject with 409.
     // Absent baseUpdatedAt means save unconditionally (back-compat/overwrite).
     const baseUpdatedAt = doc.baseUpdatedAt;
     delete doc.baseUpdatedAt;
+    const existing = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
     if (baseUpdatedAt !== undefined) {
-      const existing = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
       if (existing) {
         const stored = await existing.json();
         if (stored && stored.updatedAt && stored.updatedAt !== baseUpdatedAt) {
@@ -86,13 +105,41 @@ export async function onRequestPut(context) {
             { status: 409 }
           );
         }
+      } else if (baseUpdatedAt !== null && baseUpdatedAt !== "") {
+        return jsonNoStore(
+          { error: "conflict", serverUpdatedAt: null },
+          { status: 409 }
+        );
       }
     }
 
     doc.updatedAt = new Date().toISOString();
-    await env.PLAYBOOK_BUCKET.put(playbookKey(user.userId), JSON.stringify(doc), {
-      httpMetadata: { contentType: "application/json" },
-    });
+    const saved = await putJsonIfCurrent(
+      env,
+      playbookKey(user.userId),
+      doc,
+      existing
+    );
+    if (saved === null) {
+      const latest = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
+      let serverUpdatedAt = null;
+      if (latest) {
+        try {
+          serverUpdatedAt = (await latest.json()).updatedAt || null;
+        } catch (err) {
+          console.error("Could not read conflicting playbook:", err);
+        }
+      }
+      return jsonNoStore({ error: "conflict", serverUpdatedAt }, { status: 409 });
+    }
+
+    // Close the race with account deletion: either this check happens before
+    // the deletion sweep (which then removes the playbook), or it observes the
+    // tombstone and removes the just-finished save itself.
+    if (!(await isAccountActive(env, user))) {
+      await env.PLAYBOOK_BUCKET.delete(playbookKey(user.userId));
+      return jsonNoStore({ error: "Account is being deleted" }, { status: 409 });
+    }
 
     return jsonNoStore({ ok: true, updatedAt: doc.updatedAt });
   } catch (err) {
