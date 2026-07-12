@@ -9,7 +9,42 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "pipeline"))
 
-from playbook_pipeline import PlaybookGenerator  # noqa: E402
+from playbook_pipeline import PlaybookGenerator, wristband_positions  # noqa: E402
+
+
+class WristbandLayoutTests(unittest.TestCase):
+    def test_count_adaptive_shapes(self):
+        # (count) -> (cards on top row, vertically centered cards, bottom row)
+        expected = {
+            1: (0, 1, 0),
+            2: (0, 2, 0),
+            3: (0, 3, 0),
+            4: (2, 0, 2),
+            5: (2, 1, 2),   # 2-1-2 dice
+            6: (3, 0, 3),   # 3 over 3
+            7: (4, 0, 3),   # 4 over 3
+            8: (4, 0, 4),   # classic 4x4 over two rows
+        }
+        for n, (top, mid, bottom) in expected.items():
+            positions = wristband_positions(n)
+            self.assertEqual(len(positions), n)
+            rows = [row for _col, row in positions]
+            self.assertEqual(
+                (rows.count(0), rows.count(0.5), rows.count(1)),
+                (top, mid, bottom),
+                f"layout shape for {n} plays",
+            )
+
+    def test_seven_bottom_row_is_centered(self):
+        positions = wristband_positions(7)
+        bottom = sorted(col for col, row in positions if row == 1)
+        self.assertEqual(bottom, [0.5, 1.5, 2.5])
+
+    def test_column_major_preserves_defense_reading_order(self):
+        self.assertEqual(
+            wristband_positions(4, column_major=True),
+            [(0, 0), (0, 1), (1, 0), (1, 1)],
+        )
 
 
 class GeneratorContractTests(unittest.TestCase):

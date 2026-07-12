@@ -43,6 +43,31 @@ OUTPUT_FILENAMES = {
     "defense_wristband": "defense_wristband.pdf",
 }
 
+def wristband_positions(n, column_major=False):
+    """Card positions for one wristband cut-out group, chosen by play count so
+    partial groups space nicely instead of left-packing: 1-3 = single centered
+    row, 4 = 2x2, 5 = 2-1-2 dice, 6 = 3 over 3, 7 = 4 over 3, 8 = classic 4x4
+    over two rows. Returns (col, row) in card-pitch units; row 0.5 means
+    vertically centered between the two rows. Order is reading order for
+    offense (row-major) and column order for defense (column_major=True),
+    matching how each side has historically been numbered."""
+    n = max(1, min(8, n))
+    layouts = {
+        1: [(0, 0.5)],
+        2: [(0, 0.5), (1, 0.5)],
+        3: [(0, 0.5), (1, 0.5), (2, 0.5)],
+        4: [(0, 0), (1, 0), (0, 1), (1, 1)],
+        5: [(0, 0), (2, 0), (1, 0.5), (0, 1), (2, 1)],
+        6: [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)],
+        7: [(0, 0), (1, 0), (2, 0), (3, 0), (0.5, 1), (1.5, 1), (2.5, 1)],
+        8: [(0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1)],
+    }
+    positions = layouts[n]
+    if column_major:
+        positions = sorted(positions, key=lambda p: (p[0], p[1]))
+    return positions
+
+
 # Deck-format rule shown to users on the upload page and echoed in errors.
 SECTION_HINT = (
     "Start each section with a separator slide (a slide without a play) whose "
@@ -573,14 +598,21 @@ class PlaybookGenerator:
         start_y = page_height - ((page_height - total_height) / 2)
 
         # Render ceil(N/8) pages (capped at 2 — play names only go 01..16).
-        # Partial pages place the k available cards in the first k grid
-        # positions of every cut-out group, same as full pages.
+        # Partial pages use the count-adaptive arrangement so a group with 5
+        # cards prints as a 2-1-2 dice, 7 as 4-over-3, etc., centered within
+        # the same fixed cut-out box as a full group.
         num_pages = min(2, (len(images) + 7) // 8)
         for page_num in range(num_pages):
             if page_num > 0:
                 c.showPage()
             start_idx = page_num * 8
             page_images = images[start_idx:start_idx + 8]
+            positions = wristband_positions(len(page_images))
+            grid_width = (
+                max(p[0] for p in positions) * (card_width + internal_gap)
+                + card_width
+            )
+            cards_x_offset = (group_width - grid_width) / 2
             for group_idx in range(6):
                 group_row = group_idx // groups_across
                 group_col = group_idx % groups_across
@@ -594,11 +626,9 @@ class PlaybookGenerator:
                 c.rect(group_x, group_y - group_height, group_width, group_height)
                 c.setDash([])
 
-                for play_idx in range(len(page_images)):
-                    row = play_idx // group_cols
-                    col = play_idx % group_cols
-                    x = group_x + (col * (card_width + internal_gap))
-                    y = group_y - ((row + 1) * card_height) - (row * internal_gap)
+                for play_idx, (pcol, prow) in enumerate(positions[:len(page_images)]):
+                    x = group_x + cards_x_offset + (pcol * (card_width + internal_gap))
+                    y = group_y - (prow * (card_height + internal_gap)) - card_height
 
                     img = page_images[play_idx]
                     img_buffer = io.BytesIO()
@@ -629,15 +659,9 @@ class PlaybookGenerator:
         card_height = 1.0205 * inch
         internal_gap = (3/64) * inch
 
-        # Column layout: each entry = cards stacked in that column
-        if n <= 4:
-            col_layout = [2, 2]        # 2x2
-        elif n == 5:
-            col_layout = [2, 1, 2]    # 2x1x2
-        else:
-            col_layout = [2, 2, 2]    # 2x2x2
-
-        num_cols = len(col_layout)
+        # Count-adaptive arrangement shared with offense (2-1-2 dice for 5,
+        # 3 over 3 for 6, ...), in defense's traditional column order.
+        positions = wristband_positions(n, column_major=True)
 
         # Match offense group dimensions (4 cols × 2 rows) for consistent cut-out size
         group_cols_ref = 4
@@ -655,7 +679,9 @@ class PlaybookGenerator:
         # DEFENSE label on the left, cards centered in remaining space
         label_width = 0.25 * inch
         label_gap = 0.05 * inch
-        defense_grid_width = (num_cols * card_width) + ((num_cols - 1) * internal_gap)
+        defense_grid_width = (
+            max(p[0] for p in positions) * (card_width + internal_gap) + card_width
+        )
         cards_area = group_width - label_width - label_gap
         cards_x_offset = label_width + label_gap + (cards_area - defense_grid_width) / 2
 
@@ -680,28 +706,19 @@ class PlaybookGenerator:
             c.drawCentredString(0, 0, "DEFENSE")
             c.restoreState()
 
-            img_idx = 0
-            for col_num, cards_in_col in enumerate(col_layout):
-                for row in range(cards_in_col):
-                    if img_idx >= n:
-                        break
-                    x = group_x + cards_x_offset + col_num * (card_width + internal_gap)
-                    if cards_in_col == 1:
-                        # Center single card vertically within the 2-row height
-                        y = group_y - group_height / 2 - card_height / 2
-                    else:
-                        y = group_y - ((row + 1) * card_height) - (row * internal_gap)
+            for img_idx, (pcol, prow) in enumerate(positions[:n]):
+                x = group_x + cards_x_offset + (pcol * (card_width + internal_gap))
+                y = group_y - (prow * (card_height + internal_gap)) - card_height
 
-                    img_buffer = io.BytesIO()
-                    images[img_idx].save(img_buffer, format='PNG')
-                    img_buffer.seek(0)
-                    c.drawImage(ImageReader(img_buffer),
-                                x, y, width=card_width, height=card_height,
-                                preserveAspectRatio=True, mask='auto')
-                    img_idx += 1
+                img_buffer = io.BytesIO()
+                images[img_idx].save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                c.drawImage(ImageReader(img_buffer),
+                            x, y, width=card_width, height=card_height,
+                            preserveAspectRatio=True, mask='auto')
 
         c.save()
-        print(f"  Created: {pdf_path} (6 cards, layout {'x'.join(str(r) for r in col_layout)})")
+        print(f"  Created: {pdf_path} ({n} cards per cut-out group)")
 
     def generate_all(self, gen_offense=True, gen_defense=True,
                       offense_coach_card=True, offense_wristband=True,
