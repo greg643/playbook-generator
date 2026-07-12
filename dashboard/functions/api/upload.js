@@ -76,6 +76,8 @@ export async function onRequestPost(context) {
       "offense_wristband",
       "defense_coach_card",
       "defense_wristband",
+      "show_offense_title",
+      "show_defense_title",
     ]);
     const seenTextFields = new Set();
     let textBytes = 0;
@@ -105,15 +107,22 @@ export async function onRequestPost(context) {
     }
 
     const file = uploadFields[0];
-    const options = {
+    const outputs = {
       offense_coach_card: formData.get("offense_coach_card") !== "false",
       offense_wristband: formData.get("offense_wristband") !== "false",
       defense_coach_card: formData.get("defense_coach_card") !== "false",
       defense_wristband: formData.get("defense_wristband") !== "false",
     };
-    if (!Object.values(options).some(Boolean)) {
+    if (!Object.values(outputs).some(Boolean)) {
       return jsonNoStore({ error: "Select at least one output" }, { status: 400 });
     }
+    const options = {
+      ...outputs,
+      // Wristband section titles: offense opt-in, defense on by default. The
+      // pipeline draws them only when a cut-out group has 6 or fewer cards.
+      show_offense_title: formData.get("show_offense_title") === "true",
+      show_defense_title: formData.get("show_defense_title") !== "false",
+    };
 
     if (!PPTX_NAME_RE.test(file.name)) {
       return jsonNoStore({ error: "Only .pptx files are accepted" }, { status: 400 });

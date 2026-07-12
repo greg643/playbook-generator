@@ -226,6 +226,8 @@ def main():
                     offense_wristband=offense_wristband,
                     defense_coach_card=defense_coach_card,
                     defense_wristband=defense_wristband,
+                    show_offense_title=options.get("show_offense_title") is True,
+                    show_defense_title=options.get("show_defense_title") is not False,
                 )
             else:
                 pptx_path = tmpdir / "input.pptx"
@@ -266,10 +268,17 @@ def main():
                 if defense_coach_card: selected.append("defense_coach_card")
                 if defense_wristband: selected.append("defense_wristband")
 
+                titles = []
+                if options.get("show_offense_title") is True:
+                    titles.append("offense")
+                if options.get("show_defense_title") is not False:
+                    titles.append("defense")
+
                 # Override sys.argv for the pipeline
                 original_argv = sys.argv
                 sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir),
-                             "--sections", sections, "--outputs", ",".join(selected)]
+                             "--sections", sections, "--outputs", ",".join(selected),
+                             "--titles", ",".join(titles) if titles else "none"]
 
                 # Change to tmpdir so _playbook_work is created there
                 original_cwd = os.getcwd()

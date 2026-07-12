@@ -658,6 +658,8 @@
         <label><input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband</label>
         <label><input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card</label>
         <label><input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband</label>
+        <label><input type="checkbox" id="chkOffenseTitle"> Offense wristband title</label>
+        <label><input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title</label>
       </div>
       <button class="btn btn-primary" id="generateBtn">Generate PDFs</button>
 
@@ -2109,6 +2111,19 @@ function syncGenerateChecks() {
       ' play to the playbook first';
     box.parentElement.style.opacity = ok ? '' : '0.5';
   }
+  // Wristband titles need side space: only selectable with 1-6 plays in the
+  // playbook (a 7-8 card group fills the full cut-out width).
+  const offCount = doc ? doc.offense.filter(isIncluded).length : 0;
+  const defCount = doc ? doc.defense.filter(isIncluded).length : 0;
+  for (const [box, count, side] of [[chkOffenseTitle, offCount, 'offense'],
+                                    [chkDefenseTitle, defCount, 'defense']]) {
+    const ok = count >= 1 && count <= 6;
+    box.disabled = !ok;
+    box.parentElement.title = ok ? '' : (count > 6
+      ? 'Titles fit only with 6 or fewer plays'
+      : 'Add a' + (side === 'offense' ? 'n offense' : ' defense') + ' play to the playbook first');
+    box.parentElement.style.opacity = ok ? '' : '0.5';
+  }
   generateBtn.disabled = generating || !doc || !outputChecks.some(box => !box.disabled && box.checked);
 }
 
@@ -2116,6 +2131,8 @@ outputChecks.forEach(box => box.addEventListener('change', () => {
   hideGenError();
   syncGenerateChecks();
 }));
+
+[chkOffenseTitle, chkDefenseTitle].forEach(box => box.addEventListener('change', hideGenError));
 
 playName.addEventListener('input', () => {
   const play = currentPlay();
@@ -2694,6 +2711,8 @@ generateBtn.addEventListener('click', async () => {
     offense_wristband: !chkOffenseWrist.disabled && chkOffenseWrist.checked,
     defense_coach_card: !chkDefenseCoach.disabled && chkDefenseCoach.checked,
     defense_wristband: !chkDefenseWrist.disabled && chkDefenseWrist.checked,
+    show_offense_title: !chkOffenseTitle.disabled && chkOffenseTitle.checked,
+    show_defense_title: !chkDefenseTitle.disabled && chkDefenseTitle.checked,
   };
   hideGenError();
   downloads.classList.remove('active');

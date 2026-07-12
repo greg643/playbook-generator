@@ -285,6 +285,7 @@
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
     .format-hint { font-size: 0.85rem; opacity: 0.75; margin: 0.6rem 0 1rem; }
+    .title-note { font-size: 0.85em; opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -324,6 +325,12 @@
       </label>
       <label>
         <input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband
+      </label>
+      <label>
+        <input type="checkbox" id="chkOffenseTitle"> Offense wristband title <span class="title-note">(&le;6 plays)</span>
+      </label>
+      <label>
+        <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(&le;6 plays)</span>
       </label>
     </div>
 
@@ -370,6 +377,8 @@
   const chkOffenseWrist = document.getElementById('chkOffenseWrist');
   const chkDefenseCoach = document.getElementById('chkDefenseCoach');
   const chkDefenseWrist = document.getElementById('chkDefenseWrist');
+  const chkOffenseTitle = document.getElementById('chkOffenseTitle');
+  const chkDefenseTitle = document.getElementById('chkDefenseTitle');
 
   let selectedFile = null;
   let pollTimer = null;
@@ -546,6 +555,8 @@
       form.append('offense_wristband', chkOffenseWrist.checked);
       form.append('defense_coach_card', chkDefenseCoach.checked);
       form.append('defense_wristband', chkDefenseWrist.checked);
+      form.append('show_offense_title', chkOffenseTitle.checked);
+      form.append('show_defense_title', chkDefenseTitle.checked);
 
       const res = await generationFetch('/api/upload', { method: 'POST', body: form }, epoch, 120000);
       if (!isGenerationCurrent(epoch)) return;

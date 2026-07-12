@@ -68,6 +68,13 @@ def wristband_positions(n, column_major=False):
     return positions
 
 
+def wristband_title_allowed(n):
+    """A vertical OFFENSE/DEFENSE title fits beside the cards only while the
+    arrangement is at most 3 columns wide — with 7-8 cards the grid needs the
+    full cut-out width, so the title cannot be drawn."""
+    return n <= 6
+
+
 # Deck-format rule shown to users on the upload page and echoed in errors.
 SECTION_HINT = (
     "Start each section with a separator slide (a slide without a play) whose "
@@ -571,7 +578,19 @@ class PlaybookGenerator:
         c.save()
         print(f"  Created: {pdf_path} ({n} plays, layout {'x'.join(str(r) for r in row_layout)})")
 
-    def create_wristband_sheet_offense(self, images):
+    # Vertical section-title column on wristband groups (0.25in + 0.05in gap).
+    _TITLE_W = 0.25 * 72.0
+    _TITLE_GAP = 0.05 * 72.0
+
+    def _draw_group_title(self, c, text, group_x, group_y, group_height):
+        c.saveState()
+        c.setFont("Helvetica-Bold", 18)
+        c.translate(group_x + self._TITLE_W, group_y - group_height / 2)
+        c.rotate(90)
+        c.drawCentredString(0, 0, text)
+        c.restoreState()
+
+    def create_wristband_sheet_offense(self, images, show_title=False):
         if not images:
             return
         import io
@@ -612,7 +631,12 @@ class PlaybookGenerator:
                 max(p[0] for p in positions) * (card_width + internal_gap)
                 + card_width
             )
-            cards_x_offset = (group_width - grid_width) / 2
+            title_ok = show_title and wristband_title_allowed(len(page_images))
+            if title_ok:
+                cards_area = group_width - self._TITLE_W - self._TITLE_GAP
+                cards_x_offset = self._TITLE_W + self._TITLE_GAP + (cards_area - grid_width) / 2
+            else:
+                cards_x_offset = (group_width - grid_width) / 2
             for group_idx in range(6):
                 group_row = group_idx // groups_across
                 group_col = group_idx % groups_across
@@ -625,6 +649,9 @@ class PlaybookGenerator:
                 c.setDash([3, 3])
                 c.rect(group_x, group_y - group_height, group_width, group_height)
                 c.setDash([])
+
+                if title_ok:
+                    self._draw_group_title(c, "OFFENSE", group_x, group_y, group_height)
 
                 for play_idx, (pcol, prow) in enumerate(positions[:len(page_images)]):
                     x = group_x + cards_x_offset + (pcol * (card_width + internal_gap))
@@ -640,7 +667,7 @@ class PlaybookGenerator:
         c.save()
         print(f"  Created: {pdf_path}")
 
-    def create_wristband_sheet_defense(self, images):
+    def create_wristband_sheet_defense(self, images, show_title=True):
         if not images:
             return
         import io
@@ -676,14 +703,17 @@ class PlaybookGenerator:
         start_x = (page_width - total_width) / 2
         start_y = page_height - ((page_height - total_height) / 2)
 
-        # DEFENSE label on the left, cards centered in remaining space
-        label_width = 0.25 * inch
-        label_gap = 0.05 * inch
+        # DEFENSE label on the left when enabled and it fits (<= 6 cards);
+        # otherwise cards center across the full group width.
+        title_ok = show_title and wristband_title_allowed(n)
         defense_grid_width = (
             max(p[0] for p in positions) * (card_width + internal_gap) + card_width
         )
-        cards_area = group_width - label_width - label_gap
-        cards_x_offset = label_width + label_gap + (cards_area - defense_grid_width) / 2
+        if title_ok:
+            cards_area = group_width - self._TITLE_W - self._TITLE_GAP
+            cards_x_offset = self._TITLE_W + self._TITLE_GAP + (cards_area - defense_grid_width) / 2
+        else:
+            cards_x_offset = (group_width - defense_grid_width) / 2
 
         for group_idx in range(6):
             grow = group_idx // groups_across
@@ -698,13 +728,8 @@ class PlaybookGenerator:
             c.rect(group_x, group_y - group_height, group_width, group_height)
             c.setDash([])
 
-            # DEFENSE label (rotated 90°, left side)
-            c.saveState()
-            c.setFont("Helvetica-Bold", 18)
-            c.translate(group_x + label_width, group_y - group_height / 2)
-            c.rotate(90)
-            c.drawCentredString(0, 0, "DEFENSE")
-            c.restoreState()
+            if title_ok:
+                self._draw_group_title(c, "DEFENSE", group_x, group_y, group_height)
 
             for img_idx, (pcol, prow) in enumerate(positions[:n]):
                 x = group_x + cards_x_offset + (pcol * (card_width + internal_gap))
@@ -722,7 +747,8 @@ class PlaybookGenerator:
 
     def generate_all(self, gen_offense=True, gen_defense=True,
                       offense_coach_card=True, offense_wristband=True,
-                      defense_coach_card=True, defense_wristband=True):
+                      defense_coach_card=True, defense_wristband=True,
+                      show_offense_title=False, show_defense_title=True):
         expected = set()
         if offense_coach_card:
             expected.add(OUTPUT_FILENAMES["offense_coach_card"])
@@ -769,13 +795,13 @@ class PlaybookGenerator:
             if offense_coach_card:
                 self.create_coach_card_offense(offense_images)
             if offense_wristband:
-                self.create_wristband_sheet_offense(offense_images)
+                self.create_wristband_sheet_offense(offense_images, show_title=show_offense_title)
         if gen_defense and defense_images:
             print("\nGenerating defense materials...")
             if defense_coach_card:
                 self.create_coach_card_defense(defense_images)
             if defense_wristband:
-                self.create_wristband_sheet_defense(defense_images)
+                self.create_wristband_sheet_defense(defense_images, show_title=show_defense_title)
 
         # Only application-owned names count: a pre-existing unrelated PDF in
         # the output directory (CLI runs) must not fail the verification.
@@ -839,6 +865,18 @@ def main():
     offense_wristband = "offense_wristband" in selected_outputs
     defense_coach_card = "defense_coach_card" in selected_outputs
     defense_wristband = "defense_wristband" in selected_outputs
+
+    # Parse --titles flag: which wristbands draw the vertical section title
+    # (comma list of offense/defense; "none" for neither; default defense).
+    # Titles render only on cut-out groups with 6 or fewer cards.
+    titles = {"defense"}
+    if "--titles" in sys.argv:
+        idx = sys.argv.index("--titles")
+        if idx + 1 < len(sys.argv):
+            titles = {
+                t for t in sys.argv[idx + 1].lower().split(",")
+                if t in ("offense", "defense")
+            }
 
     # Parse --mode flag: "standard" (200 DPI + ink overlay) or "screenshot" (600 DPI, no ink overlay)
     mode = "standard"
@@ -924,7 +962,9 @@ def main():
     generator = PlaybookGenerator(str(plays_dir), output_dir)
     generator.generate_all(gen_offense=gen_offense, gen_defense=gen_defense,
                            offense_coach_card=offense_coach_card, offense_wristband=offense_wristband,
-                           defense_coach_card=defense_coach_card, defense_wristband=defense_wristband)
+                           defense_coach_card=defense_coach_card, defense_wristband=defense_wristband,
+                           show_offense_title="offense" in titles,
+                           show_defense_title="defense" in titles)
 
     # Cleanup
     print(f"\nPlay images saved in: {plays_dir}/")

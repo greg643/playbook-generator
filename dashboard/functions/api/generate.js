@@ -100,6 +100,9 @@ export async function onRequestPost(context) {
     if (!Object.values(selected).some(Boolean)) {
       return jsonNoStore({ error: "Select at least one output" }, { status: 400 });
     }
+    // Title flags ride along after the output check so they can't satisfy it.
+    selected.show_offense_title = options.show_offense_title === true;
+    selected.show_defense_title = options.show_defense_title !== false;
 
     const files = formData.getAll("plays");
     const allFiles = [];

@@ -9,7 +9,17 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "pipeline"))
 
-from playbook_pipeline import PlaybookGenerator, wristband_positions  # noqa: E402
+from playbook_pipeline import (  # noqa: E402
+    PlaybookGenerator,
+    wristband_positions,
+    wristband_title_allowed,
+)
+
+
+def page_text(pdf_path, page=0):
+    from pypdf import PdfReader
+
+    return PdfReader(str(pdf_path)).pages[page].extract_text()
 
 
 class WristbandLayoutTests(unittest.TestCase):
@@ -45,6 +55,50 @@ class WristbandLayoutTests(unittest.TestCase):
             wristband_positions(4, column_major=True),
             [(0, 0), (0, 1), (1, 0), (1, 1)],
         )
+
+    def test_title_allowed_only_below_seven(self):
+        self.assertTrue(wristband_title_allowed(6))
+        self.assertFalse(wristband_title_allowed(7))
+        self.assertFalse(wristband_title_allowed(8))
+
+
+class WristbandTitleTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        root = Path(self.temp_dir.name)
+        self.images = root / "images"
+        self.output = root / "output"
+        self.images.mkdir()
+
+    def make_images(self, offense=0, defense=0):
+        for i in range(1, offense + 1):
+            Image.new("RGB", (160, 120), "white").save(self.images / f"{i:02d}.png")
+        for i in range(1, defense + 1):
+            Image.new("RGB", (160, 120), "gray").save(self.images / f"D{i}.png")
+        return PlaybookGenerator(self.images, self.output)
+
+    def test_defense_title_shown_by_default(self):
+        gen = self.make_images(defense=4)
+        gen.create_wristband_sheet_defense(gen.load_images()[1])
+        self.assertIn("DEFENSE", page_text(self.output / "defense_wristband.pdf"))
+
+    def test_defense_title_can_be_disabled(self):
+        gen = self.make_images(defense=4)
+        gen.create_wristband_sheet_defense(gen.load_images()[1], show_title=False)
+        self.assertNotIn("DEFENSE", page_text(self.output / "defense_wristband.pdf"))
+
+    def test_offense_title_opt_in_when_it_fits(self):
+        gen = self.make_images(offense=5)
+        gen.create_wristband_sheet_offense(gen.load_images()[0], show_title=True)
+        self.assertIn("OFFENSE", page_text(self.output / "offense_wristband.pdf"))
+
+    def test_offense_title_suppressed_on_full_groups(self):
+        # 8-card groups fill the cut-out width: no room for the title even
+        # when requested.
+        gen = self.make_images(offense=8)
+        gen.create_wristband_sheet_offense(gen.load_images()[0], show_title=True)
+        self.assertNotIn("OFFENSE", page_text(self.output / "offense_wristband.pdf"))
 
 
 class GeneratorContractTests(unittest.TestCase):
