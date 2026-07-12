@@ -5,7 +5,10 @@ const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const RECENT_AUTH_SECONDS = 10 * 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const PASSWORD_ITERATIONS = 600000;
+// Cloudflare Workers WebCrypto rejects PBKDF2 above 100000 iterations
+// (NotSupportedError at runtime; Node allows more, so tests won't catch it).
+// 100000 is the platform maximum — do not raise without changing algorithms.
+export const PASSWORD_ITERATIONS = 100000;
 
 export function jsonNoStore(data, init = {}) {
   const headers = new Headers(init.headers || {});

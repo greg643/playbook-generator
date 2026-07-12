@@ -8,6 +8,7 @@ import {
   generateSaltHex,
   getUser,
   hashPassword,
+  PASSWORD_ITERATIONS,
 } from "../../dashboard/functions/_lib/auth.js";
 import {
   cancelAndScrubUserJobs,
@@ -229,7 +230,13 @@ test("password recovery atomically consumes its code and revokes the old session
   assert.equal(await getUser(oldRequest, env), null);
   const updated = await (await env.PLAYBOOK_BUCKET.get(await emailKey(email))).json();
   assert.equal(updated.sessionVersion, 2);
-  assert.equal(updated.iterations, 600000);
+  assert.equal(updated.iterations, 100000);
+});
+
+test("password iterations stay within the Workers PBKDF2 limit", () => {
+  // Workers WebCrypto throws NotSupportedError above 100000 iterations, which
+  // breaks login/register/recover in production while Node-based tests pass.
+  assert.ok(PASSWORD_ITERATIONS <= 100000);
 });
 
 test("job quotas limit concurrency and release terminal jobs", async () => {
