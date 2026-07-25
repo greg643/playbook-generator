@@ -1,17 +1,17 @@
 # Fully pinned production environment. Update deliberately from requirements.in
 # and validate generated PDFs before committing a new lock.
-boto3==1.43.46
-botocore==1.43.46
+boto3==1.43.56
+botocore==1.43.56
 charset-normalizer==3.4.9
 jmespath==1.1.0
 lxml==6.1.1
 pillow==12.3.0
-python-dateutil==2.9.0.post0
 pypdf==6.12.2
+python-dateutil==2.9.0.post0
 python-pptx==1.0.2
 reportlab==5.0.0
 s3transfer==0.19.1
 six==1.17.0
-typing_extensions==4.16.0
+typing-extensions==4.16.0
 urllib3==2.7.0
 xlsxwriter==3.2.9
