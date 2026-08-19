@@ -8,10 +8,11 @@ Usage:
     python3 playbook_pipeline.py <playbook.pptx> [output_dir]
 
 The script:
-1. Reads the PPTX and identifies OFFENSE/DEFENSE sections
+1. Reads the PPTX and identifies OFFENSE/DEFENSE sections (or treats a
+   headerless deck as offense)
 2. Converts slides to high-res images via LibreOffice + pdftoppm
-3. Crops each play to its field rectangle ("Rectangle 1")
-4. Names them 01.png-16.png (offense) and D1.png-D4.png (defense)
+3. Crops each play to its largest rectangle AutoShape
+4. Names them 01.png-64.png (offense) and D1.png-D6.png (defense)
 5. Feeds them into PlaybookGenerator to create coach cards + wristband PDFs
 """
 
@@ -25,11 +26,18 @@ import re
 from pathlib import Path
 from PIL import Image
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Emu
 
 # Import the ink overlay module
 from ink_overlay import overlay_ink_on_slides
-from input_safety import MAX_SLIDES, validate_pptx_archive, validate_print_play_counts
+from input_safety import (
+    MAX_DEFENSE_PLAYS,
+    MAX_OFFENSE_PLAYS,
+    MAX_SLIDES,
+    validate_pptx_archive,
+    validate_print_play_counts,
+)
 
 
 MAX_SOURCE_IMAGE_DIMENSION = 10000
@@ -75,11 +83,13 @@ def wristband_title_allowed(n):
     return n <= 6
 
 
-# Deck-format rule shown to users on the upload page and echoed in errors.
+# Deck-format rule echoed in errors. Separators are optional for offense-only
+# decks; they are still required to distinguish offense from defense.
 SECTION_HINT = (
-    "Start each section with a separator slide (a slide without a play) whose "
-    "text mentions 'Offense' or 'Defense' in any capitalization — '6v6 Offense' "
-    "works. Every play slide needs a rectangle shape marking the field."
+    "Every play slide needs a rectangle shape marking the field. A deck with "
+    "no section separators is treated as offense-only. To distinguish sections, "
+    "start each one with a separator slide (a slide without a play) whose text "
+    "mentions 'Offense' or 'Defense' in any capitalization — '6v6 Offense' works."
 )
 # ─── STEP 1: Analyze the PPTX ────────────────────────────────────────────────
 
@@ -95,19 +105,47 @@ def analyze_playbook(pptx_path):
     slide_width = prs.slide_width  # EMU
     slide_height = prs.slide_height
 
-    plays = []
-    current_section = None  # "OFFENSE" or "DEFENSE"
-    offense_count = 0
-    defense_count = 0
-
+    # Pre-scan the complete deck before assigning sections. This makes the
+    # headerless fallback unambiguous: only when there are no recognized
+    # separators anywhere do field-bearing slides default to OFFENSE. If even
+    # one separator exists, the established behavior (skip plays before the
+    # first separator) is preserved.
+    slide_records = []
+    has_section_headers = False
     for i, slide in enumerate(prs.slides):
         shapes = list(slide.shapes)
-        shape_count = len(shapes)
-
         all_text = " ".join(
             s.text_frame.text for s in shapes if s.has_text_frame
         ).upper()
         crop_box = find_field_rectangle(shapes)
+        mentions_offense = "OFFENSE" in all_text
+        mentions_defense = "DEFENSE" in all_text
+        header_section = None
+        if crop_box is None and mentions_offense != mentions_defense:
+            header_section = "OFFENSE" if mentions_offense else "DEFENSE"
+            has_section_headers = True
+        slide_records.append({
+            "index": i,
+            "shapes": shapes,
+            "all_text": all_text,
+            "crop_box": crop_box,
+            "header_section": header_section,
+        })
+
+    plays = []
+    current_section = None if has_section_headers else "OFFENSE"
+    offense_count = 0
+    defense_count = 0
+
+    if not has_section_headers:
+        print("  No section headers found; treating recognizable play slides as OFFENSE")
+
+    for record in slide_records:
+        i = record["index"]
+        shapes = record["shapes"]
+        shape_count = len(shapes)
+        all_text = record["all_text"]
+        crop_box = record["crop_box"]
 
         # Section separators mention OFFENSE or DEFENSE anywhere in their text,
         # in any capitalization ("6v6 Offense", "OFFENSE PLAYS"). A slide with a
@@ -116,10 +154,8 @@ def analyze_playbook(pptx_path):
         # is not a separator either. A repeated section later in the deck
         # continues numbering rather than overwriting 01.png/D1.png from an
         # earlier section.
-        mentions_offense = "OFFENSE" in all_text
-        mentions_defense = "DEFENSE" in all_text
-        if crop_box is None and mentions_offense != mentions_defense:
-            current_section = "OFFENSE" if mentions_offense else "DEFENSE"
+        if record["header_section"] is not None:
+            current_section = record["header_section"]
             print(f"  Slide {i+1}: Section header → {current_section}")
             continue
 
@@ -153,7 +189,10 @@ def analyze_playbook(pptx_path):
 
         header_texts = []
         for s in shapes:
-            if s.has_text_frame and "TextBox" in s.name:
+            # Text box object names are localized and user-editable. Rely on
+            # the actual text-frame capability while preserving the existing
+            # top-of-field positional rule.
+            if s.has_text_frame:
                 text = s.text_frame.text.strip()
                 if text and s.top <= header_start_zone:
                     header_texts.append((s, text))
@@ -203,14 +242,13 @@ def analyze_playbook(pptx_path):
         print(f"  Slide {i+1}: {current_section} #{play_num} → {filename} ({play_id} {play_name})")
 
     if not plays:
-        if current_section is None:
+        if has_section_headers:
             raise ValueError(
-                "No OFFENSE or DEFENSE section slides were found in this deck. "
-                + SECTION_HINT
+                "Sections were found, but no play slides with a field rectangle "
+                "were detected after them. " + SECTION_HINT
             )
         raise ValueError(
-            "Sections were found, but no play slides with a field rectangle "
-            "were detected after them. " + SECTION_HINT
+            "No play slides with a field rectangle were detected. " + SECTION_HINT
         )
 
     return plays, slide_width, slide_height
@@ -224,13 +262,20 @@ def find_field_rectangle(shapes):
     while "Rectangle 2" is the full field outline.
     Returns (left, top, right, bottom) in EMU, or None.
     """
-    # Collect all rectangles with their areas
+    # Collect actual rectangle AutoShapes with their areas. PowerPoint's object
+    # names are localized, editable, and not semantic: a genuine rectangle may
+    # be renamed "Field", while an oval can be misleadingly named "Rectangle".
+    # Group-recursive geometry remains intentionally unsupported because group
+    # coordinate transforms require separate crop-box handling.
     rectangles = []
     for s in shapes:
-        if hasattr(s, "shape_type") and "rectangle" in s.name.lower():
-            if s.width and s.height:
-                area = s.width * s.height
-                rectangles.append((area, s))
+        try:
+            is_rectangle = s.auto_shape_type == MSO_SHAPE.RECTANGLE
+        except (AttributeError, ValueError):
+            is_rectangle = False
+        if is_rectangle and s.width and s.height:
+            area = s.width * s.height
+            rectangles.append((area, s))
 
     # Sort by area descending — use the largest rectangle
     rectangles.sort(key=lambda x: x[0], reverse=True)
@@ -322,6 +367,12 @@ def crop_plays(plays, slide_images, slide_width_emu, slide_height_emu, output_di
     emu_to_px_x = img_w / slide_width_emu
     emu_to_px_y = img_h / slide_height_emu
 
+    normalized_output_names = [
+        Path(play["filename"]).name.casefold() for play in plays
+    ]
+    if len(normalized_output_names) != len(set(normalized_output_names)):
+        raise RuntimeError("Detected plays map to duplicate output filenames")
+
     saved = []
     for play in plays:
         si = play["slide_index"]
@@ -359,6 +410,15 @@ def crop_plays(plays, slide_images, slide_width_emu, slide_height_emu, output_di
 
         if cropped.mode != "RGB":
             cropped = cropped.convert("RGB")
+        # PDF rendering at 400 DPI can make an ordinary field crop several
+        # thousand pixels wide. The printed cards never need that resolution;
+        # bounding it here prevents a 64-play deck from predictably exhausting
+        # the aggregate generator pixel budget while retaining ample print DPI.
+        if max(cropped.size) > MAX_RENDER_IMAGE_DIMENSION:
+            cropped.thumbnail(
+                (MAX_RENDER_IMAGE_DIMENSION, MAX_RENDER_IMAGE_DIMENSION),
+                Image.Resampling.LANCZOS,
+            )
 
         out_path = output_dir / play["filename"]
         cropped.save(out_path, "PNG")
@@ -401,18 +461,21 @@ class PlaybookGenerator:
     def _image_inventory(self):
         """Return canonical play slots and reject files we would otherwise ignore."""
         inventory = {}
-        offense_re = re.compile(r"^(?:0?([1-9])|(1[0-6]))\.(?:png|jpg)$", re.IGNORECASE)
-        defense_re = re.compile(r"^D([1-6])\.(?:png|jpg)$", re.IGNORECASE)
+        # One-digit offense names may be padded (1.png / 01.png); two-digit
+        # names are canonical without an extra leading zero. Bounds are checked
+        # separately so the filename grammar cannot drift from input_safety.
+        offense_re = re.compile(r"^(0?[1-9]|[1-9][0-9])\.(?:png|jpg)$", re.IGNORECASE)
+        defense_re = re.compile(r"^D([1-9])\.(?:png|jpg)$", re.IGNORECASE)
 
         for path in sorted(self.images_dir.iterdir()):
             if not path.is_file() or path.suffix.lower() not in {".png", ".jpg"}:
                 continue
             offense_match = offense_re.match(path.name)
             defense_match = defense_re.match(path.name)
-            if offense_match:
-                number = int(offense_match.group(1) or offense_match.group(2))
+            if offense_match and int(offense_match.group(1)) <= MAX_OFFENSE_PLAYS:
+                number = int(offense_match.group(1))
                 slot = ("offense", number)
-            elif defense_match:
+            elif defense_match and int(defense_match.group(1)) <= MAX_DEFENSE_PLAYS:
                 slot = ("defense", int(defense_match.group(1)))
             else:
                 raise ValueError(f"Unsupported play image filename: {path.name}")
@@ -424,7 +487,7 @@ class PlaybookGenerator:
             inventory[slot] = path
         return inventory
 
-    def _load_bounded_image(self, path, total_pixels):
+    def _load_bounded_image(self, path, total_render_pixels):
         try:
             with Image.open(path) as source:
                 if source.format not in {"PNG", "JPEG"}:
@@ -440,7 +503,15 @@ class PlaybookGenerator:
                     )
                 if pixels > MAX_SOURCE_IMAGE_PIXELS:
                     raise ValueError(f"Play image has too many pixels: {path.name}")
-                if total_pixels + pixels > MAX_TOTAL_SOURCE_IMAGE_PIXELS:
+                # Images are retained only after being bounded to render size.
+                # Account for that retained size rather than the source crop's
+                # 400-DPI dimensions, while preserving the per-source cap above
+                # and decoding only one source image at a time.
+                scale = min(1.0, MAX_RENDER_IMAGE_DIMENSION / max(width, height))
+                bounded_width = max(1, round(width * scale))
+                bounded_height = max(1, round(height * scale))
+                bounded_pixels = bounded_width * bounded_height
+                if total_render_pixels + bounded_pixels > MAX_TOTAL_SOURCE_IMAGE_PIXELS:
                     raise ValueError("Combined play images exceed the pixel safety limit")
                 source.load()
                 image = self.fix_image_transparency(source).copy()
@@ -452,22 +523,25 @@ class PlaybookGenerator:
                 (MAX_RENDER_IMAGE_DIMENSION, MAX_RENDER_IMAGE_DIMENSION),
                 Image.Resampling.LANCZOS,
             )
-        return image, total_pixels + pixels
+        actual_render_pixels = image.width * image.height
+        if total_render_pixels + actual_render_pixels > MAX_TOTAL_SOURCE_IMAGE_PIXELS:
+            raise ValueError("Combined play images exceed the pixel safety limit")
+        return image, total_render_pixels + actual_render_pixels
 
     def load_images(self):
         offense_images = []
         defense_images = []
         inventory = self._image_inventory()
-        total_pixels = 0
-        for i in range(1, 17):
+        total_render_pixels = 0
+        for i in range(1, MAX_OFFENSE_PLAYS + 1):
             img_path = inventory.get(("offense", i))
             if img_path:
-                img, total_pixels = self._load_bounded_image(img_path, total_pixels)
+                img, total_render_pixels = self._load_bounded_image(img_path, total_render_pixels)
                 offense_images.append(img)
-        for i in range(1, 7):  # Support up to D6
+        for i in range(1, MAX_DEFENSE_PLAYS + 1):
             img_path = inventory.get(("defense", i))
             if img_path:
-                img, total_pixels = self._load_bounded_image(img_path, total_pixels)
+                img, total_render_pixels = self._load_bounded_image(img_path, total_render_pixels)
                 defense_images.append(img)
         return offense_images, defense_images
 
@@ -491,29 +565,39 @@ class PlaybookGenerator:
         cell_width = grid_width / cols
         cell_height = grid_height / rows
 
-        c.saveState()
-        c.setFont("Helvetica-Bold", 24)
-        c.translate(margin + label_space/2, page_height/2)
-        c.rotate(90)
-        c.drawCentredString(0, 0, "OFFENSE")
-        c.restoreState()
+        page_count = (len(images) + 15) // 16
+        for page_num, start_idx in enumerate(range(0, len(images), 16)):
+            if page_num > 0:
+                c.showPage()
 
-        for idx, img in enumerate(images[:16]):
-            row = idx // cols
-            col = idx % cols
-            x = margin + label_space + col * cell_width
-            y = page_height - (margin + (row + 1) * cell_height)
-            img_buffer = io.BytesIO()
-            img.save(img_buffer, format='PNG')
-            img_buffer.seek(0)
-            padding = 3
-            c.drawImage(ImageReader(img_buffer),
-                        x + padding, y + padding,
-                        width=cell_width - 2*padding,
-                        height=cell_height - 2*padding,
-                        preserveAspectRatio=True)
+            c.saveState()
+            c.setFont("Helvetica-Bold", 24)
+            c.translate(margin + label_space/2, page_height/2)
+            c.rotate(90)
+            c.drawCentredString(0, 0, "OFFENSE")
+            c.restoreState()
+
+            page_images = images[start_idx:start_idx + 16]
+            page_readers = []
+            for img in page_images:
+                img_buffer = io.BytesIO()
+                img.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                page_readers.append(ImageReader(img_buffer))
+
+            for idx, image_reader in enumerate(page_readers):
+                row = idx // cols
+                col = idx % cols
+                x = margin + label_space + col * cell_width
+                y = page_height - (margin + (row + 1) * cell_height)
+                padding = 3
+                c.drawImage(image_reader,
+                            x + padding, y + padding,
+                            width=cell_width - 2*padding,
+                            height=cell_height - 2*padding,
+                            preserveAspectRatio=True)
         c.save()
-        print(f"  Created: {pdf_path}")
+        print(f"  Created: {pdf_path} ({len(images)} plays across {page_count} page(s))")
 
     def _defense_row_layout(self, n):
         """Return list of plays-per-row for n defense plays: 4→[2,2], 5→[2,1,2], 6→[2,2,2]."""
@@ -616,16 +700,25 @@ class PlaybookGenerator:
         start_x = (page_width - total_width) / 2
         start_y = page_height - ((page_height - total_height) / 2)
 
-        # Render ceil(N/8) pages (capped at 2 — play names only go 01..16).
+        # Render ceil(N/8) pages, up to the 64-play offense capacity.
         # Partial pages use the count-adaptive arrangement so a group with 5
         # cards prints as a 2-1-2 dice, 7 as 4-over-3, etc., centered within
         # the same fixed cut-out box as a full group.
-        num_pages = min(2, (len(images) + 7) // 8)
+        num_pages = (len(images) + 7) // 8
         for page_num in range(num_pages):
             if page_num > 0:
                 c.showPage()
             start_idx = page_num * 8
             page_images = images[start_idx:start_idx + 8]
+            # Each cut-out group repeats the same page of plays six times. PNG
+            # encoding and ImageReader creation are therefore done once per
+            # play per page, not once per repeated group.
+            page_readers = []
+            for img in page_images:
+                img_buffer = io.BytesIO()
+                img.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                page_readers.append(ImageReader(img_buffer))
             positions = wristband_positions(len(page_images))
             grid_width = (
                 max(p[0] for p in positions) * (card_width + internal_gap)
@@ -657,11 +750,7 @@ class PlaybookGenerator:
                     x = group_x + cards_x_offset + (pcol * (card_width + internal_gap))
                     y = group_y - (prow * (card_height + internal_gap)) - card_height
 
-                    img = page_images[play_idx]
-                    img_buffer = io.BytesIO()
-                    img.save(img_buffer, format='PNG')
-                    img_buffer.seek(0)
-                    c.drawImage(ImageReader(img_buffer),
+                    c.drawImage(page_readers[play_idx],
                                 x, y, width=card_width, height=card_height,
                                 preserveAspectRatio=True, mask='auto')
         c.save()
@@ -715,6 +804,13 @@ class PlaybookGenerator:
         else:
             cards_x_offset = (group_width - defense_grid_width) / 2
 
+        image_readers = []
+        for img in images:
+            img_buffer = io.BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            image_readers.append(ImageReader(img_buffer))
+
         for group_idx in range(6):
             grow = group_idx // groups_across
             gcol = group_idx % groups_across
@@ -735,10 +831,7 @@ class PlaybookGenerator:
                 x = group_x + cards_x_offset + (pcol * (card_width + internal_gap))
                 y = group_y - (prow * (card_height + internal_gap)) - card_height
 
-                img_buffer = io.BytesIO()
-                images[img_idx].save(img_buffer, format='PNG')
-                img_buffer.seek(0)
-                c.drawImage(ImageReader(img_buffer),
+                c.drawImage(image_readers[img_idx],
                             x, y, width=card_width, height=card_height,
                             preserveAspectRatio=True, mask='auto')
 

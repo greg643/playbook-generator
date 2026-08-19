@@ -255,6 +255,18 @@
       cursor: pointer;
       font-size: 0.9rem;
     }
+    .compatibility-note {
+      margin-top: 1rem;
+      padding: 0.75rem 0.85rem;
+      background: rgba(88, 166, 255, 0.06);
+      border: 1px solid rgba(88, 166, 255, 0.35);
+      border-radius: 8px;
+      color: #c9d1d9;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .compatibility-note a { color: #58a6ff; }
+    .compatibility-note .disclosure { color: #8b949e; }
     .reset-action {
       appearance: none;
       border: 0;
@@ -294,6 +306,7 @@
   <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
   <div class="pill-links">
     <a class="editor-link" href="/editor">&#9999;&#65039; Play Editor (beta)</a>
+    <a class="editor-link" href="/pptx-guide">&#128209; PPTX Guide</a>
     <a class="editor-link" href="/help">&#128214; Help</a>
   </div>
 
@@ -308,10 +321,11 @@
     </div>
     <input type="file" id="fileInput" accept=".pptx" aria-label="Choose PowerPoint playbook">
 
-    <p class="format-hint">Deck format: start each section with a separator slide whose text
-    mentions <strong>Offense</strong> or <strong>Defense</strong> in any capitalization
-    (&ldquo;6v6 Offense&rdquo; works) &mdash; then one play per slide, each with a
-    rectangle shape marking the field.</p>
+    <p class="format-hint">Deck format: use one play per slide with one large rectangle shape
+    marking the field. If the deck has no section separators, every recognized play is treated
+    as <strong>offense</strong>. For a mixed deck, add <strong>Offense</strong> and
+    <strong>Defense</strong> separator slides. Offense playbooks continue onto extra PDF pages
+    after play 16, up to 64 plays. See the <a href="/pptx-guide">visual PPTX guide</a>.</p>
 
     <div class="section-select" role="group" aria-label="PDF outputs">
       <label>
@@ -333,6 +347,17 @@
         <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(&le;6 plays)</span>
       </label>
     </div>
+
+    <p class="compatibility-note"><strong>Wristband fit &amp; finishing:</strong> Each PDF cut-out group is about
+      <strong>4.40 &times; 2.09 in</strong> and is designed to fit the
+      <a href="https://www.amazon.com/dp/B07QHCVV7M?th=1" target="_blank" rel="noopener noreferrer"
+         aria-label="WristCoaches adult three-panel wrist coach on Amazon (opens in a new tab)">WristCoaches adult three-panel holder</a>&rsquo;s
+      <strong>2 5/8 &times; 4 5/8 in</strong> window when the long edges align. Print at <strong>100%</strong> scale and
+      <strong>laminate before cutting</strong>; an optional
+      <a href="https://www.amazon.com/Fiskars-SureCut-Portable-Paper-Trimmer/dp/B000OMYB18/" target="_blank" rel="noopener noreferrer"
+         aria-label="Fiskars SureCut portable paper trimmer on Amazon (opens in a new tab)">compact paper trimmer</a>
+      makes straight cuts easy.
+      <span class="disclosure">Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</span></p>
 
     <button class="btn btn-primary" id="generateBtn" disabled>Generate Playbook</button>
 

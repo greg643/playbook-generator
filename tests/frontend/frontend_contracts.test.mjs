@@ -7,6 +7,7 @@ const read = name => readFileSync(new URL(`../../dashboard/${name}`, import.meta
 const editor = read('editor.html');
 const index = read('index.html');
 const help = read('help.html');
+const pptxGuide = read('pptx-guide.html');
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
@@ -104,4 +105,41 @@ test('help names the Arrow and Block controls shown by the editor', () => {
   assert.match(help, /<strong>Arrow<\/strong> tool/);
   assert.match(help, /<strong>Add a block<\/strong>/);
   assert.match(help, /Arrow \/ Ball \/ Block \/ None/);
+});
+
+test('wristband compatibility guidance is accurate and links safely', () => {
+  for (const html of [index, help]) {
+    assert.match(html, /4\.40 &times; 2\.09 in/);
+    assert.match(html, /2 5\/8 &times; 4 5\/8 in/);
+    assert.doesNotMatch(html, /2\.75 &times; 4\.75 in/);
+    assert.match(html, /https:\/\/www\.amazon\.com\/dp\/B07QHCVV7M\?th=1/);
+    assert.match(html, /https:\/\/www\.amazon\.com\/Fiskars-SureCut-Portable-Paper-Trimmer\/dp\/B000OMYB18\//);
+    assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+    assert.match(html, /(?:Print at <strong>100%|<strong>Print at 100%)/i);
+    assert.match(html, /laminate before cutting/i);
+    assert.match(html, /not affiliated with or endorsed by/);
+    assert.match(html, /aria-label="WristCoaches adult three-panel wrist coach on Amazon \(opens in a new tab\)"/);
+    assert.match(html, /aria-label="Fiskars SureCut portable paper trimmer on Amazon \(opens in a new tab\)"/);
+  }
+});
+
+test('PPTX guidance matches the deterministic multi-page converter', () => {
+  for (const html of [index, help]) {
+    assert.match(html, /href="\/pptx-guide"/);
+  }
+  assert.match(index, /no section separators[\s\S]*treated[\s\S]*offense/i);
+  assert.match(help, /no LLM/i);
+  assert.match(help, /64 offense/);
+  assert.match(help, /16 plays per page/);
+  assert.match(help, /paginate every 8/);
+
+  assert.match(pptxGuide, /Up to 64 offense plays/);
+  assert.match(pptxGuide, /No separator slides\?/);
+  assert.match(pptxGuide, /every recognized play slide is treated as <strong>offense<\/strong>/);
+  assert.match(pptxGuide, /Once any separator is present, slides before the first separator are ignored/);
+  assert.match(pptxGuide, /Start with OFFENSE if offense comes first/);
+  assert.match(pptxGuide, /actual rectangle geometry/);
+  assert.match(pptxGuide, /No LLM/);
+  assert.doesNotMatch(pptxGuide, /<script\b/i);
+  assert.doesNotMatch(pptxGuide, /(?:src|href)="https?:/i);
 });

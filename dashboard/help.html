@@ -100,7 +100,8 @@
     p + p { margin-top: 0.6rem; }
     .muted { color: #8b949e; font-size: 0.85rem; }
 
-    ul {
+    ul,
+    ol {
       margin: 0.5rem 0 0.25rem;
       padding-left: 1.25rem;
     }
@@ -182,23 +183,25 @@
   <div class="nav-links">
     <a class="pill" href="/">&#128196; PPTX upload</a>
     <a class="pill" href="/editor">&#9999;&#65039; Play Editor</a>
+    <a class="pill" href="/pptx-guide">&#128209; Visual PPTX guide</a>
   </div>
 
   <nav class="toc">
     <a href="#overview">What this is</a>
     <a href="#editor">Editor quick start</a>
     <a href="#editing">Editing</a>
-    <a href="#numbering">Playbook &amp; numbering</a>
+    <a href="#numbering">Editor playbook &amp; numbering</a>
     <a href="#printing">Generating &amp; printing</a>
     <a href="#account">Account &amp; safety</a>
     <a href="#pptx">PPTX upload format</a>
+    <a href="/pptx-guide">Visual PPTX guide</a>
   </nav>
 
   <section class="card" id="overview">
     <h2>What this is</h2>
     <p>Two ways to make a playbook, one set of outputs:</p>
     <ul>
-      <li><strong>Upload a PowerPoint</strong> &mdash; drop a <strong>.pptx</strong> on the <a href="/">home page</a> and the pipeline extracts each play automatically. Deck format: start each section with a separator slide whose text mentions &ldquo;Offense&rdquo; or &ldquo;Defense&rdquo; in any capitalization (&ldquo;6v6 Offense&rdquo; works); every play slide needs a rectangle shape marking the field. A deck with only one section produces just that section&rsquo;s PDFs.</li>
+      <li><strong>Upload a PowerPoint</strong> &mdash; drop a <strong>.pptx</strong> on the <a href="/">home page</a> and the pipeline extracts each play automatically. Every play slide needs one large rectangle shape marking the field. With no section separators, all recognized plays become offense; use OFFENSE and DEFENSE separators for a mixed deck. The <a href="/pptx-guide">visual PPTX guide</a> shows a clean, non-proprietary example.</li>
       <li><strong>Play Editor</strong> &mdash; draw plays right in the browser at <a href="/editor">/editor</a>. No PowerPoint needed: drag the player chips, draw routes and zone lines, add text, and generate from there.</li>
     </ul>
     <p>Either way, generation runs in the cloud and produces the same four print-ready PDFs:</p>
@@ -206,7 +209,7 @@
       <div class="out">
         <span class="out-icon">&#127944;</span>
         <span><span class="out-name">Offense Coach Card</span><br>
-        <span class="out-desc">Full-page 4&times;4 grid of your offense plays (up to 16) for the sideline.</span></span>
+        <span class="out-desc">Full-page 4&times;4 grid, 16 plays per page. PPTX uploads can continue across pages.</span></span>
       </div>
       <div class="out">
         <span class="out-icon">&#128737;&#65039;</span>
@@ -216,7 +219,7 @@
       <div class="out">
         <span class="out-icon">&#9200;</span>
         <span><span class="out-name">Offense Wristband</span><br>
-        <span class="out-desc">Cut-out card groups sized for QB wristband insert windows.</span></span>
+        <span class="out-desc">Cut-out card groups sized for QB wristband insert windows, eight plays per output page.</span></span>
       </div>
       <div class="out">
         <span class="out-icon">&#9200;</span>
@@ -224,7 +227,7 @@
         <span class="out-desc">Same-size defense reference cards for player wristbands.</span></span>
       </div>
     </div>
-    <p class="callout">Wristband cards are sized for standard <strong>1.07 &times; 1.02 in</strong> wristband insert windows &mdash; the kind on most youth football play wristbands.</p>
+    <p class="callout">Each play tile is about <strong>1.07 &times; 1.02 in</strong>. The dashed cut-out group that holds the tiles is about <strong>4.40 &times; 2.09 in</strong>.</p>
   </section>
 
   <section class="card" id="editor">
@@ -256,12 +259,12 @@
   </section>
 
   <section class="card" id="numbering">
-    <h2>Playbook &amp; numbering</h2>
+    <h2>Editor playbook &amp; numbering</h2>
     <ul>
       <li><strong>In-playbook toggle</strong> &mdash; the checkbox on each sidebar row controls whether a play prints. Unchecked plays stay on the bench: kept in your account, shown faded, but left out of the PDFs.</li>
       <li><strong>Sticky numbers</strong> &mdash; a play keeps its number (offense <strong>1&ndash;16</strong>) or letter (defense <strong>A&ndash;F</strong>) once assigned, even as you bench or reorder other plays &mdash; so wristbands you printed earlier stay valid.</li>
       <li><strong>Renumber</strong> &mdash; when you want a clean sequence again, the <strong>Renumber</strong> button reassigns numbers in sidebar order.</li>
-      <li><strong>Print caps</strong> &mdash; the printed cards hold at most <strong>16 offense</strong> and <strong>6 defense</strong> plays in the playbook at once.</li>
+      <li><strong>Editor print caps</strong> &mdash; a browser-editor generation includes at most <strong>16 offense</strong> and <strong>6 defense</strong> plays at once. PPTX uploads have a separate multi-page offense limit of 64.</li>
       <li><strong>Storage caps</strong> &mdash; your account can keep up to <strong>64 offense</strong> and <strong>24 defense</strong> plays total (in playbook + benched), so you can archive plays between seasons.</li>
     </ul>
   </section>
@@ -270,10 +273,27 @@
     <h2>Generating &amp; printing</h2>
     <ul>
       <li>Check the outputs you want (any of the four PDFs), then hit <strong>Generate</strong>. Jobs usually take <strong>about 1&ndash;2 minutes</strong>; the page polls automatically and shows download buttons when everything is ready.</li>
-      <li><strong>Coach cards</strong> are full-page grids &mdash; print one per coach.</li>
-      <li><strong>Wristband sheets</strong> print six identical cut-out groups per page with dashed <strong>cut guides</strong> around each group. Cut along the guides and each group slides into a wristband insert window (<strong>1.07 &times; 1.02 in</strong> per card).</li>
+      <li><strong>Coach cards</strong> are full-page grids &mdash; print one set per coach. Uploaded offense decks use 16 plays per page and continue automatically when needed.</li>
+      <li><strong>Wristband sheets</strong> print six identical <strong>4.40 &times; 2.09 in</strong> cut-out groups per page, with dashed <strong>cut guides</strong> around each group. Each output page holds the next eight offense plays.</li>
     </ul>
-    <p class="callout warn">Print at <strong>100% scale</strong> (turn off &ldquo;fit to page&rdquo;) so the wristband cut-outs keep their exact size.</p>
+    <p class="callout warn"><strong>Print at 100% scale and laminate before cutting.</strong> Turn off &ldquo;fit to page&rdquo; so the wristband inserts keep their exact size.</p>
+    <p class="callout"><strong>Compatible holder:</strong> The cut-out group is designed to fit the
+      <a href="https://www.amazon.com/dp/B07QHCVV7M?th=1" target="_blank" rel="noopener noreferrer"
+         aria-label="WristCoaches adult three-panel wrist coach on Amazon (opens in a new tab)">WristCoaches adult three-panel wrist coach</a>.
+      The <a href="https://www.wristcoaches.com/products/adult-black-wrist-coach" target="_blank" rel="noopener noreferrer"
+         aria-label="WristCoaches manufacturer specifications for the adult black wrist coach (opens in a new tab)">manufacturer&rsquo;s specifications</a>
+      list a <strong>2 5/8 &times; 4 5/8 in</strong> clear window, so the <strong>4.40 &times; 2.09 in</strong> insert fits when its long edge follows the window&rsquo;s long edge.</p>
+    <h3>Clean wristband insert workflow</h3>
+    <ol>
+      <li><strong>Print at 100% scale.</strong> Check the print dialog for &ldquo;actual size&rdquo; and turn off scaling or &ldquo;fit to page.&rdquo;</li>
+      <li><strong>Laminate the full sheet before cutting.</strong> Let it cool and flatten first if you use a heat laminator.</li>
+      <li><strong>Cut along the dashed guides.</strong> Scissors work, or an optional compact trimmer such as the
+        <a href="https://www.amazon.com/Fiskars-SureCut-Portable-Paper-Trimmer/dp/B000OMYB18/" target="_blank" rel="noopener noreferrer"
+           aria-label="Fiskars SureCut portable paper trimmer on Amazon (opens in a new tab)">Fiskars SureCut portable paper trimmer</a>
+        can make clean, straight cuts without taking much storage space.</li>
+      <li><strong>Load the holder.</strong> Slide each finished insert into a panel with the 4.40-inch edge following the window&rsquo;s long edge.</li>
+    </ol>
+    <p class="muted">The holder and trimmer are optional examples. Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</p>
   </section>
 
   <section class="card" id="account">
@@ -290,18 +310,22 @@
 
   <section class="card" id="pptx">
     <h2>PPTX upload format</h2>
-    <p>The PowerPoint pipeline reads your deck slide by slide. For clean results it expects:</p>
+    <p>The PowerPoint pipeline is deterministic: no LLM interprets your football notation. It reads the slide objects, locates a field rectangle, renders the visible slide, and crops that rendering to the rectangle. For clean results it expects:</p>
     <ul>
-      <li><strong>Section slides</strong> &mdash; a nearly-empty slide whose text says <strong>OFFENSE</strong> starts the offense section; one saying <strong>DEFENSE</strong> starts the defense section. Play slides before the first section header are ignored.</li>
-      <li><strong>Field rectangle</strong> &mdash; each play slide draws the play inside one large rectangle shape (the field). The slide image is cropped to that rectangle for the cards.</li>
-      <li><strong>Numbered text boxes</strong> &mdash; text boxes near the top of the field become the play header: a short one with the play number (<strong>1&ndash;16</strong>, or <strong>A&ndash;F</strong> for defense) and a longer one with the play name.</li>
+      <li><strong>Modern PowerPoint file</strong> &mdash; upload a <strong>.pptx</strong>, not a legacy .ppt, PDF, Keynote file, or shared link.</li>
+      <li><strong>One play per slide</strong> &mdash; keep the play name, number, players, and routes together inside the field.</li>
+      <li><strong>Field rectangle</strong> &mdash; make the field one large, ungrouped PowerPoint rectangle at the top level of the slide. Its object name or PowerPoint language does not matter. If a slide has several rectangles, the largest one is used.</li>
+      <li><strong>Offense-only decks</strong> &mdash; if the entire deck has no recognized OFFENSE or DEFENSE separator, every slide with a field rectangle becomes an offense play.</li>
+      <li><strong>Mixed decks</strong> &mdash; use a nearly empty slide containing <strong>OFFENSE</strong> or <strong>DEFENSE</strong> before each section. Once any separator is present, play slides before the first separator are ignored.</li>
+      <li><strong>Capacity and pagination</strong> &mdash; uploads support up to <strong>64 offense</strong> and <strong>6 defense</strong> plays. Offense coach cards paginate every 16 plays; offense wristband sheets paginate every 8.</li>
       <li>Slides containing <strong>PRINT IMAGES</strong>, <strong>APPENDIX</strong>, or <strong>TEMPLATE</strong> are skipped automatically.</li>
     </ul>
-    <p class="muted">If a slide is skipped unexpectedly, check that it has a field rectangle and comes after an OFFENSE or DEFENSE section slide.</p>
+    <p class="callout">See the <a href="/pptx-guide">visual PPTX conversion guide</a> for original example slides, a pre-upload checklist, and the most common failure cases.</p>
+    <p class="muted">If a slide is skipped unexpectedly, confirm its field is a separate rectangle shape rather than a group, background image, table, or decorative border.</p>
   </section>
 
   <footer>
-    <a href="/">PPTX upload</a> &middot; <a href="/editor">Play Editor</a> &middot; <a href="#overview">Back to top</a>
+    <a href="/">PPTX upload</a> &middot; <a href="/pptx-guide">Visual PPTX guide</a> &middot; <a href="/editor">Play Editor</a> &middot; <a href="#overview">Back to top</a>
   </footer>
 
 </body>

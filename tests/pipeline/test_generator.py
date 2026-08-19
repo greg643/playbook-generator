@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -20,6 +21,22 @@ def page_text(pdf_path, page=0):
     from pypdf import PdfReader
 
     return PdfReader(str(pdf_path)).pages[page].extract_text()
+
+
+def image_xobject_count(page):
+    """Count distinct embedded images referenced by one PDF page."""
+    resources = page["/Resources"].get_object()
+    xobjects = resources.get("/XObject", {})
+    return sum(
+        1
+        for reference in xobjects.values()
+        if reference.get_object().get("/Subtype") == "/Image"
+    )
+
+
+def xobject_draw_count(page):
+    """Count image/form paint operations in one ReportLab page stream."""
+    return page.get_contents().get_data().split().count(b"Do")
 
 
 class WristbandLayoutTests(unittest.TestCase):
@@ -167,8 +184,76 @@ class GeneratorContractTests(unittest.TestCase):
         self.assertEqual(produced, ["offense_coach_card.pdf"])
         self.assertTrue((self.output / "notes.pdf").exists())
 
+    def test_offense_outputs_paginate_without_dropping_plays(self):
+        from pypdf import PdfReader
+
+        # Give every play distinct image bytes so PDF resource counts prove
+        # that every logical play, including #17, reached its expected page.
+        for index in range(1, 18):
+            color = (index, (index * 7) % 256, (index * 13) % 256)
+            Image.new("RGB", (32, 24), color).save(self.images / f"{index:02d}.png")
+
+        produced = self.generator().generate_all(
+            gen_offense=True,
+            gen_defense=False,
+            offense_coach_card=True,
+            offense_wristband=True,
+            defense_coach_card=False,
+            defense_wristband=False,
+        )
+
+        self.assertEqual(produced, ["offense_coach_card.pdf", "offense_wristband.pdf"])
+        coach_pages = PdfReader(str(self.output / "offense_coach_card.pdf")).pages
+        wristband_pages = PdfReader(str(self.output / "offense_wristband.pdf")).pages
+        self.assertEqual(len(coach_pages), 2)
+        self.assertEqual(len(wristband_pages), 3)
+        self.assertEqual([image_xobject_count(page) for page in coach_pages], [16, 1])
+        self.assertEqual([xobject_draw_count(page) for page in coach_pages], [16, 1])
+        self.assertEqual([image_xobject_count(page) for page in wristband_pages], [8, 8, 1])
+        self.assertEqual([xobject_draw_count(page) for page in wristband_pages], [48, 48, 6])
+        self.assertTrue(all("OFFENSE" in page.extract_text() for page in coach_pages))
+
+    def test_loads_full_sixty_four_play_capacity(self):
+        from pypdf import PdfReader
+
+        for index in range(1, 65):
+            Image.new("RGB", (4, 4), (index, 0, 0)).save(
+                self.images / f"{index:02d}.png"
+            )
+
+        generator = self.generator()
+        offense, defense = generator.load_images()
+
+        self.assertEqual(len(offense), 64)
+        self.assertEqual(defense, [])
+
+        generator.create_coach_card_offense(offense)
+        generator.create_wristband_sheet_offense(offense)
+        coach_pages = PdfReader(str(self.output / "offense_coach_card.pdf")).pages
+        wristband_pages = PdfReader(str(self.output / "offense_wristband.pdf")).pages
+        self.assertEqual(len(coach_pages), 4)
+        self.assertEqual(len(wristband_pages), 8)
+        self.assertEqual([image_xobject_count(page) for page in coach_pages], [16] * 4)
+        self.assertEqual([xobject_draw_count(page) for page in coach_pages], [16] * 4)
+        self.assertEqual([image_xobject_count(page) for page in wristband_pages], [8] * 8)
+        self.assertEqual([xobject_draw_count(page) for page in wristband_pages], [48] * 8)
+
+    def test_aggregate_budget_uses_bounded_render_pixels(self):
+        source_path = self.images / "01.png"
+        Image.new("RGB", (2000, 1000), "white").save(source_path)
+        generator = self.generator()
+
+        # The 2M-pixel source exceeds this aggregate budget, while its bounded
+        # 1800x900 render (1.62M) fits. Per-source dimensions/pixels remain
+        # independently limited by the production constants.
+        with patch("playbook_pipeline.MAX_TOTAL_SOURCE_IMAGE_PIXELS", 1_700_000):
+            image, total = generator._load_bounded_image(source_path, 0)
+
+        self.assertEqual(image.size, (1800, 900))
+        self.assertEqual(total, 1_620_000)
+
     def test_rejects_images_outside_print_capacity(self):
-        Image.new("RGB", (32, 32), "white").save(self.images / "17.png")
+        Image.new("RGB", (32, 32), "white").save(self.images / "65.png")
         with self.assertRaisesRegex(ValueError, "Unsupported play image filename"):
             self.generator().load_images()
 

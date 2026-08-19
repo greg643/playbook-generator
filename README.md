@@ -4,9 +4,9 @@ Web app that converts a flag football PowerPoint playbook (`.pptx`) into printab
 
 ## What it produces
 
-- **Offense Coach Card** — 4x4 grid of all 16 plays
-- **Defense Coach Card** — 2x2 grid of defensive formations
-- **Offense Wristband** — Cut-and-laminate cards sized for QB wristband holders
+- **Offense Coach Card** — 4x4 grid, automatically paginated every 16 plays
+- **Defense Coach Card** — Full-page grid of up to 6 defensive formations
+- **Offense Wristband** — Cut-and-laminate cards, automatically paginated every 8 plays
 - **Defense Wristband** — Cut-and-laminate defense reference cards
 
 ## Architecture
@@ -30,7 +30,8 @@ playbooks, or the session-signing key.
 Browser-based editor at `/editor` — sign in, build plays directly (drag the fixed player chips, draw routes/lines/labels), and generate the same four PDFs without PowerPoint.
 
 - **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
-  salt, 600k iterations; legacy hashes upgrade on login). Sessions are
+  salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
+  legacy hashes upgrade on login). Sessions are
   HMAC-signed, account/version checked, and revoked after password recovery or
   deletion. Recovery codes are single-use and rotated atomically. Account
   deletion first writes a blocking tombstone and durable job inventory; cleanup
@@ -61,6 +62,17 @@ Requires Python 3.11+, LibreOffice and Poppler (`pdftoppm`). Every run uses an
 isolated directory under `_playbook_work/`; artifacts from an older deck are
 never reused. The pipeline rejects unsafe/oversized PPTX archives, excessive
 slide/play counts and images with unsafe dimensions.
+
+### PPTX conversion behavior
+
+Conversion is deterministic; it does not use an LLM to interpret play marks.
+The pipeline identifies the largest top-level PowerPoint rectangle on each play
+slide, renders the slide, and crops the rendered image to that field. A deck
+with no recognized section separators is treated as offense-only. Mixed decks
+use nearly empty `OFFENSE` and `DEFENSE` separator slides. PPTX uploads support
+up to 64 offense plays (16 per coach-card page and 8 per wristband page) and 6
+defense plays. See the [visual PPTX guide](dashboard/pptx-guide.html) for example
+slides and known failure cases.
 
 Convert a supported PPTX into an editor JSON backup with:
 

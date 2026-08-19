@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A visual guide to building PowerPoint playbook decks that convert cleanly into coach cards and wristband PDFs.">
+  <title>PPTX Conversion Guide &mdash; Playbook Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0f1117;
+      --panel: #161b22;
+      --panel-strong: #21262d;
+      --border: #30363d;
+      --text: #e1e4e8;
+      --muted: #8b949e;
+      --white: #ffffff;
+      --blue: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    a { color: var(--blue); }
+    strong { color: var(--white); font-weight: 650; }
+
+    a:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 3px;
+      border-radius: 3px;
+    }
+
+    .page-header,
+    main,
+    footer {
+      width: 100%;
+      max-width: 960px;
+      margin-inline: auto;
+    }
+
+    .page-header { text-align: center; }
+
+    .eyebrow {
+      margin-bottom: 0.45rem;
+      color: var(--green);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      color: var(--white);
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      max-width: 700px;
+      margin: 0.65rem auto 1.25rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.6;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.35rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--blue);
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .pill:hover {
+      border-color: var(--blue);
+      background: var(--panel-strong);
+    }
+
+    main { display: grid; gap: 1rem; }
+
+    .card {
+      padding: 1.5rem 1.75rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    h2 {
+      margin-bottom: 0.55rem;
+      color: var(--white);
+      font-size: 1.2rem;
+      line-height: 1.3;
+    }
+
+    h3 {
+      color: var(--white);
+      font-size: 0.96rem;
+      line-height: 1.35;
+    }
+
+    p,
+    li {
+      font-size: 0.9rem;
+      line-height: 1.65;
+    }
+
+    .section-intro {
+      max-width: 760px;
+      color: var(--muted);
+    }
+
+    .lede {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(230px, 0.6fr);
+      gap: 1rem;
+      align-items: center;
+      border-color: rgba(88, 166, 255, 0.5);
+      background: linear-gradient(135deg, rgba(88, 166, 255, 0.11), rgba(22, 27, 34, 0.95) 55%);
+    }
+
+    .lede p { color: #c9d1d9; }
+
+    .status-list {
+      display: grid;
+      gap: 0.5rem;
+      list-style: none;
+    }
+
+    .status-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(15, 17, 23, 0.55);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .check {
+      flex: 0 0 auto;
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .rules {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.65rem;
+      margin-top: 1rem;
+      list-style: none;
+      counter-reset: rule;
+    }
+
+    .rules li {
+      min-height: 130px;
+      padding: 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--panel-strong);
+      counter-increment: rule;
+    }
+
+    .rules li::before {
+      display: grid;
+      width: 1.65rem;
+      height: 1.65rem;
+      margin-bottom: 0.55rem;
+      place-items: center;
+      border: 1px solid rgba(88, 166, 255, 0.55);
+      border-radius: 50%;
+      color: var(--blue);
+      content: counter(rule);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .rules strong { display: block; margin-bottom: 0.15rem; }
+    .rules span { color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+
+    .deck-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    figure { min-width: 0; }
+
+    .slide-shell {
+      overflow: hidden;
+      border: 1px solid #484f58;
+      border-radius: 7px;
+      background: #f6f8fa;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+    }
+
+    .slide-shell svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+    }
+
+    figcaption {
+      margin-top: 0.55rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+
+    figcaption strong { display: block; font-size: 0.82rem; }
+
+    .optional-tag,
+    .required-tag {
+      display: inline-block;
+      margin-top: 0.3rem;
+      padding: 0.12rem 0.42rem;
+      border-radius: 999px;
+      font-size: 0.67rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .optional-tag {
+      border: 1px solid rgba(88, 166, 255, 0.45);
+      background: rgba(88, 166, 255, 0.08);
+      color: #79c0ff;
+    }
+
+    .required-tag {
+      border: 1px solid rgba(210, 153, 34, 0.55);
+      background: rgba(210, 153, 34, 0.08);
+      color: #e3b341;
+    }
+
+    .callout {
+      margin-top: 1rem;
+      padding: 0.8rem 0.9rem;
+      border: 1px solid rgba(88, 166, 255, 0.35);
+      border-radius: 8px;
+      background: rgba(88, 166, 255, 0.06);
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
+
+    .callout.warn {
+      border-color: rgba(210, 153, 34, 0.5);
+      background: rgba(210, 153, 34, 0.07);
+    }
+
+    .anatomy-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.75fr);
+      gap: 1rem;
+      align-items: center;
+      margin-top: 1rem;
+    }
+
+    .anatomy-notes {
+      display: grid;
+      gap: 0.55rem;
+      list-style: none;
+      counter-reset: anatomy;
+    }
+
+    .anatomy-notes li {
+      position: relative;
+      padding: 0.65rem 0.7rem 0.65rem 2.65rem;
+      border-left: 2px solid var(--border);
+      background: rgba(33, 38, 45, 0.6);
+      counter-increment: anatomy;
+    }
+
+    .anatomy-notes li::before {
+      position: absolute;
+      top: 0.62rem;
+      left: 0.65rem;
+      display: grid;
+      width: 1.35rem;
+      height: 1.35rem;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #0d1117;
+      content: counter(anatomy);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .anatomy-notes span {
+      display: block;
+      margin-top: 0.08rem;
+      color: var(--muted);
+      font-size: 0.79rem;
+      line-height: 1.45;
+    }
+
+    .behavior-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .behavior {
+      padding: 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--panel-strong);
+    }
+
+    .behavior .label {
+      display: block;
+      margin-bottom: 0.35rem;
+      color: var(--blue);
+      font-size: 0.72rem;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .behavior p { margin-top: 0.3rem; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+
+    .pages {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.55rem;
+      margin-top: 0.75rem;
+    }
+
+    .page-block {
+      padding: 0.65rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #0d1117;
+      text-align: center;
+    }
+
+    .page-block strong { display: block; color: var(--green); font-size: 0.8rem; }
+    .page-block span { color: var(--muted); font-size: 0.74rem; }
+
+    .failure-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .failure {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 0.85rem;
+      align-items: center;
+      padding: 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--panel-strong);
+    }
+
+    .failure .mini-slide {
+      overflow: hidden;
+      border: 1px solid #484f58;
+      border-radius: 5px;
+      background: #f6f8fa;
+    }
+
+    .failure svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+    }
+
+    .failure h3 { color: #ff7b72; }
+    .failure.success h3 { color: #7ee787; }
+    .failure p { margin-top: 0.2rem; color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+    .fix { color: #7ee787; }
+
+    .file-types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.55rem;
+    }
+
+    .file-badge {
+      padding: 0.22rem 0.5rem;
+      border: 1px solid rgba(248, 81, 73, 0.45);
+      border-radius: 5px;
+      background: rgba(248, 81, 73, 0.08);
+      color: #ff7b72;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+    }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem 1rem;
+      margin-top: 0.85rem;
+      list-style: none;
+    }
+
+    .checklist li {
+      position: relative;
+      padding: 0.55rem 0.65rem 0.55rem 2rem;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.75);
+      font-size: 0.84rem;
+    }
+
+    .checklist li::before {
+      position: absolute;
+      top: 0.58rem;
+      left: 0.45rem;
+      color: var(--green);
+      content: "\2713";
+      font-weight: 800;
+    }
+
+    .technical-note {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.8rem;
+      align-items: start;
+    }
+
+    .technical-note .badge {
+      padding: 0.28rem 0.55rem;
+      border: 1px solid rgba(63, 185, 80, 0.5);
+      border-radius: 999px;
+      background: rgba(63, 185, 80, 0.08);
+      color: #7ee787;
+      font-size: 0.7rem;
+      font-weight: 750;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .technical-note p { color: #c9d1d9; }
+    .technical-note p + p { margin-top: 0.45rem; color: var(--muted); font-size: 0.82rem; }
+
+    footer {
+      margin-top: 2rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    footer a { text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 800px) {
+      .rules,
+      .deck-strip,
+      .pages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      .anatomy-grid,
+      .lede { grid-template-columns: 1fr; }
+
+      .failure-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      body { padding: 1.25rem 0.75rem 3rem; }
+      .card { padding: 1.2rem; }
+      .rules,
+      .deck-strip,
+      .behavior-grid,
+      .checklist { grid-template-columns: 1fr; }
+      .failure { grid-template-columns: 105px minmax(0, 1fr); }
+      .technical-note { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+
+    @media print {
+      body { padding: 0; background: #fff; color: #111; }
+      .nav-links { display: none; }
+      .card { break-inside: avoid; border-color: #bbb; background: #fff; }
+      h1, h2, h3, strong { color: #111; }
+      p, li, .section-intro, .subtitle, figcaption { color: #333; }
+    }
+  </style>
+</head>
+<body id="top">
+
+  <header class="page-header">
+    <p class="eyebrow">PPTX compatibility guide</p>
+    <h1>Make a deck that converts cleanly</h1>
+    <p class="subtitle">You do not need our playbook or a proprietary template. Keep each slide simple, give the converter one clear field to crop, and your own diagrams stay yours.</p>
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a class="pill" href="/">&larr; PPTX upload</a>
+      <a class="pill" href="/help">Help</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card lede" aria-labelledby="ready-heading">
+      <div>
+        <h2 id="ready-heading">A familiar PowerPoint workflow</h2>
+        <p>Draw plays with ordinary PowerPoint text, lines, arrows, circles, and other shapes. The converter renders what is visible inside the field rectangle; it does not need to understand your terminology or your scheme.</p>
+      </div>
+      <ul class="status-list" aria-label="Supported deck basics">
+        <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>.pptx files</strong> only</span></li>
+        <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>One play</strong> per slide</span></li>
+        <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>Up to 64 offense plays</strong> across additional pages</span></li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="rules-heading">
+      <h2 id="rules-heading">The four rules</h2>
+      <p class="section-intro">A deck that follows these basics gives the cropper the clearest possible signal.</p>
+      <ol class="rules">
+        <li><strong>Save as .pptx</strong><span>Export older PowerPoint, Keynote, or Google Slides decks to the modern PowerPoint format first.</span></li>
+        <li><strong>One play per slide</strong><span>Do not place two fields or multiple play options on the same slide.</span></li>
+        <li><strong>Use one large rectangle</strong><span>Make an ordinary, ungrouped PowerPoint rectangle the largest rectangle on every play slide.</span></li>
+        <li><strong>Choose one section pattern</strong><span>Use no separators for offense-only, or start every section with OFFENSE or DEFENSE in a mixed deck.</span></li>
+      </ol>
+    </section>
+
+    <section class="card" aria-labelledby="sequence-heading">
+      <h2 id="sequence-heading">An ideal deck, slide by slide</h2>
+      <p class="section-intro">These illustrations are synthetic examples&mdash;not a real team&rsquo;s playbook. Your colors, formations, labels, and route language can be completely different.</p>
+
+      <div class="deck-strip">
+        <figure>
+          <div class="slide-shell">
+            <svg viewBox="0 0 320 180" role="img" aria-labelledby="off-title off-desc">
+              <title id="off-title">Offense separator slide for a mixed deck</title>
+              <desc id="off-desc">A dark blue title slide containing only the word offense and a small subtitle, required before offense plays when the deck also uses section separators.</desc>
+              <rect width="320" height="180" fill="#10253f"/>
+              <path d="M0 150 L320 80 L320 180 L0 180 Z" fill="#173d65"/>
+              <text x="160" y="84" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="26" font-weight="700">OFFENSE</text>
+              <text x="160" y="108" text-anchor="middle" fill="#9ccaff" font-family="Arial, sans-serif" font-size="10" letter-spacing="2">PLAY SECTION</text>
+            </svg>
+          </div>
+          <figcaption><strong>1. OFFENSE separator</strong>A nearly empty title slide. <span class="required-tag">Required in this mixed deck</span></figcaption>
+        </figure>
+
+        <figure>
+          <div class="slide-shell">
+            <svg viewBox="0 0 320 180" role="img" aria-labelledby="play-one-title play-one-desc">
+              <title id="play-one-title">Example offense play slide</title>
+              <desc id="play-one-desc">A play named Blue Jet with a single large green field rectangle, player circles, and route arrows.</desc>
+              <defs>
+                <marker id="arrow-a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 Z" fill="#fff"/></marker>
+              </defs>
+              <rect width="320" height="180" fill="#f6f8fa"/>
+              <rect x="28" y="20" width="264" height="140" rx="2" fill="#19713d" stroke="#0f4c29" stroke-width="3"/>
+              <path d="M41 51 H279 M41 82 H279 M41 113 H279 M41 144 H279" stroke="#ffffff" stroke-width="1" opacity="0.38"/>
+              <text x="43" y="39" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">07  BLUE JET</text>
+              <g fill="#e8f3ff" stroke="#0d1d2e" stroke-width="2">
+                <circle cx="89" cy="116" r="9"/><circle cx="134" cy="116" r="9"/><circle cx="160" cy="124" r="9"/><circle cx="186" cy="116" r="9"/><circle cx="231" cy="116" r="9"/>
+              </g>
+              <g fill="none" stroke="#ffffff" stroke-width="3" marker-end="url(#arrow-a)">
+                <path d="M89 106 V77 Q89 63 107 63 H123"/>
+                <path d="M231 106 V86 Q231 73 213 68"/>
+              </g>
+              <path d="M145 120 Q121 135 98 126" fill="none" stroke="#ffd33d" stroke-width="3" marker-end="url(#arrow-a)"/>
+            </svg>
+          </div>
+          <figcaption><strong>2. One offense play</strong>One large field, name near the top, drawing inside.</figcaption>
+        </figure>
+
+        <figure>
+          <div class="slide-shell">
+            <svg viewBox="0 0 320 180" role="img" aria-labelledby="def-title def-desc">
+              <title id="def-title">Required defense separator slide</title>
+              <desc id="def-desc">A charcoal title slide containing only the word defense and a small subtitle.</desc>
+              <rect width="320" height="180" fill="#202b39"/>
+              <path d="M0 38 L320 112 V180 H0 Z" fill="#29384a"/>
+              <text x="160" y="84" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="26" font-weight="700">DEFENSE</text>
+              <text x="160" y="108" text-anchor="middle" fill="#b6c8da" font-family="Arial, sans-serif" font-size="10" letter-spacing="2">PLAY SECTION</text>
+            </svg>
+          </div>
+          <figcaption><strong>3. DEFENSE separator</strong>Everything after this starts the defense section. <span class="required-tag">Needed for defense</span></figcaption>
+        </figure>
+
+        <figure>
+          <div class="slide-shell">
+            <svg viewBox="0 0 320 180" role="img" aria-labelledby="play-two-title play-two-desc">
+              <title id="play-two-title">Example defense play slide</title>
+              <desc id="play-two-desc">A defensive play named Cloud with a single large blue field rectangle, player circles, and zone outlines.</desc>
+              <rect width="320" height="180" fill="#f6f8fa"/>
+              <rect x="28" y="20" width="264" height="140" rx="2" fill="#23466e" stroke="#173252" stroke-width="3"/>
+              <path d="M41 51 H279 M41 82 H279 M41 113 H279 M41 144 H279" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
+              <text x="43" y="39" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">B  CLOUD</text>
+              <g fill="#ffc857" stroke="#5c4200" stroke-width="2">
+                <circle cx="86" cy="109" r="9"/><circle cx="126" cy="116" r="9"/><circle cx="160" cy="103" r="9"/><circle cx="194" cy="116" r="9"/><circle cx="234" cy="109" r="9"/>
+              </g>
+              <g fill="none" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="5 4">
+                <path d="M61 82 Q86 59 112 82"/><path d="M208 82 Q234 59 259 82"/><path d="M133 71 Q160 48 187 71"/>
+              </g>
+            </svg>
+          </div>
+          <figcaption><strong>4. One defense play</strong>The same slide rules apply after the DEFENSE separator.</figcaption>
+        </figure>
+      </div>
+
+      <p class="callout"><strong>No separator slides?</strong> That is fine. If the deck contains no OFFENSE or DEFENSE separator, every recognized play slide is treated as <strong>offense</strong>. For a mixed deck, start the first offense section with OFFENSE and the first defense section with DEFENSE. Once any separator is present, slides before the first separator are ignored.</p>
+    </section>
+
+    <section class="card" aria-labelledby="anatomy-heading">
+      <h2 id="anatomy-heading">Anatomy of a reliable play slide</h2>
+      <p class="section-intro">The rectangle defines the crop. Everything important should sit inside it, including the play name.</p>
+
+      <div class="anatomy-grid">
+        <div class="slide-shell">
+          <svg viewBox="0 0 640 360" role="img" aria-labelledby="anatomy-title anatomy-desc">
+            <title id="anatomy-title">Annotated ideal play slide</title>
+            <desc id="anatomy-desc">A PowerPoint-style slide with numbered annotations marking the play title, field rectangle, route shapes, and clear margins.</desc>
+            <defs>
+              <marker id="arrow-b" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#fff"/></marker>
+            </defs>
+            <rect width="640" height="360" fill="#f6f8fa"/>
+            <rect x="72" y="44" width="496" height="272" rx="3" fill="#176a39" stroke="#0e4625" stroke-width="5"/>
+            <path d="M92 104 H548 M92 164 H548 M92 224 H548 M92 284 H548" stroke="#fff" stroke-width="2" opacity="0.32"/>
+            <text x="102" y="83" fill="#ffffff" font-family="Arial, sans-serif" font-size="23" font-weight="700">12  RIVER MOTION</text>
+            <g fill="#e7f3ff" stroke="#10253f" stroke-width="4">
+              <circle cx="154" cy="238" r="17"/><circle cx="245" cy="238" r="17"/><circle cx="320" cy="255" r="17"/><circle cx="395" cy="238" r="17"/><circle cx="486" cy="238" r="17"/>
+            </g>
+            <g fill="none" stroke="#fff" stroke-width="6" marker-end="url(#arrow-b)">
+              <path d="M154 220 V164 Q154 134 190 134 H226"/>
+              <path d="M486 220 V176 Q486 146 452 135"/>
+            </g>
+            <path d="M303 250 Q258 290 205 254" fill="none" stroke="#ffd33d" stroke-width="6" marker-end="url(#arrow-b)"/>
+            <g font-family="Arial, sans-serif" font-size="18" font-weight="700" text-anchor="middle">
+              <circle cx="84" cy="72" r="15" fill="#58a6ff"/><text x="84" y="78" fill="#0d1117">1</text>
+              <circle cx="558" cy="302" r="15" fill="#58a6ff"/><text x="558" y="308" fill="#0d1117">2</text>
+              <circle cx="453" cy="142" r="15" fill="#58a6ff"/><text x="453" y="148" fill="#0d1117">3</text>
+              <circle cx="96" cy="303" r="15" fill="#58a6ff"/><text x="96" y="309" fill="#0d1117">4</text>
+            </g>
+          </svg>
+        </div>
+
+        <ol class="anatomy-notes">
+          <li><strong>Play name and number</strong><span>Put a short, readable label near the top, inside the rectangle.</span></li>
+          <li><strong>One explicit field rectangle</strong><span>Use Insert &rarr; Shapes &rarr; Rectangle and leave it ungrouped. Its object name and PowerPoint language do not matter.</span></li>
+          <li><strong>Ordinary visible shapes</strong><span>Lines, arrows, freeforms, player circles, and text all render as part of the slide image.</span></li>
+          <li><strong>Safe inner margin</strong><span>Keep labels and route tips away from the rectangle edge so cropping and printing do not crowd them.</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="behavior-heading">
+      <h2 id="behavior-heading">Sections and longer offense playbooks</h2>
+      <p class="section-intro">Separator slides control the current section; they are not included as plays.</p>
+
+      <div class="behavior-grid">
+        <article class="behavior">
+          <span class="label">Offense-only deck</span>
+          <h3>Title cards are optional</h3>
+          <p>With no section separators, every slide that has a recognized field rectangle becomes an offense play.</p>
+        </article>
+        <article class="behavior">
+          <span class="label">Deck with defense</span>
+          <h3>Mark every section</h3>
+          <p>Start with OFFENSE if offense comes first, then place DEFENSE before the first defensive play. Add another OFFENSE separator if the deck switches back.</p>
+        </article>
+        <article class="behavior">
+          <span class="label">17&ndash;64 offense plays</span>
+          <h3>Additional pages are automatic</h3>
+          <p>The sixteenth play is no longer the end. Recognized offense plays continue onto additional output pages, up to 64 total.</p>
+        </article>
+        <article class="behavior">
+          <span class="label">Play slides</span>
+          <h3>Section words are safe inside a play</h3>
+          <p>A slide with a field rectangle remains a play even when its title happens to include &ldquo;offense&rdquo; or &ldquo;defense.&rdquo;</p>
+        </article>
+      </div>
+
+      <div class="pages" aria-label="Offense coach-card pagination">
+        <div class="page-block"><strong>Coach page 1</strong><span>plays 1&ndash;16</span></div>
+        <div class="page-block"><strong>Coach page 2</strong><span>plays 17&ndash;32</span></div>
+        <div class="page-block"><strong>Coach page 3</strong><span>plays 33&ndash;48</span></div>
+        <div class="page-block"><strong>Coach page 4</strong><span>plays 49&ndash;64</span></div>
+      </div>
+      <p class="callout">Offense wristband sheets use the same play order with <strong>eight plays per output page</strong>.</p>
+    </section>
+
+    <section class="card" aria-labelledby="failures-heading">
+      <h2 id="failures-heading">What works&mdash;and what can fail</h2>
+      <p class="section-intro">Renaming a rectangle is safe. Most conversion issues come from how the field object is built, not from the routes themselves.</p>
+
+      <div class="failure-grid">
+        <article class="failure">
+          <div class="mini-slide">
+            <svg viewBox="0 0 160 90" role="img" aria-labelledby="grouped-title grouped-desc">
+              <title id="grouped-title">Grouped field failure example</title>
+              <desc id="grouped-desc">A field rectangle and play objects surrounded by a dashed group selection box and a red X.</desc>
+              <rect width="160" height="90" fill="#f6f8fa"/>
+              <rect x="24" y="13" width="112" height="64" fill="#397a4d" stroke="#0f4c29" stroke-width="2"/>
+              <rect x="17" y="7" width="126" height="76" fill="none" stroke="#8250df" stroke-width="1.5" stroke-dasharray="4 3"/>
+              <circle cx="57" cy="56" r="5" fill="#fff"/><circle cx="82" cy="61" r="5" fill="#fff"/><circle cx="107" cy="56" r="5" fill="#fff"/>
+              <path d="M128 8 L151 31 M151 8 L128 31" stroke="#cf222e" stroke-width="6"/>
+            </svg>
+          </div>
+          <div><h3>Grouped field</h3><p>The field can disappear inside a group. <strong class="fix">Fix:</strong> ungroup it and leave the field rectangle as a top-level shape.</p></div>
+        </article>
+
+        <article class="failure success">
+          <div class="mini-slide">
+            <svg viewBox="0 0 160 90" role="img" aria-labelledby="renamed-title renamed-desc">
+              <title id="renamed-title">Renamed field supported example</title>
+              <desc id="renamed-desc">A field with a selection pane label saying Main Field and a green check mark.</desc>
+              <rect width="160" height="90" fill="#f6f8fa"/>
+              <rect x="9" y="14" width="92" height="62" fill="#397a4d" stroke="#0f4c29" stroke-width="2"/>
+              <rect x="107" y="14" width="46" height="45" rx="3" fill="#eaeef2" stroke="#8c959f"/>
+              <text x="112" y="27" fill="#24292f" font-family="Arial, sans-serif" font-size="5">Selection Pane</text>
+              <rect x="111" y="33" width="38" height="12" fill="#fff" stroke="#afb8c1"/>
+              <text x="114" y="41" fill="#1a7f37" font-family="Arial, sans-serif" font-size="6">Main Field</text>
+              <circle cx="130" cy="69" r="11" fill="#1a7f37"/>
+              <path d="M124 69 L128 73 L136 64" fill="none" stroke="#fff" stroke-width="3"/>
+            </svg>
+          </div>
+          <div><h3>Renamed rectangle: supported</h3><p>The converter recognizes actual rectangle geometry, even when the object is renamed or PowerPoint uses another language. Keep it ungrouped and top-level.</p></div>
+        </article>
+
+        <article class="failure">
+          <div class="mini-slide">
+            <svg viewBox="0 0 160 90" role="img" aria-labelledby="missing-title missing-desc">
+              <title id="missing-title">Missing field failure example</title>
+              <desc id="missing-desc">A play drawn on a solid slide background without a rectangle around the field.</desc>
+              <rect width="160" height="90" fill="#397a4d"/>
+              <text x="11" y="18" fill="#fff" font-family="Arial, sans-serif" font-size="8" font-weight="700">NO FIELD SHAPE</text>
+              <circle cx="44" cy="60" r="6" fill="#fff"/><circle cx="80" cy="66" r="6" fill="#fff"/><circle cx="116" cy="60" r="6" fill="#fff"/>
+              <path d="M44 53 V35 H64" fill="none" stroke="#fff" stroke-width="3"/>
+              <circle cx="140" cy="17" r="11" fill="#cf222e"/>
+              <text x="140" y="22" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="15" font-weight="700">!</text>
+            </svg>
+          </div>
+          <div><h3>Missing field shape</h3><p>A background color or background image is not a rectangle object. <strong class="fix">Fix:</strong> insert a real rectangle behind the play.</p></div>
+        </article>
+
+        <article class="failure">
+          <div class="mini-slide">
+            <svg viewBox="0 0 160 90" role="img" aria-labelledby="decor-title decor-desc">
+              <title id="decor-title">Decorative rectangle failure example</title>
+              <desc id="decor-desc">A small play field inside a much larger decorative border, with the larger rectangle highlighted in red.</desc>
+              <rect width="160" height="90" fill="#f6f8fa"/>
+              <rect x="6" y="6" width="148" height="78" rx="5" fill="none" stroke="#cf222e" stroke-width="5"/>
+              <rect x="33" y="20" width="94" height="55" fill="#397a4d" stroke="#0f4c29" stroke-width="2"/>
+              <circle cx="58" cy="58" r="5" fill="#fff"/><circle cx="80" cy="63" r="5" fill="#fff"/><circle cx="102" cy="58" r="5" fill="#fff"/>
+              <text x="80" y="15" text-anchor="middle" fill="#cf222e" font-family="Arial, sans-serif" font-size="6" font-weight="700">LARGEST RECTANGLE</text>
+            </svg>
+          </div>
+          <div><h3>Larger decorative rectangle</h3><p>The cropper uses the largest recognized rectangle. <strong class="fix">Fix:</strong> remove large rectangle borders or make the field clearly largest.</p></div>
+        </article>
+
+        <article class="failure">
+          <div class="mini-slide">
+            <svg viewBox="0 0 160 90" role="img" aria-labelledby="format-title format-desc">
+              <title id="format-title">Unsupported file formats</title>
+              <desc id="format-desc">Several document icons labeled PPT, KEY, and PDF point toward one supported PPTX icon.</desc>
+              <rect width="160" height="90" fill="#f6f8fa"/>
+              <g font-family="Arial, sans-serif" font-size="7" font-weight="700" text-anchor="middle">
+                <path d="M11 20 H36 L45 29 V65 H11 Z" fill="#ffebe9" stroke="#cf222e"/><text x="28" y="48" fill="#cf222e">.PPT</text>
+                <path d="M57 20 H82 L91 29 V65 H57 Z" fill="#ffebe9" stroke="#cf222e"/><text x="74" y="48" fill="#cf222e">.KEY</text>
+                <path d="M103 20 H128 L137 29 V65 H103 Z" fill="#ffebe9" stroke="#cf222e"/><text x="120" y="48" fill="#cf222e">.PDF</text>
+              </g>
+              <path d="M15 72 H139" stroke="#cf222e" stroke-width="4"/>
+            </svg>
+          </div>
+          <div><h3>Unsupported file format</h3><p>The uploader accepts modern PowerPoint files only. Export first; do not upload a link, PDF, Keynote file, or legacy PowerPoint file.</p><div class="file-types" aria-label="Unsupported extensions"><span class="file-badge">.ppt</span><span class="file-badge">.key</span><span class="file-badge">.pdf</span></div></div>
+        </article>
+
+        <article class="failure">
+          <div class="mini-slide">
+            <svg viewBox="0 0 160 90" role="img" aria-labelledby="complex-title complex-desc">
+              <title id="complex-title">Complex PowerPoint feature warning</title>
+              <desc id="complex-desc">A stylized SmartArt diagram, a missing font symbol, and a caution badge.</desc>
+              <rect width="160" height="90" fill="#f6f8fa"/>
+              <rect x="14" y="19" width="38" height="19" rx="9" fill="#8250df"/><rect x="62" y="19" width="38" height="19" rx="9" fill="#0969da"/><rect x="110" y="19" width="38" height="19" rx="9" fill="#1a7f37"/>
+              <path d="M52 28 H62 M100 28 H110" stroke="#57606a" stroke-width="2"/>
+              <rect x="15" y="53" width="83" height="17" fill="#eaeef2" stroke="#8c959f"/>
+              <text x="21" y="64" fill="#57606a" font-family="Arial, sans-serif" font-size="6">Missing custom font?</text>
+              <path d="M130 48 L151 78 H109 Z" fill="#bf8700"/>
+              <text x="130" y="72" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="16" font-weight="700">!</text>
+            </svg>
+          </div>
+          <div><h3>Special Office effects</h3><p>SmartArt, embedded media, unusual fonts, and some ink effects can render differently outside PowerPoint. <strong class="fix">Fix:</strong> use ordinary shapes and common fonts when possible.</p></div>
+        </article>
+      </div>
+
+      <p class="callout warn"><strong>Quick check:</strong> In PowerPoint, open the Selection Pane and confirm the field is a separate, top-level rectangle object rather than part of a group, table, or background image. If several rectangles exist, make the field clearly the largest.</p>
+    </section>
+
+    <section class="card technical-note" aria-labelledby="converter-heading">
+      <span class="badge">No LLM</span>
+      <div>
+        <h2 id="converter-heading">What the converter actually does</h2>
+        <p>The conversion is deterministic, not AI-mediated. It reads the slide&rsquo;s object structure to locate the large field rectangle, renders the visible slide, and crops that rendering to the rectangle&rsquo;s bounds.</p>
+        <p>That is why an ordinary route arrow does not need a special meaning: it only needs to render visibly inside a field the converter can find. It is also why the field rectangle&rsquo;s object structure matters more than the football notation.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="checklist-heading">
+      <h2 id="checklist-heading">Before you upload</h2>
+      <ul class="checklist">
+        <li>The file extension is <strong>.pptx</strong>.</li>
+        <li>Each play has its own slide.</li>
+        <li>Each play slide has one large, ungrouped rectangle.</li>
+        <li>The field is a real rectangle shape, not a background image or table.</li>
+        <li>The play name and number sit inside the field near the top.</li>
+        <li>A mixed deck starts with the appropriate <strong>OFFENSE</strong> or <strong>DEFENSE</strong> separator.</li>
+        <li>No decorative rectangle is larger than the field.</li>
+        <li>Important routes and labels stay clear of the crop edge.</li>
+      </ul>
+      <p class="callout">Ready to try it? Return to the <a href="/">PPTX upload</a>. Start with a small copy of your deck if you want to verify the format before converting the whole playbook.</p>
+    </section>
+  </main>
+
+  <footer>
+    <a href="/">PPTX upload</a> &middot; <a href="/help">Help</a> &middot; <a href="#top">Back to top</a>
+  </footer>
+
+</body>
+</html>

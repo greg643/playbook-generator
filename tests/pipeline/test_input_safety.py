@@ -57,8 +57,8 @@ class InputSafetyTests(unittest.TestCase):
             validate_pptx_archive(path)
 
     def test_rejects_print_counts_above_capacity(self):
-        plays = [{"section": "OFFENSE"} for _ in range(17)]
-        with self.assertRaisesRegex(ValueError, "at most 16"):
+        plays = [{"section": "OFFENSE"} for _ in range(65)]
+        with self.assertRaisesRegex(ValueError, "at most 64"):
             validate_print_play_counts(plays)
 
         plays = [{"section": "DEFENSE"} for _ in range(7)]
@@ -67,7 +67,7 @@ class InputSafetyTests(unittest.TestCase):
 
     def test_accepts_capacity_boundaries(self):
         plays = (
-            [{"section": "OFFENSE"} for _ in range(16)]
+            [{"section": "OFFENSE"} for _ in range(64)]
             + [{"section": "DEFENSE"} for _ in range(6)]
         )
         validate_print_play_counts(plays)
