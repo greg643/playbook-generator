@@ -8,6 +8,7 @@ import {
   generateSaltHex,
   getUser,
   hashPassword,
+  normalizeRecoveryCode,
   PASSWORD_ITERATIONS,
 } from "../../dashboard/functions/_lib/auth.js";
 import {
@@ -21,8 +22,10 @@ import {
 import { onRequestPost as recover } from "../../dashboard/functions/api/auth/recover.js";
 import { onRequestPost as deleteAccount } from "../../dashboard/functions/api/auth/delete-account.js";
 import { onRequestPost as login } from "../../dashboard/functions/api/auth/login.js";
+import { onRequestGet as getMe } from "../../dashboard/functions/api/auth/me.js";
 import { onRequestPost as register } from "../../dashboard/functions/api/auth/register.js";
 import { onRequestPost as generate } from "../../dashboard/functions/api/generate.js";
+import { onRequestPost as upload } from "../../dashboard/functions/api/upload.js";
 import { onRequestPut as savePlays } from "../../dashboard/functions/api/plays.js";
 import { onRequestGet as getStatus } from "../../dashboard/functions/api/status/[[jobId]].js";
 import { onRequestGet as download } from "../../dashboard/functions/api/download/[[catchall]].js";
@@ -169,6 +172,34 @@ async function sessionRequest(env, account, url = "https://example.test/api") {
   return new Request(url, { headers: { cookie: setCookie.split(";", 1)[0] } });
 }
 
+function requestWithResponseCookie(response, url = "https://example.test/api") {
+  const setCookie = response.headers.get("set-cookie");
+  assert.ok(setCookie, "expected an authenticated response cookie");
+  return new Request(url, { headers: { cookie: setCookie.split(";", 1)[0] } });
+}
+
+// Accounts and cookies created before auth versioning had no sessionVersion,
+// `sv`, or `iat`. Keep an exact old-token fixture so the fallback cannot be
+// accidentally removed while initial pilot accounts still exist.
+async function legacySessionRequest(env, account, url = "https://example.test/api") {
+  const payload = Buffer.from(JSON.stringify({
+    uid: account.userId,
+    em: account.email,
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  })).toString("base64url");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    Buffer.from(env.SESSION_SECRET, "hex"),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = Buffer.from(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))
+  ).toString("base64url");
+  return new Request(url, { headers: { cookie: `pb_session=${payload}.${signature}` } });
+}
+
 async function json(response) {
   return response.json();
 }
@@ -196,6 +227,140 @@ test("a stale cookie cannot cross into a re-created email account", async () => 
     JSON.stringify({ ...oldAccount, userId: OTHER_USER_ID })
   );
   assert.equal(await getUser(request, env), null);
+});
+
+test("pre-version accounts and cookies remain valid and the account can log in", async () => {
+  const env = makeEnv();
+  const email = "initial.coach@example.com";
+  const password = "original-password";
+  const salt = generateSaltHex();
+  const account = {
+    userId: USER_ID,
+    email,
+    salt,
+    iterations: 100000,
+    hash: await hashPassword(password, salt, 100000),
+    createdAt: "2026-07-07T19:47:02.000Z",
+  };
+  await env.PLAYBOOK_BUCKET.put(await emailKey(email), JSON.stringify(account));
+
+  const legacyRequest = await legacySessionRequest(env, account);
+  const legacyUser = await getUser(legacyRequest, env);
+  assert.equal(legacyUser.userId, USER_ID);
+  assert.equal(legacyUser.email, email);
+  assert.equal(legacyUser.sessionVersion, 1);
+  assert.equal(legacyUser.authenticatedAt, 0);
+  const legacyMe = await getMe({ request: legacyRequest, env });
+  assert.equal(legacyMe.status, 200);
+  assert.deepEqual(await legacyMe.json(), { email, userId: USER_ID });
+
+  const response = await login({
+    request: new Request("https://example.test/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+    env,
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.clone().json(), { email, userId: USER_ID });
+  assert.equal((await getUser(requestWithResponseCookie(response), env)).userId, USER_ID);
+
+  const stored = await (await env.PLAYBOOK_BUCKET.get(await emailKey(email))).json();
+  assert.deepEqual(stored, account, "a current-work-factor legacy login must not rewrite the account");
+});
+
+test("a successful legacy password login upgrades its PBKDF2 work factor", async () => {
+  const env = makeEnv();
+  const email = "low-work-factor@example.com";
+  const password = "upgrade-password";
+  const oldSalt = generateSaltHex();
+  const account = {
+    userId: USER_ID,
+    email,
+    salt: oldSalt,
+    iterations: 1000,
+    hash: await hashPassword(password, oldSalt, 1000),
+    createdAt: "2026-01-01T00:00:00.000Z",
+    compatibilityMarker: "preserve-me",
+  };
+  await env.PLAYBOOK_BUCKET.put(await emailKey(email), JSON.stringify(account));
+
+  const response = await login({
+    request: new Request("https://example.test/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+    env,
+  });
+  assert.equal(response.status, 200);
+
+  const upgraded = await (await env.PLAYBOOK_BUCKET.get(await emailKey(email))).json();
+  assert.equal(upgraded.iterations, PASSWORD_ITERATIONS);
+  assert.equal(upgraded.sessionVersion, 1);
+  assert.notEqual(upgraded.salt, oldSalt);
+  assert.equal(upgraded.compatibilityMarker, "preserve-me");
+  assert.equal(
+    upgraded.hash,
+    await hashPassword(password, upgraded.salt, PASSWORD_ITERATIONS)
+  );
+  assert.equal((await getUser(requestWithResponseCookie(response), env)).userId, USER_ID);
+});
+
+test("new registration persists current credentials and returns a usable session", async () => {
+  const env = makeEnv();
+  const email = "new.coach@example.com";
+  const password = "new-coach-password";
+  const response = await register({
+    request: new Request("https://example.test/api/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: `  ${email.toUpperCase()}  `, password }),
+    }),
+    env,
+  });
+
+  assert.equal(response.status, 200);
+  const data = await response.clone().json();
+  assert.equal(data.email, email);
+  assert.match(data.userId, /^[0-9a-f-]{36}$/i);
+  assert.match(data.recoveryCode, /^(?:[0-9A-F]{4}-){4}[0-9A-F]{4}$/);
+
+  const stored = await (await env.PLAYBOOK_BUCKET.get(await emailKey(email))).json();
+  assert.equal(stored.userId, data.userId);
+  assert.equal(stored.email, email);
+  assert.equal(stored.iterations, PASSWORD_ITERATIONS);
+  assert.equal(stored.sessionVersion, 1);
+  assert.equal(stored.hash, await hashPassword(password, stored.salt, PASSWORD_ITERATIONS));
+  assert.equal(
+    stored.recoveryHash,
+    await hashPassword(
+      normalizeRecoveryCode(data.recoveryCode),
+      stored.recoverySalt,
+      stored.recoveryIterations
+    )
+  );
+
+  const registeredRequest = requestWithResponseCookie(
+    response,
+    "https://example.test/api/auth/me"
+  );
+  const registeredUser = await getUser(registeredRequest, env);
+  assert.equal(registeredUser.userId, data.userId);
+  assert.equal(registeredUser.email, email);
+  const me = await getMe({ request: registeredRequest, env });
+  assert.equal(me.status, 200);
+  assert.deepEqual(await me.json(), { email, userId: data.userId });
+
+  const relogin = await login({
+    request: new Request("https://example.test/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }),
+    env,
+  });
+  assert.equal(relogin.status, 200);
+  assert.equal((await relogin.json()).userId, data.userId);
 });
 
 test("password recovery atomically consumes its code and revokes the old session", async () => {
@@ -588,6 +753,24 @@ test("playbook saves reject a document captured for another account", async () =
   const response = await savePlays({ request, env });
   assert.equal(response.status, 403);
   assert.equal(await env.PLAYBOOK_BUCKET.get(`accounts/${USER_ID}/playbook.json`), null);
+});
+
+test("PPTX upload rejects signed-out requests before parsing or writing the file", async () => {
+  const env = makeEnv();
+  let parsed = false;
+  const request = {
+    headers: new Headers({ "content-type": "multipart/form-data; boundary=test" }),
+    async formData() {
+      parsed = true;
+      throw new Error("signed-out uploads must never be parsed");
+    },
+  };
+
+  const response = await upload({ request, env });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await json(response), { error: "Not signed in" });
+  assert.equal(parsed, false);
+  assert.equal(env.PLAYBOOK_BUCKET.objects.size, 0);
 });
 
 test("image generation rejects duplicate and zero-byte multipart files before dispatch", async () => {

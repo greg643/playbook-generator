@@ -1,6 +1,18 @@
-# Playbook Generator
+# GSS Playbook
 
-Web app that converts a flag football PowerPoint playbook (`.pptx`) into printable coach cards and wristband PDFs.
+Greenwich Sports Systems web app for drawing flag football plays or converting a PowerPoint playbook (`.pptx`) into printable coach cards and wristband PDFs.
+
+## Web routes
+
+- `/` — account sign-in and the two-choice GSS Playbook home
+- `/editor` — browser play editor
+- `/pptx-guide` — public, non-proprietary deck compatibility guide
+- `/converter` — signed-in PowerPoint upload and conversion screen
+- `/help` — editor, account, compatibility, and printing help
+
+The converter page verifies the current session before revealing its controls. The upload,
+status, and download APIs remain the actual security boundary: they require an authenticated
+account, and job results are owner-checked.
 
 ## What it produces
 
@@ -27,7 +39,7 @@ playbooks, or the session-signing key.
 
 ## Play Editor
 
-Browser-based editor at `/editor` — sign in, build plays directly (drag the fixed player chips, draw routes/lines/labels), and generate the same four PDFs without PowerPoint.
+Browser-based editor at `/editor` — sign in at `/`, choose **Play Editor**, build plays directly (drag the fixed player chips, draw routes/lines/labels), and generate the same four PDFs without PowerPoint.
 
 - **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
   salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor

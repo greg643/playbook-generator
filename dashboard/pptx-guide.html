@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="A visual guide to building PowerPoint playbook decks that convert cleanly into coach cards and wristband PDFs.">
-  <title>PPTX Conversion Guide &mdash; Playbook Generator</title>
+  <title>GSS Playbook PPTX Guide &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -51,6 +51,44 @@
     }
 
     .page-header { text-align: center; }
+
+    .guide-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+
+    .home-action {
+      color: var(--blue);
+      font-size: 0.88rem;
+      text-decoration: none;
+    }
+
+    .home-action:hover { text-decoration: underline; }
+
+    .converter-cta {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      padding: 0.72rem 1.05rem;
+      border: 1px solid #3fb950;
+      border-radius: 8px;
+      background: #238636;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 750;
+      line-height: 1.25;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .converter-cta:hover { background: #2f7d3a; transform: translateY(-1px); }
+
+    .bottom-action { margin-top: 1rem; text-align: right; }
 
     .eyebrow {
       margin-bottom: 0.45rem;
@@ -490,6 +528,9 @@
 
     @media (max-width: 560px) {
       body { padding: 1.25rem 0.75rem 3rem; }
+      .guide-actions { align-items: stretch; flex-direction: column; }
+      .home-action { align-self: flex-start; }
+      .converter-cta { width: 100%; }
       .card { padding: 1.2rem; }
       .rules,
       .deck-strip,
@@ -506,7 +547,7 @@
 
     @media print {
       body { padding: 0; background: #fff; color: #111; }
-      .nav-links { display: none; }
+      .guide-actions, .nav-links, .bottom-action { display: none; }
       .card { break-inside: avoid; border-color: #bbb; background: #fff; }
       h1, h2, h3, strong { color: #111; }
       p, li, .section-intro, .subtitle, figcaption { color: #333; }
@@ -516,11 +557,14 @@
 <body id="top">
 
   <header class="page-header">
-    <p class="eyebrow">PPTX compatibility guide</p>
+    <div class="guide-actions" aria-label="Guide actions">
+      <a class="home-action" href="/">&larr; GSS Playbook home</a>
+      <a class="converter-cta" href="/converter">OK, take me to the converter &rarr;</a>
+    </div>
+    <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook</p>
     <h1>Make a deck that converts cleanly</h1>
     <p class="subtitle">You do not need our playbook or a proprietary template. Keep each slide simple, give the converter one clear field to crop, and your own diagrams stay yours.</p>
     <nav class="nav-links" aria-label="Primary navigation">
-      <a class="pill" href="/">&larr; PPTX upload</a>
       <a class="pill" href="/help">Help</a>
     </nav>
   </header>
@@ -837,12 +881,13 @@
         <li>No decorative rectangle is larger than the field.</li>
         <li>Important routes and labels stay clear of the crop edge.</li>
       </ul>
-      <p class="callout">Ready to try it? Return to the <a href="/">PPTX upload</a>. Start with a small copy of your deck if you want to verify the format before converting the whole playbook.</p>
+      <p class="callout">Ready to try it? Start with a small copy of your deck if you want to verify the format before converting the whole playbook.</p>
+      <p class="bottom-action"><a class="converter-cta" href="/converter">OK, take me to the converter &rarr;</a></p>
     </section>
   </main>
 
   <footer>
-    <a href="/">PPTX upload</a> &middot; <a href="/help">Help</a> &middot; <a href="#top">Back to top</a>
+    <a href="/">GSS Playbook home</a> &middot; <a href="/converter">PPTX converter</a> &middot; <a href="/help">Help</a> &middot; <a href="#top">Back to top</a>
   </footer>
 
 </body>

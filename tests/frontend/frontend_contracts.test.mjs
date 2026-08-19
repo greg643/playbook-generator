@@ -6,6 +6,7 @@ import vm from 'node:vm';
 const read = name => readFileSync(new URL(`../../dashboard/${name}`, import.meta.url), 'utf8');
 const editor = read('editor.html');
 const index = read('index.html');
+const converter = read('converter.html');
 const help = read('help.html');
 const pptxGuide = read('pptx-guide.html');
 
@@ -14,7 +15,11 @@ function inlineScripts(html) {
 }
 
 test('inline frontend scripts compile', () => {
-  for (const [name, html] of [['editor.html', editor], ['index.html', index]]) {
+  for (const [name, html] of [
+    ['editor.html', editor],
+    ['index.html', index],
+    ['converter.html', converter],
+  ]) {
     const scripts = inlineScripts(html);
     assert.ok(scripts.length, `${name} should contain an inline script`);
     scripts.forEach((source, i) => assert.doesNotThrow(
@@ -24,7 +29,7 @@ test('inline frontend scripts compile', () => {
 });
 
 test('polling is sequential and bounded on both generation surfaces', () => {
-  for (const html of [editor, index]) {
+  for (const html of [editor, converter]) {
     assert.doesNotMatch(html, /\bsetInterval\s*\(/);
     assert.match(html, /POLL_TIMEOUT_MS\s*=\s*10\s*\*\s*60\s*\*\s*1000/);
     assert.match(html, /pollTimer\s*=\s*setTimeout\(poll,\s*POLL_INTERVAL_MS\)/);
@@ -90,15 +95,59 @@ test('authentication and account actions cannot apply stale responses', () => {
 });
 
 test('download labels are built without an HTML injection sink', () => {
-  assert.doesNotMatch(index, /\.innerHTML\s*=/);
-  assert.match(index, /a\.appendChild\(document\.createTextNode/);
+  assert.doesNotMatch(converter, /\.innerHTML\s*=/);
+  assert.match(converter, /a\.appendChild\(document\.createTextNode/);
 });
 
 test('responsive and keyboard contracts stay present', () => {
   assert.match(editor, /@media \(max-width: 820px\)/);
-  assert.match(index, /id="dropZone" role="button" tabindex="0"/);
-  assert.match(index, /dropZone\.addEventListener\('keydown'/);
+  assert.match(converter, /id="dropZone" role="button" tabindex="0"/);
+  assert.match(converter, /dropZone\.addEventListener\('keydown'/);
   assert.match(editor, /role="dialog" aria-modal="true"/);
+});
+
+test('home is an authenticated two-choice hub, not an upload surface', () => {
+  assert.match(index, /<title>GSS Playbook/);
+  assert.match(index, /<form id="signinForm"/);
+  assert.match(index, /authSubmit\('\/api\/auth\/login'\)/);
+  assert.match(index, /authSubmit\('\/api\/auth\/register'\)/);
+  assert.match(index, /fetch\('\/api\/auth\/recover'/);
+  assert.match(index, /class="choice editor-choice" href="\/editor"/);
+  assert.match(index, /class="choice converter" href="\/pptx-guide"/);
+  assert.match(index, />Play Editor<\/h2>/);
+  assert.match(index, />PPTX Converter<\/h2>/);
+  assert.doesNotMatch(index, /id="dropZone"/);
+  assert.doesNotMatch(index, /['"]\/api\/upload['"]/);
+});
+
+test('home preserves one-time recovery codes until explicit acknowledgement', () => {
+  assert.match(index, /function showRecoveryCode/);
+  assert.match(index, /recoveryModalOpen\s*=\s*true/);
+  assert.match(index, /if \(event\.key === 'Escape'\)[\s\S]*?event\.preventDefault\(\)/);
+  assert.match(index, /saveRecoveryBtn\.addEventListener\('click'/);
+  assert.match(index, /beforeunload[\s\S]*?recoveryModalOpen/);
+  assert.match(index, /const focusable = \[recoveryCode, copyRecoveryBtn, saveRecoveryBtn\]/);
+  assert.match(index, /document\.querySelector\('main'\)\.inert = true/);
+  assert.match(index, /verifyAccount\(data\.userId, epoch\)/);
+});
+
+test('cold signed-out editor visits use home while in-editor reauthentication stays local', () => {
+  assert.match(editor, /finish-deletion/);
+  assert.match(editor, /res\.status === 401 && !finishingDeletion/);
+  assert.match(editor, /window\.location\.replace\('\/'\)/);
+  assert.match(editor, /function showAuthView/);
+  assert.match(editor, /doc && saveState !== 'saved' && docOwner === userId/);
+  assert.match(index, /href="\/editor\?finish-deletion=1"/);
+});
+
+test('converter stays hidden until auth succeeds and returns signed-out users home', () => {
+  assert.match(converter, /id="converterApp" hidden/);
+  assert.match(converter, /fetch\('\/api\/auth\/me', \{ cache: 'no-store' \}\)/);
+  assert.match(converter, /res\.status === 401/);
+  assert.match(converter, /const target = '\/\?signin=converter'/);
+  assert.match(converter, /window\.location\.replace\(target\)/);
+  assert.match(converter, /converterApp\.hidden = false/);
+  assert.match(converter, /generationFetch\('\/api\/upload'/);
 });
 
 test('help names the Arrow and Block controls shown by the editor', () => {
@@ -108,7 +157,7 @@ test('help names the Arrow and Block controls shown by the editor', () => {
 });
 
 test('wristband compatibility guidance is accurate and links safely', () => {
-  for (const html of [index, help]) {
+  for (const html of [converter, help]) {
     assert.match(html, /4\.40 &times; 2\.09 in/);
     assert.match(html, /2 5\/8 &times; 4 5\/8 in/);
     assert.doesNotMatch(html, /2\.75 &times; 4\.75 in/);
@@ -124,10 +173,10 @@ test('wristband compatibility guidance is accurate and links safely', () => {
 });
 
 test('PPTX guidance matches the deterministic multi-page converter', () => {
-  for (const html of [index, help]) {
+  for (const html of [converter, help]) {
     assert.match(html, /href="\/pptx-guide"/);
   }
-  assert.match(index, /no section separators[\s\S]*treated[\s\S]*offense/i);
+  assert.match(converter, /no section separators[\s\S]*treated[\s\S]*offense/i);
   assert.match(help, /no LLM/i);
   assert.match(help, /64 offense/);
   assert.match(help, /16 plays per page/);
@@ -140,6 +189,8 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   assert.match(pptxGuide, /Start with OFFENSE if offense comes first/);
   assert.match(pptxGuide, /actual rectangle geometry/);
   assert.match(pptxGuide, /No LLM/);
+  assert.match(pptxGuide, /class="converter-cta" href="\/converter">OK, take me to the converter/);
+  assert.match(pptxGuide, /href="\/">&larr; GSS Playbook home/);
   assert.doesNotMatch(pptxGuide, /<script\b/i);
   assert.doesNotMatch(pptxGuide, /(?:src|href)="https?:/i);
 });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playbook Editor</title>
+  <title>GSS Playbook Editor &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -517,8 +517,8 @@
 <body>
 
   <div class="topbar">
-    <h1>Playbook Editor</h1>
-    <a class="back" href="/">&larr; PPTX upload</a>
+    <h1>GSS Playbook Editor</h1>
+    <a class="back" href="/">&larr; Home</a>
     <div class="spacer"></div>
     <a class="back" href="/help" target="_blank" rel="noopener">Help</a>
     <span class="email" id="userEmail"></span>
@@ -530,7 +530,7 @@
     <div class="splash">
       <div class="splash-pitch">
         <h2 class="splash-title">Draw your plays.<br>Print your game day.</h2>
-        <p class="splash-sub">A playbook editor built for 6v6 flag football &mdash; design plays in the
+        <p class="splash-sub">GSS Playbook by Greenwich Sports Systems is built for 6v6 flag football &mdash; design plays in the
           browser and generate coach cards and cut-out wristband inserts in one click.</p>
         <ul class="splash-points">
           <li>&#9989; Fixed player chips &mdash; drag the formation, draw the routes</li>
@@ -3285,7 +3285,7 @@ signOutBtn.addEventListener('click', async () => {
   try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
   if (epoch !== authEpoch) return;
   discardLocalDoc();
-  showAuthView();
+  window.location.assign('/');
 });
 
 // ---------- Init ----------
@@ -3324,6 +3324,11 @@ syncStyleUI();
       const data = await res.json();
       if (epoch !== authEpoch) return;
       await enterEditor(data.email, data.userId, epoch);
+      return;
+    }
+    const finishingDeletion = new URLSearchParams(window.location.search).get('finish-deletion') === '1';
+    if (res.status === 401 && !finishingDeletion) {
+      window.location.replace('/');
       return;
     }
   } catch { /* fall through */ }

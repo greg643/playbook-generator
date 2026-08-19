@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSS Playbook PPTX Converter &mdash; Greenwich Sports Systems</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e1e4e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    [hidden] { display: none !important; }
+
+    .converter-app {
+      display: flex;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .auth-check {
+      display: grid;
+      min-height: 55vh;
+      place-items: center;
+      color: #8b949e;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .auth-check a { color: #58a6ff; }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #30363d;
+      border-radius: 8px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #58a6ff;
+      background: rgba(88, 166, 255, 0.05);
+    }
+    .drop-zone:focus-visible {
+      outline: 2px solid #58a6ff;
+      outline-offset: 3px;
+      border-color: #58a6ff;
+    }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .drop-zone p { color: #8b949e; font-size: 0.9rem; }
+    .drop-zone .file-name {
+      color: #58a6ff;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      word-break: break-all;
+    }
+
+    input[type="file"] { display: none; }
+
+    /* Button */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary {
+      background: #238636;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2f7d3a; }
+    .btn-primary:disabled {
+      background: #21262d;
+      color: #484f58;
+      cursor: not-allowed;
+    }
+
+    /* Progress */
+    .progress-section {
+      margin-top: 1.5rem;
+      display: none;
+    }
+    .progress-section.active { display: block; }
+
+    .progress-bar-container {
+      background: #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 8px;
+      margin: 0.75rem 0;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #58a6ff;
+      border-radius: 6px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+    .progress-bar.indeterminate {
+      width: 30%;
+      animation: indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes indeterminate {
+      0% { margin-left: 0; }
+      50% { margin-left: 70%; }
+      100% { margin-left: 0; }
+    }
+
+    .status-text {
+      color: #8b949e;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    /* Downloads */
+    .downloads {
+      margin-top: 1.5rem;
+      display: none;
+    }
+    .downloads.active { display: block; }
+    .downloads h3 {
+      margin-bottom: 0.75rem;
+      color: #58a6ff;
+      font-size: 1rem;
+    }
+
+    .dl-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .dl-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e1e4e8;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .dl-btn:hover {
+      border-color: #58a6ff;
+      background: #161b22;
+    }
+    .dl-btn .dl-icon { font-size: 1.1rem; }
+
+    /* Error */
+    .error-msg {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      color: #f85149;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .error-msg.active { display: block; }
+
+    /* Editor link */
+    .pill-links {
+      display: flex;
+      gap: 0.5rem;
+      margin: -1.4rem 0 1.8rem;
+    }
+    .editor-link {
+      display: inline-block;
+      padding: 0.3rem 0.85rem;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      color: #58a6ff;
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .editor-link:hover { border-color: #58a6ff; }
+
+    /* Reset link */
+    .reset-link {
+      display: none;
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .reset-link.active { display: block; }
+    .reset-link a {
+      color: #58a6ff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .reset-link a:hover { text-decoration: underline; }
+
+    /* Auth */
+    .drop-zone.disabled {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .signed-in {
+      display: none;
+      margin-top: 1rem;
+      text-align: center;
+      color: #8b949e;
+      font-size: 0.8rem;
+    }
+    .signed-in.active { display: block; }
+
+    .section-select {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 1.5rem;
+    }
+    .section-select label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .compatibility-note {
+      margin-top: 1rem;
+      padding: 0.75rem 0.85rem;
+      background: rgba(88, 166, 255, 0.06);
+      border: 1px solid rgba(88, 166, 255, 0.35);
+      border-radius: 8px;
+      color: #c9d1d9;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .compatibility-note a { color: #58a6ff; }
+    .compatibility-note .disclosure { color: #8b949e; }
+    .reset-action {
+      appearance: none;
+      border: 0;
+      padding: 0;
+      background: none;
+      color: #58a6ff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    .reset-action:hover { text-decoration: underline; }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 2px solid #58a6ff;
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 560px) {
+      body { padding: 1.25rem 0.75rem; }
+      h1 { font-size: 1.5rem; text-align: center; }
+      .subtitle { text-align: center; margin-bottom: 1.5rem; }
+      .pill-links { margin-top: -1rem; margin-bottom: 1.25rem; flex-wrap: wrap; justify-content: center; }
+      .card { padding: 1.25rem; }
+      .drop-zone { padding: 2rem 0.75rem; }
+      .section-select, .dl-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+    .format-hint { font-size: 0.85rem; opacity: 0.75; margin: 0.6rem 0 1rem; }
+    .format-hint a { color: #79c0ff; }
+    .title-note { font-size: 0.85em; opacity: 0.7; }
+  </style>
+</head>
+<body>
+
+  <div class="auth-check" id="authCheck" role="status" aria-live="polite">
+    <div>
+      <p id="authCheckMessage">Checking your account&hellip;</p>
+      <p id="authCheckHelp" hidden>We could not verify your session. <a href="/converter">Try again</a> or <a href="/">return home</a>.</p>
+    </div>
+  </div>
+
+  <main class="converter-app" id="converterApp" hidden>
+    <p class="title-note">Greenwich Sports Systems</p>
+    <h1>GSS Playbook &mdash; PPTX Converter</h1>
+    <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
+    <div class="pill-links">
+      <a class="editor-link" href="/">&#8592; Home</a>
+      <a class="editor-link" href="/pptx-guide">&#128209; PPTX Guide</a>
+      <a class="editor-link" href="/help">&#128214; Help</a>
+    </div>
+
+    <div class="card">
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-controls="fileInput" aria-describedby="dropInstructions">
+        <div class="icon">&#128196;</div>
+        <p id="dropInstructions">Drag &amp; drop a <strong>.pptx</strong> file here, or click to browse</p>
+        <div class="file-name" id="fileName"></div>
+      </div>
+      <input type="file" id="fileInput" accept=".pptx" aria-label="Choose PowerPoint playbook">
+
+      <p class="format-hint">Deck format: use one play per slide with one large rectangle shape
+      marking the field. If the deck has no section separators, every recognized play is treated
+      as <strong>offense</strong>. For a mixed deck, add <strong>Offense</strong> and
+      <strong>Defense</strong> separator slides. Offense playbooks continue onto extra PDF pages
+      after play 16, up to 64 plays. See the <a href="/pptx-guide">visual PPTX guide</a>.</p>
+
+      <div class="section-select" role="group" aria-label="PDF outputs">
+        <label>
+          <input type="checkbox" id="chkOffenseCoach" checked> Offense Coach Card
+        </label>
+        <label>
+          <input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card
+        </label>
+        <label>
+          <input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband
+        </label>
+        <label>
+          <input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband
+        </label>
+        <label>
+          <input type="checkbox" id="chkOffenseTitle"> Offense wristband title <span class="title-note">(&le;6 plays)</span>
+        </label>
+        <label>
+          <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(&le;6 plays)</span>
+        </label>
+      </div>
+
+      <p class="compatibility-note"><strong>Wristband fit &amp; finishing:</strong> Each PDF cut-out group is about
+        <strong>4.40 &times; 2.09 in</strong> and is designed to fit the
+        <a href="https://www.amazon.com/dp/B07QHCVV7M?th=1" target="_blank" rel="noopener noreferrer"
+           aria-label="WristCoaches adult three-panel wrist coach on Amazon (opens in a new tab)">WristCoaches adult three-panel holder</a>&rsquo;s
+        <strong>2 5/8 &times; 4 5/8 in</strong> window when the long edges align. Print at <strong>100%</strong> scale and
+        <strong>laminate before cutting</strong>; an optional
+        <a href="https://www.amazon.com/Fiskars-SureCut-Portable-Paper-Trimmer/dp/B000OMYB18/" target="_blank" rel="noopener noreferrer"
+           aria-label="Fiskars SureCut portable paper trimmer on Amazon (opens in a new tab)">compact paper trimmer</a>
+        makes straight cuts easy.
+        <span class="disclosure">Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</span></p>
+
+      <button class="btn btn-primary" id="generateBtn" disabled>Convert PPTX</button>
+
+      <div class="progress-section" id="progressSection" role="status" aria-live="polite">
+        <div class="progress-bar-container">
+          <div class="progress-bar indeterminate" id="progressBar"></div>
+        </div>
+        <p class="status-text" id="statusText">Uploading...</p>
+      </div>
+
+      <div class="downloads" id="downloads" aria-live="polite">
+        <h3>Your PDFs are ready</h3>
+        <div class="dl-grid" id="dlGrid"></div>
+      </div>
+
+      <div class="error-msg" id="errorMsg" role="alert" aria-live="assertive"></div>
+
+      <div class="reset-link" id="resetLink">
+        <button type="button" class="reset-action" id="resetBtn">Generate another playbook</button>
+      </div>
+
+      <p class="signed-in" id="signedInLine" role="status"></p>
+    </div>
+  </main>
+
+<script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileName = document.getElementById('fileName');
+  const generateBtn = document.getElementById('generateBtn');
+  const progressSection = document.getElementById('progressSection');
+  const progressBar = document.getElementById('progressBar');
+  const statusText = document.getElementById('statusText');
+  const downloads = document.getElementById('downloads');
+  const dlGrid = document.getElementById('dlGrid');
+  const errorMsg = document.getElementById('errorMsg');
+  const resetLink = document.getElementById('resetLink');
+  const resetBtn = document.getElementById('resetBtn');
+  const signedInLine = document.getElementById('signedInLine');
+  const authCheck = document.getElementById('authCheck');
+  const authCheckMessage = document.getElementById('authCheckMessage');
+  const authCheckHelp = document.getElementById('authCheckHelp');
+  const converterApp = document.getElementById('converterApp');
+
+  const chkOffenseCoach = document.getElementById('chkOffenseCoach');
+  const chkOffenseWrist = document.getElementById('chkOffenseWrist');
+  const chkDefenseCoach = document.getElementById('chkDefenseCoach');
+  const chkDefenseWrist = document.getElementById('chkDefenseWrist');
+  const chkOffenseTitle = document.getElementById('chkOffenseTitle');
+  const chkDefenseTitle = document.getElementById('chkDefenseTitle');
+
+  let selectedFile = null;
+  let pollTimer = null;
+  let signedIn = false;
+  let generating = false;
+  let generationEpoch = 0;
+  let activeRequest = null;
+  const POLL_INTERVAL_MS = 3000;
+  const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+  const POLL_REQUEST_TIMEOUT_MS = 15000;
+  const MAX_POLL_FAILURES = 3;
+  const JOB_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  const FRIENDLY_NAMES = {
+    'offense_coach_card.pdf': 'Offense Coach Card',
+    'defense_coach_card.pdf': 'Defense Coach Card',
+    'offense_wristband.pdf': 'Offense Wristband',
+    'defense_wristband.pdf': 'Defense Wristband',
+  };
+
+  const FRIENDLY_ICONS = {
+    'offense_coach_card.pdf': '\u{1F3C8}',
+    'defense_coach_card.pdf': '\u{1F6E1}\uFE0F',
+    'offense_wristband.pdf': '\u23F0',
+    'defense_wristband.pdf': '\u23F0',
+  };
+
+  // Drop zone events
+  dropZone.addEventListener('click', () => {
+    if (signedIn && !generating) fileInput.click();
+  });
+  dropZone.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (signedIn && !generating) fileInput.click();
+  });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) selectFile(file);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  });
+
+  function selectFile(file) {
+    if (!signedIn || generating) return;
+    if (!file || !file.name.toLowerCase().endsWith('.pptx')) {
+      selectedFile = null;
+      fileInput.value = '';
+      fileName.textContent = '';
+      showError('Choose a .pptx PowerPoint file');
+      syncGenerateButton();
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      selectedFile = null;
+      fileInput.value = '';
+      fileName.textContent = '';
+      showError('File too large (max 50 MB)');
+      syncGenerateButton();
+      return;
+    }
+    selectedFile = file;
+    fileName.textContent = file.name;
+    hideError();
+    syncGenerateButton();
+  }
+
+  const outputChecks = [chkOffenseCoach, chkOffenseWrist, chkDefenseCoach, chkDefenseWrist];
+  outputChecks.forEach(box => box.addEventListener('change', hideError));
+
+  function syncGenerateButton() {
+    generateBtn.disabled = generating || !signedIn || !selectedFile;
+    const canChooseFile = signedIn && !generating;
+    dropZone.classList.toggle('disabled', !canChooseFile);
+    dropZone.toggleAttribute('aria-disabled', !canChooseFile);
+    dropZone.tabIndex = canChooseFile ? 0 : -1;
+  }
+
+  function isGenerationCurrent(epoch) {
+    return generating && generationEpoch === epoch;
+  }
+
+  function cancelGeneration({ clearUI = false } = {}) {
+    generationEpoch++;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    if (activeRequest) activeRequest.abort();
+    activeRequest = null;
+    generating = false;
+    if (clearUI) {
+      progressSection.classList.remove('active');
+      downloads.classList.remove('active');
+      resetLink.classList.remove('active');
+      hideError();
+      dlGrid.replaceChildren();
+    }
+    syncGenerateButton();
+  }
+
+  function finishGeneration(epoch) {
+    if (!isGenerationCurrent(epoch)) return false;
+    generationEpoch++;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    if (activeRequest) activeRequest.abort();
+    activeRequest = null;
+    generating = false;
+    syncGenerateButton();
+    return true;
+  }
+
+  function failGeneration(epoch, message) {
+    if (!finishGeneration(epoch)) return;
+    showError(message);
+    resetLink.classList.add('active');
+  }
+
+  async function generationFetch(url, options, epoch, timeoutMs) {
+    if (!isGenerationCurrent(epoch)) throw new Error('Generation was cancelled');
+    const controller = new AbortController();
+    activeRequest = controller;
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (timedOut) throw new Error('The server request timed out');
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+      if (activeRequest === controller) activeRequest = null;
+    }
+  }
+
+  function transitionToSignedOut(message) {
+    cancelGeneration({ clearUI: true });
+    signedIn = false;
+    selectedFile = null;
+    fileInput.value = '';
+    fileName.textContent = '';
+    signedInLine.classList.remove('active');
+    signedInLine.textContent = '';
+    syncGenerateButton();
+    const target = '/?signin=converter';
+    if (message) window.location.assign(target);
+    else window.location.replace(target);
+  }
+
+  generateBtn.addEventListener('click', async () => {
+    if (!selectedFile || !signedIn) return;
+    const epoch = ++generationEpoch;
+    generating = true;
+    syncGenerateButton();
+    showProgress('Uploading...');
+    hideError();
+    downloads.classList.remove('active');
+    resetLink.classList.remove('active');
+
+    try {
+      if (!chkOffenseCoach.checked && !chkOffenseWrist.checked &&
+          !chkDefenseCoach.checked && !chkDefenseWrist.checked) {
+        showError('Select at least one output');
+        finishGeneration(epoch);
+        return;
+      }
+
+      const form = new FormData();
+      form.append('file', selectedFile);
+      form.append('offense_coach_card', chkOffenseCoach.checked);
+      form.append('offense_wristband', chkOffenseWrist.checked);
+      form.append('defense_coach_card', chkDefenseCoach.checked);
+      form.append('defense_wristband', chkDefenseWrist.checked);
+      form.append('show_offense_title', chkOffenseTitle.checked);
+      form.append('show_defense_title', chkDefenseTitle.checked);
+
+      const res = await generationFetch('/api/upload', { method: 'POST', body: form }, epoch, 120000);
+      if (!isGenerationCurrent(epoch)) return;
+      if (res.status === 401) {
+        transitionToSignedOut('Your session expired — sign in again to upload.');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      if (!data || typeof data.jobId !== 'string' || !JOB_ID_RE.test(data.jobId)) {
+        throw new Error('Upload started, but the server returned an invalid job ID');
+      }
+
+      showProgress('Processing your playbook...');
+      startPolling(data.jobId, epoch);
+    } catch (err) {
+      if (isGenerationCurrent(epoch)) failGeneration(epoch, err.message || 'Upload failed');
+    }
+  });
+
+  function startPolling(jobId, epoch) {
+    const startedAt = Date.now();
+    let failures = 0;
+
+    const schedule = () => {
+      if (!isGenerationCurrent(epoch)) return;
+      pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+    };
+
+    const poll = async () => {
+      pollTimer = null;
+      if (!isGenerationCurrent(epoch)) return;
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
+        failGeneration(epoch, 'Processing took too long. Please try again with a smaller playbook.');
+        return;
+      }
+      try {
+        const res = await generationFetch('/api/status/' + encodeURIComponent(jobId), {}, epoch, POLL_REQUEST_TIMEOUT_MS);
+        if (!isGenerationCurrent(epoch)) return;
+        if (res.status === 401) {
+          transitionToSignedOut('Your session expired — sign in again to continue.');
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          const err = new Error(data && data.error || 'Could not check processing status (' + res.status + ')');
+          err.fatal = res.status >= 400 && res.status < 500;
+          throw err;
+        }
+        if (!data || typeof data !== 'object' || Array.isArray(data) ||
+            !['processing', 'complete', 'error'].includes(data.status)) {
+          const err = new Error('The server returned an invalid processing status');
+          err.fatal = true;
+          throw err;
+        }
+        failures = 0;
+
+        if (data.status === 'complete') {
+          if (!Array.isArray(data.files) || !data.files.length ||
+              !data.files.every(f => typeof f === 'string' && f.length > 0 && f.length <= 200)) {
+            const err = new Error('Processing completed without a valid file list');
+            err.fatal = true;
+            throw err;
+          }
+          if (!finishGeneration(epoch)) return;
+          progressSection.classList.remove('active');
+          showDownloads(jobId, data.files);
+        } else if (data.status === 'error') {
+          let errText = data.message || 'Processing failed';
+          if (data.detail) errText += `\n\nDetail: ${data.detail}`;
+          failGeneration(epoch, errText);
+        } else {
+          const step = data.step || 'processing';
+          const msgs = {
+            downloading: 'Downloading your file...',
+            generating: 'Generating coach cards & wristbands...',
+            uploading: 'Uploading results...',
+          };
+          statusText.textContent = msgs[step] || `Processing... (${elapsed}s)`;
+          schedule();
+        }
+      } catch (err) {
+        if (!isGenerationCurrent(epoch)) return;
+        failures++;
+        if (err.fatal || failures >= MAX_POLL_FAILURES) {
+          failGeneration(epoch, err.message || 'Could not check processing status');
+        } else {
+          statusText.textContent = `Connection issue — retrying... (${elapsed}s)`;
+          schedule();
+        }
+      }
+    };
+
+    schedule();
+  }
+
+  function showProgress(msg) {
+    progressSection.classList.add('active');
+    statusText.textContent = msg;
+    progressBar.classList.add('indeterminate');
+  }
+
+  function showDownloads(jobId, files) {
+    dlGrid.replaceChildren();
+    files.forEach(f => {
+      const a = document.createElement('a');
+      a.className = 'dl-btn';
+      a.href = '/api/download/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(f);
+      const icon = document.createElement('span');
+      icon.className = 'dl-icon';
+      icon.textContent = FRIENDLY_ICONS[f] || '\u{1F4C4}';
+      a.appendChild(icon);
+      a.appendChild(document.createTextNode(FRIENDLY_NAMES[f] || f));
+      dlGrid.appendChild(a);
+    });
+    downloads.classList.add('active');
+    resetLink.classList.add('active');
+  }
+
+  function showError(msg) {
+    errorMsg.style.whiteSpace = 'pre-wrap';
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('active');
+    progressSection.classList.remove('active');
+  }
+
+  function hideError() {
+    errorMsg.classList.remove('active');
+  }
+
+  function resetUI() {
+    cancelGeneration({ clearUI: true });
+    selectedFile = null;
+    fileInput.value = '';
+    fileName.textContent = '';
+    chkOffenseCoach.checked = true;
+    chkOffenseWrist.checked = true;
+    chkDefenseCoach.checked = true;
+    chkDefenseWrist.checked = true;
+    syncGenerateButton();
+  }
+
+  resetBtn.addEventListener('click', resetUI);
+
+  // ---------- Init ----------
+
+  syncGenerateButton();
+  (async function initAuth() {
+    try {
+      const res = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (!data || typeof data.userId !== 'string' || !data.userId ||
+            typeof data.email !== 'string' || !data.email) {
+          throw new Error('Invalid account response');
+        }
+        signedIn = true;
+        signedInLine.textContent = `Signed in as ${data.email}`;
+        signedInLine.classList.add('active');
+        authCheck.hidden = true;
+        converterApp.hidden = false;
+        syncGenerateButton();
+        return;
+      }
+      if (res.status === 401) {
+        transitionToSignedOut();
+        return;
+      }
+      throw new Error('Could not verify your session');
+    } catch {
+      authCheckMessage.textContent = 'The converter is still locked because we could not verify your session.';
+      authCheckHelp.hidden = false;
+    }
+  })();
+</script>
+
+</body>
+</html>

@@ -3,753 +3,817 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playbook Generator</title>
+  <meta name="description" content="Draw flag football plays or convert a PowerPoint playbook into printable coach cards and wristband inserts.">
+  <title>GSS Playbook &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    :root {
+      color-scheme: dark;
+      --bg: #0f1117;
+      --panel: #161b22;
+      --panel-strong: #21262d;
+      --border: #30363d;
+      --text: #e1e4e8;
+      --muted: #8b949e;
+      --blue: #58a6ff;
+      --green: #238636;
+      --green-hover: #2f7d3a;
+      --red: #f85149;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f1117;
-      color: #e1e4e8;
       min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    button, input { font: inherit; }
+    [hidden] { display: none !important; }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 3px;
+    }
+
+    .topbar {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      padding: 2rem 1rem;
+      min-height: 58px;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: inline-grid;
+      width: 2.15rem;
+      height: 2.15rem;
+      place-items: center;
+      border: 1px solid #3fb950;
+      border-radius: 8px;
+      background: rgba(35, 134, 54, 0.16);
+      color: #7ee787;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+    }
+
+    .topbar .spacer { flex: 1; }
+
+    .top-link,
+    .link-button {
+      border: 0;
+      background: none;
+      color: var(--blue);
+      font-size: 0.85rem;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .top-link:hover,
+    .link-button:hover { text-decoration: underline; }
+    .link-button:disabled { color: var(--muted); cursor: wait; }
+
+    main {
+      width: 100%;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: clamp(2rem, 6vw, 4.5rem) 1rem 3rem;
+    }
+
+    .loading-view {
+      display: grid;
+      min-height: 45vh;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .loading-dot {
+      display: inline-block;
+      width: 0.55rem;
+      height: 0.55rem;
+      margin-right: 0.45rem;
+      border-radius: 50%;
+      background: var(--blue);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse { 50% { opacity: 0.3; transform: scale(0.8); } }
+
+    .auth-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+      gap: clamp(2rem, 6vw, 4.5rem);
+      align-items: start;
+    }
+
+    .eyebrow {
+      margin-bottom: 0.55rem;
+      color: #7ee787;
+      font-size: 0.75rem;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
     }
 
     h1 {
-      font-size: 1.8rem;
-      margin-bottom: 0.25rem;
+      max-width: 650px;
       color: #fff;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      line-height: 1.06;
+      letter-spacing: -0.025em;
     }
 
-    .subtitle {
-      color: #8b949e;
-      margin-bottom: 2rem;
+    .intro {
+      max-width: 620px;
+      margin-top: 1rem;
+      color: #c9d1d9;
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+
+    .feature-list {
+      display: grid;
+      gap: 0.55rem;
+      margin-top: 1.25rem;
+      list-style: none;
+    }
+
+    .feature-list li { font-size: 0.9rem; line-height: 1.5; }
+    .feature-list .check { margin-right: 0.45rem; color: #7ee787; font-weight: 800; }
+
+    .play-preview {
+      overflow: hidden;
+      max-width: 520px;
+      margin-top: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f6f8fa;
+      box-shadow: 0 16px 35px rgba(0, 0, 0, 0.24);
+    }
+
+    .play-preview svg { display: block; width: 100%; height: auto; }
+
+    .card {
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    .card h2 { color: #fff; font-size: 1.3rem; }
+    .card-sub { margin: 0.45rem 0 1.2rem; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+
+    .signin-notice {
+      margin-bottom: 1rem;
+      padding: 0.7rem 0.8rem;
+      border: 1px solid rgba(88, 166, 255, 0.45);
+      border-radius: 8px;
+      background: rgba(88, 166, 255, 0.08);
+      color: #c9d1d9;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .field {
+      display: block;
+      margin-bottom: 0.9rem;
+      color: #c9d1d9;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .field input {
+      display: block;
+      width: 100%;
+      margin-top: 0.35rem;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0d1117;
+      color: var(--text);
       font-size: 0.95rem;
     }
 
-    .card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 12px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 520px;
-    }
+    .field input:focus { border-color: var(--blue); outline: 2px solid transparent; }
 
-    /* Drop zone */
-    .drop-zone {
-      border: 2px dashed #30363d;
+    .error-msg {
+      display: none;
+      margin-bottom: 0.9rem;
+      padding: 0.7rem 0.75rem;
+      border: 1px solid var(--red);
       border-radius: 8px;
-      padding: 2.5rem 1rem;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: #58a6ff;
-      background: rgba(88, 166, 255, 0.05);
-    }
-    .drop-zone:focus-visible {
-      outline: 2px solid #58a6ff;
-      outline-offset: 3px;
-      border-color: #58a6ff;
-    }
-    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .drop-zone p { color: #8b949e; font-size: 0.9rem; }
-    .drop-zone .file-name {
-      color: #58a6ff;
-      font-weight: 600;
-      margin-top: 0.5rem;
-      word-break: break-all;
+      background: rgba(248, 81, 73, 0.08);
+      color: #ff7b72;
+      font-size: 0.82rem;
+      line-height: 1.45;
     }
 
-    input[type="file"] { display: none; }
+    .error-msg.active { display: block; }
+    .deletion-help { margin: -0.35rem 0 0.9rem; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+    .deletion-help a { color: var(--blue); }
 
-    /* Button */
     .btn {
       display: block;
       width: 100%;
-      padding: 0.75rem;
-      margin-top: 1.25rem;
-      border: none;
+      padding: 0.7rem 0.9rem;
+      border: 1px solid transparent;
       border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
+      font-size: 0.92rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
     }
-    .btn-primary {
-      background: #238636;
+
+    .btn + .btn { margin-top: 0.55rem; }
+    .btn-primary { background: var(--green); color: #fff; }
+    .btn-primary:hover { background: var(--green-hover); }
+    .btn-secondary { border-color: var(--border); background: var(--panel-strong); color: var(--text); }
+    .btn-secondary:hover { border-color: var(--blue); }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+
+    .auth-links { margin-top: 0.9rem; text-align: center; font-size: 0.8rem; }
+    .auth-links a { color: var(--blue); text-decoration: none; }
+    .auth-links a:hover { text-decoration: underline; }
+
+    .hub {
+      max-width: 820px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .hub h1 { max-width: none; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+    .hub-sub { margin: 0.7rem auto 0; color: var(--muted); line-height: 1.6; }
+    .account-line { margin-top: 0.7rem; color: #c9d1d9; font-size: 0.85rem; }
+    .account-line strong { color: #fff; font-weight: 600; }
+    .account-line button { margin-left: 0.65rem; }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+      text-align: left;
+    }
+
+    .choice {
+      display: flex;
+      min-height: 210px;
+      flex-direction: column;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--text);
+      text-decoration: none;
+      transition: transform 0.18s, border-color 0.18s, background 0.18s;
+    }
+
+    .choice:hover {
+      transform: translateY(-2px);
+      border-color: var(--blue);
+      background: var(--panel-strong);
+    }
+
+    .choice.converter:hover { border-color: #3fb950; }
+    .choice-icon { font-size: 2rem; line-height: 1; }
+    .choice h2 { margin-top: 1rem; color: #fff; font-size: 1.3rem; }
+    .choice p { margin-top: 0.45rem; color: var(--muted); font-size: 0.9rem; line-height: 1.55; }
+    .choice-action { margin-top: auto; padding-top: 1rem; color: var(--blue); font-size: 0.88rem; font-weight: 700; }
+    .converter .choice-action { color: #7ee787; }
+
+    .hub-help { margin-top: 1.4rem; color: var(--muted); font-size: 0.82rem; }
+    .hub-help a { color: var(--blue); }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(1, 4, 9, 0.78);
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 430px;
+      padding: 1.35rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal h2 { color: #fff; font-size: 1.15rem; }
+    .modal p { margin-top: 0.55rem; color: var(--muted); font-size: 0.85rem; line-height: 1.55; }
+    .recovery-code {
+      margin: 1rem 0;
+      padding: 0.75rem;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0d1117;
       color: #fff;
-    }
-    .btn-primary:hover { background: #2ea043; }
-    .btn-primary:disabled {
-      background: #21262d;
-      color: #484f58;
-      cursor: not-allowed;
-    }
-
-    /* Progress */
-    .progress-section {
-      margin-top: 1.5rem;
-      display: none;
-    }
-    .progress-section.active { display: block; }
-
-    .progress-bar-container {
-      background: #21262d;
-      border-radius: 6px;
-      overflow: hidden;
-      height: 8px;
-      margin: 0.75rem 0;
-    }
-    .progress-bar {
-      height: 100%;
-      background: #58a6ff;
-      border-radius: 6px;
-      transition: width 0.3s;
-      width: 0%;
-    }
-    .progress-bar.indeterminate {
-      width: 30%;
-      animation: indeterminate 1.5s ease-in-out infinite;
-    }
-    @keyframes indeterminate {
-      0% { margin-left: 0; }
-      50% { margin-left: 70%; }
-      100% { margin-left: 0; }
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1.05rem;
+      letter-spacing: 0.05em;
+      text-align: center;
+      user-select: all;
     }
 
-    .status-text {
-      color: #8b949e;
-      font-size: 0.85rem;
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.55rem; }
+    .modal-actions .btn { width: auto; margin: 0; }
+
+    footer {
+      padding: 1rem 1rem 2rem;
+      color: var(--muted);
+      font-size: 0.76rem;
       text-align: center;
     }
 
-    /* Downloads */
-    .downloads {
-      margin-top: 1.5rem;
-      display: none;
-    }
-    .downloads.active { display: block; }
-    .downloads h3 {
-      margin-bottom: 0.75rem;
-      color: #58a6ff;
-      font-size: 1rem;
+    footer a { color: var(--blue); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 760px) {
+      main { padding-top: 2rem; }
+      .auth-layout { grid-template-columns: 1fr; gap: 2rem; }
+      .auth-copy { text-align: center; }
+      .intro, .play-preview { margin-right: auto; margin-left: auto; }
+      .feature-list { max-width: 520px; margin-right: auto; margin-left: auto; text-align: left; }
+      .card { width: 100%; max-width: 440px; margin: 0 auto; }
     }
 
-    .dl-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-    }
-
-    .dl-btn {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.6rem 0.75rem;
-      background: #21262d;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      color: #e1e4e8;
-      text-decoration: none;
-      font-size: 0.82rem;
-      font-weight: 500;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    .dl-btn:hover {
-      border-color: #58a6ff;
-      background: #161b22;
-    }
-    .dl-btn .dl-icon { font-size: 1.1rem; }
-
-    /* Error */
-    .error-msg {
-      margin-top: 1rem;
-      padding: 0.75rem;
-      background: rgba(248, 81, 73, 0.1);
-      border: 1px solid #f85149;
-      border-radius: 8px;
-      color: #f85149;
-      font-size: 0.85rem;
-      display: none;
-    }
-    .error-msg.active { display: block; }
-
-    /* Editor link */
-    .pill-links {
-      display: flex;
-      gap: 0.5rem;
-      margin: -1.4rem 0 1.8rem;
-    }
-    .editor-link {
-      display: inline-block;
-      padding: 0.3rem 0.85rem;
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 999px;
-      color: #58a6ff;
-      font-size: 0.85rem;
-      text-decoration: none;
-      transition: border-color 0.2s;
-    }
-    .editor-link:hover { border-color: #58a6ff; }
-
-    /* Reset link */
-    .reset-link {
-      display: none;
-      margin-top: 1rem;
-      text-align: center;
-    }
-    .reset-link.active { display: block; }
-    .reset-link a {
-      color: #58a6ff;
-      cursor: pointer;
-      font-size: 0.85rem;
-      text-decoration: none;
-    }
-    .reset-link a:hover { text-decoration: underline; }
-
-    /* Auth */
-    .drop-zone.disabled {
-      pointer-events: none;
-      opacity: 0.5;
-    }
-    .auth-notice {
-      margin-bottom: 1.25rem;
-      padding: 0.75rem;
-      background: rgba(88, 166, 255, 0.08);
-      border: 1px solid #58a6ff;
-      border-radius: 8px;
-      color: #e1e4e8;
-      font-size: 0.85rem;
-      text-align: center;
-      display: none;
-    }
-    .auth-notice.active { display: block; }
-    .auth-notice a { color: #58a6ff; text-decoration: none; }
-    .auth-notice a:hover { text-decoration: underline; }
-    .signed-in {
-      display: none;
-      margin-top: 1rem;
-      text-align: center;
-      color: #8b949e;
-      font-size: 0.8rem;
-    }
-    .signed-in.active { display: block; }
-
-    .section-select {
-      margin-top: 1rem;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem 1.5rem;
-    }
-    .section-select label {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-    .compatibility-note {
-      margin-top: 1rem;
-      padding: 0.75rem 0.85rem;
-      background: rgba(88, 166, 255, 0.06);
-      border: 1px solid rgba(88, 166, 255, 0.35);
-      border-radius: 8px;
-      color: #c9d1d9;
-      font-size: 0.82rem;
-      line-height: 1.5;
-    }
-    .compatibility-note a { color: #58a6ff; }
-    .compatibility-note .disclosure { color: #8b949e; }
-    .reset-action {
-      appearance: none;
-      border: 0;
-      padding: 0;
-      background: none;
-      color: #58a6ff;
-      cursor: pointer;
-      font: inherit;
-      font-size: 0.85rem;
-    }
-    .reset-action:hover { text-decoration: underline; }
-    button:focus-visible, a:focus-visible, input:focus-visible {
-      outline: 2px solid #58a6ff;
-      outline-offset: 2px;
-    }
-
-    @media (max-width: 560px) {
-      body { padding: 1.25rem 0.75rem; }
-      h1 { font-size: 1.5rem; text-align: center; }
-      .subtitle { text-align: center; margin-bottom: 1.5rem; }
-      .pill-links { margin-top: -1rem; margin-bottom: 1.25rem; flex-wrap: wrap; justify-content: center; }
-      .card { padding: 1.25rem; }
-      .drop-zone { padding: 2rem 0.75rem; }
-      .section-select, .dl-grid { grid-template-columns: 1fr; }
+    @media (max-width: 620px) {
+      .choice-grid { grid-template-columns: 1fr; }
+      .choice { min-height: 175px; }
+      .account-line button { display: block; margin: 0.55rem auto 0; }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
-    .format-hint { font-size: 0.85rem; opacity: 0.75; margin: 0.6rem 0 1rem; }
-    .title-note { font-size: 0.85em; opacity: 0.7; }
   </style>
 </head>
 <body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">GSS</span><span>GSS Playbook</span></a>
+    <div class="spacer"></div>
+    <a class="top-link" href="/help">Help</a>
+  </header>
 
-  <h1>Playbook Generator</h1>
-  <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
-  <div class="pill-links">
-    <a class="editor-link" href="/editor">&#9999;&#65039; Play Editor (beta)</a>
-    <a class="editor-link" href="/pptx-guide">&#128209; PPTX Guide</a>
-    <a class="editor-link" href="/help">&#128214; Help</a>
-  </div>
+  <main>
+    <section class="loading-view" id="loadingView" aria-live="polite">
+      <p><span class="loading-dot" aria-hidden="true"></span>Checking your account&hellip;</p>
+    </section>
 
-  <div class="card">
-    <div class="auth-notice" id="authNotice" role="status">
-      Sign in to upload &mdash; the <a href="/editor">play editor</a> account works here too
-    </div>
-    <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-controls="fileInput" aria-describedby="dropInstructions">
-      <div class="icon">&#128196;</div>
-      <p id="dropInstructions">Drag &amp; drop a <strong>.pptx</strong> file here, or click to browse</p>
-      <div class="file-name" id="fileName"></div>
-    </div>
-    <input type="file" id="fileInput" accept=".pptx" aria-label="Choose PowerPoint playbook">
+    <section id="authView" hidden>
+      <div class="auth-layout">
+        <div class="auth-copy">
+          <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook</p>
+          <h1>Build your playbook.<br>Print your game day.</h1>
+          <p class="intro">Draw plays in the browser or convert an existing PowerPoint deck into coach cards and wristband inserts.</p>
+          <ul class="feature-list">
+            <li><span class="check" aria-hidden="true">&#10003;</span>Design, organize, and save plays in the browser</li>
+            <li><span class="check" aria-hidden="true">&#10003;</span>Convert compatible .pptx decks without sharing your scheme with an LLM</li>
+            <li><span class="check" aria-hidden="true">&#10003;</span>Generate print-ready coach cards and wristband inserts</li>
+          </ul>
+          <div class="play-preview" aria-hidden="true">
+            <svg viewBox="0 0 920 420" xmlns="http://www.w3.org/2000/svg">
+              <rect width="920" height="420" fill="#fff"/>
+              <rect x="5" y="5" width="910" height="410" rx="4" fill="none" stroke="#111" stroke-width="10"/>
+              <line x1="5" y1="95" x2="915" y2="95" stroke="#111" stroke-width="8"/>
+              <text x="78" y="64" fill="#111" font-family="Arial,sans-serif" font-size="52" text-anchor="middle">7</text>
+              <text x="500" y="64" fill="#111" font-family="Arial,sans-serif" font-size="43" font-weight="700" text-anchor="middle">DAGGER</text>
+              <line x1="25" y1="282" x2="895" y2="282" stroke="#1f6e8c" stroke-width="7" stroke-dasharray="22 16"/>
+              <g font-family="Arial,sans-serif" font-size="34" font-weight="700" text-anchor="middle" dominant-baseline="central">
+                <circle cx="110" cy="315" r="35" fill="#c00000" stroke="#111" stroke-width="4"/><text x="110" y="315" fill="#fff">1</text>
+                <circle cx="250" cy="315" r="35" fill="#ffc000" stroke="#111" stroke-width="4"/><text x="250" y="315" fill="#1f3864">2</text>
+                <circle cx="390" cy="315" r="35" fill="#7030a0" stroke="#111" stroke-width="4"/><text x="390" y="315" fill="#fff">3</text>
+                <circle cx="530" cy="315" r="35" fill="#00b050" stroke="#111" stroke-width="4"/><text x="530" y="315" fill="#fff">4</text>
+                <circle cx="670" cy="365" r="35" fill="#ffff00" stroke="#111" stroke-width="4"/><text x="670" y="365" fill="#1f3864">5</text>
+                <circle cx="805" cy="315" r="35" fill="#111" stroke="#111" stroke-width="4"/><text x="805" y="315" fill="#fff" font-size="26">QB</text>
+              </g>
+              <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
+                <path d="M110 278 C110 205 190 165 315 155 L375 155" stroke="#e31b23"/>
+                <path d="M250 278 L250 132" stroke="#0070c0"/>
+                <path d="M390 278 Q450 210 560 210" stroke="#111"/>
+              </g>
+              <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
+                <path d="M375 155 l-22 -14 M375 155 l-22 14" stroke="#e31b23"/>
+                <path d="M250 132 l-15 22 M250 132 l15 22" stroke="#0070c0"/>
+                <path d="M560 210 l-22 -14 M560 210 l-22 14" stroke="#111"/>
+              </g>
+            </svg>
+          </div>
+        </div>
 
-    <p class="format-hint">Deck format: use one play per slide with one large rectangle shape
-    marking the field. If the deck has no section separators, every recognized play is treated
-    as <strong>offense</strong>. For a mixed deck, add <strong>Offense</strong> and
-    <strong>Defense</strong> separator slides. Offense playbooks continue onto extra PDF pages
-    after play 16, up to 64 plays. See the <a href="/pptx-guide">visual PPTX guide</a>.</p>
+        <div class="card" id="authCard">
+          <div id="signinFormWrap">
+            <h2>Sign in</h2>
+            <p class="card-sub">One free account protects your saved plays and PowerPoint conversions.</p>
+            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in first. Afterward, choose <strong>PPTX Converter</strong> to review the deck guide and upload.</p>
+            <form id="signinForm" novalidate>
+              <label class="field">Email
+                <input type="email" id="authEmail" autocomplete="email" maxlength="320">
+              </label>
+              <label class="field">Password
+                <input type="password" id="authPassword" autocomplete="current-password" maxlength="1024">
+              </label>
+              <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
+              <p class="deletion-help" id="deletionHelp" hidden>Use the <a href="/editor?finish-deletion=1">account-cleanup sign-in</a> to resume an interrupted account deletion.</p>
+              <button class="btn btn-primary" id="loginBtn" type="submit">Sign in</button>
+              <button class="btn btn-secondary" id="registerBtn" type="button">Create account</button>
+            </form>
+            <p class="auth-links"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
+          </div>
 
-    <div class="section-select" role="group" aria-label="PDF outputs">
-      <label>
-        <input type="checkbox" id="chkOffenseCoach" checked> Offense Coach Card
-      </label>
-      <label>
-        <input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card
-      </label>
-      <label>
-        <input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband
-      </label>
-      <label>
-        <input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband
-      </label>
-      <label>
-        <input type="checkbox" id="chkOffenseTitle"> Offense wristband title <span class="title-note">(&le;6 plays)</span>
-      </label>
-      <label>
-        <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(&le;6 plays)</span>
-      </label>
-    </div>
-
-    <p class="compatibility-note"><strong>Wristband fit &amp; finishing:</strong> Each PDF cut-out group is about
-      <strong>4.40 &times; 2.09 in</strong> and is designed to fit the
-      <a href="https://www.amazon.com/dp/B07QHCVV7M?th=1" target="_blank" rel="noopener noreferrer"
-         aria-label="WristCoaches adult three-panel wrist coach on Amazon (opens in a new tab)">WristCoaches adult three-panel holder</a>&rsquo;s
-      <strong>2 5/8 &times; 4 5/8 in</strong> window when the long edges align. Print at <strong>100%</strong> scale and
-      <strong>laminate before cutting</strong>; an optional
-      <a href="https://www.amazon.com/Fiskars-SureCut-Portable-Paper-Trimmer/dp/B000OMYB18/" target="_blank" rel="noopener noreferrer"
-         aria-label="Fiskars SureCut portable paper trimmer on Amazon (opens in a new tab)">compact paper trimmer</a>
-      makes straight cuts easy.
-      <span class="disclosure">Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</span></p>
-
-    <button class="btn btn-primary" id="generateBtn" disabled>Generate Playbook</button>
-
-    <div class="progress-section" id="progressSection" role="status" aria-live="polite">
-      <div class="progress-bar-container">
-        <div class="progress-bar indeterminate" id="progressBar"></div>
+          <div id="recoverFormWrap" hidden>
+            <h2>Reset password</h2>
+            <p class="card-sub">Enter the recovery code you saved when the account was created.</p>
+            <form id="recoverForm" novalidate>
+              <label class="field">Email
+                <input type="email" id="recEmail" autocomplete="email" maxlength="320">
+              </label>
+              <label class="field">Recovery code
+                <input type="text" id="recCode" autocomplete="off" maxlength="64" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
+              </label>
+              <label class="field">New password
+                <input type="password" id="recPassword" autocomplete="new-password" maxlength="1024">
+              </label>
+              <div class="error-msg" id="recError" role="alert" aria-live="assertive"></div>
+              <button class="btn btn-primary" id="recoverBtn" type="submit">Reset password &amp; sign in</button>
+            </form>
+            <p class="auth-links"><a id="backToSignin" href="#">&larr; Back to sign in</a></p>
+          </div>
+        </div>
       </div>
-      <p class="status-text" id="statusText">Uploading...</p>
+    </section>
+
+    <section class="hub" id="hubView" hidden>
+      <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook</p>
+      <h1 id="hubHeading" tabindex="-1">How do you want to build your playbook?</h1>
+      <p class="hub-sub">Both paths make the same print-ready coach cards and wristband inserts.</p>
+      <p class="account-line">Signed in as <strong id="userEmail"></strong><button class="link-button" id="signOutBtn" type="button">Sign out</button></p>
+      <p class="error-msg" id="hubError" role="alert" aria-live="assertive"></p>
+
+      <div class="choice-grid">
+        <a class="choice editor-choice" href="/editor">
+          <span class="choice-icon" aria-hidden="true">&#9999;&#65039;</span>
+          <h2>Play Editor</h2>
+          <p>Draw, organize, save, and print plays right in the browser.</p>
+          <span class="choice-action">Open the editor &rarr;</span>
+        </a>
+        <a class="choice converter" href="/pptx-guide">
+          <span class="choice-icon" aria-hidden="true">&#128196;</span>
+          <h2>PPTX Converter</h2>
+          <p>Review the visual deck guide, then upload your compatible .pptx.</p>
+          <span class="choice-action">Read the PPTX guide &rarr;</span>
+        </a>
+      </div>
+
+      <p class="hub-help">New here? The <a href="/help">quick-start guide</a> explains editing, printing, accounts, and deck compatibility.</p>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="recoveryModal" aria-hidden="true" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle" aria-describedby="recoveryDescription">
+      <h2 id="recoveryTitle">Save your recovery code</h2>
+      <p id="recoveryDescription"></p>
+      <div class="recovery-code" id="recoveryCode" tabindex="0" aria-label="Recovery code"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="copyRecoveryBtn" type="button">Copy code</button>
+        <button class="btn btn-primary" id="saveRecoveryBtn" type="button">I saved it</button>
+      </div>
     </div>
-
-    <div class="downloads" id="downloads" aria-live="polite">
-      <h3>Your PDFs are ready</h3>
-      <div class="dl-grid" id="dlGrid"></div>
-    </div>
-
-    <div class="error-msg" id="errorMsg" role="alert" aria-live="assertive"></div>
-
-    <div class="reset-link" id="resetLink">
-      <button type="button" class="reset-action" id="resetBtn">Generate another playbook</button>
-    </div>
-
-    <p class="signed-in" id="signedInLine" role="status"></p>
   </div>
+
+  <footer>Greenwich Sports Systems &middot; <a href="/help">Help &amp; printing guide</a> &middot; Your files and saved plays require a signed-in account.</footer>
 
 <script>
-  const dropZone = document.getElementById('dropZone');
-  const fileInput = document.getElementById('fileInput');
-  const fileName = document.getElementById('fileName');
-  const generateBtn = document.getElementById('generateBtn');
-  const progressSection = document.getElementById('progressSection');
-  const progressBar = document.getElementById('progressBar');
-  const statusText = document.getElementById('statusText');
-  const downloads = document.getElementById('downloads');
-  const dlGrid = document.getElementById('dlGrid');
-  const errorMsg = document.getElementById('errorMsg');
-  const resetLink = document.getElementById('resetLink');
-  const resetBtn = document.getElementById('resetBtn');
-  const authNotice = document.getElementById('authNotice');
-  const signedInLine = document.getElementById('signedInLine');
+'use strict';
 
-  const chkOffenseCoach = document.getElementById('chkOffenseCoach');
-  const chkOffenseWrist = document.getElementById('chkOffenseWrist');
-  const chkDefenseCoach = document.getElementById('chkDefenseCoach');
-  const chkDefenseWrist = document.getElementById('chkDefenseWrist');
-  const chkOffenseTitle = document.getElementById('chkOffenseTitle');
-  const chkDefenseTitle = document.getElementById('chkDefenseTitle');
+const $ = id => document.getElementById(id);
+const loadingView = $('loadingView');
+const authView = $('authView');
+const hubView = $('hubView');
+const authEmail = $('authEmail');
+const authPassword = $('authPassword');
+const authError = $('authError');
+const loginBtn = $('loginBtn');
+const registerBtn = $('registerBtn');
+const recoverBtn = $('recoverBtn');
+const signinFormWrap = $('signinFormWrap');
+const recoverFormWrap = $('recoverFormWrap');
+const recEmail = $('recEmail');
+const recCode = $('recCode');
+const recPassword = $('recPassword');
+const recError = $('recError');
+const recoveryModal = $('recoveryModal');
+const recoveryCode = $('recoveryCode');
+const recoveryDescription = $('recoveryDescription');
+const copyRecoveryBtn = $('copyRecoveryBtn');
+const saveRecoveryBtn = $('saveRecoveryBtn');
 
-  let selectedFile = null;
-  let pollTimer = null;
-  let signedIn = false;
-  let generating = false;
-  let generationEpoch = 0;
-  let activeRequest = null;
-  const POLL_INTERVAL_MS = 3000;
-  const POLL_TIMEOUT_MS = 10 * 60 * 1000;
-  const POLL_REQUEST_TIMEOUT_MS = 15000;
-  const MAX_POLL_FAILURES = 3;
-  const JOB_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+let authEpoch = 0;
+let authBusy = false;
+let recoveryModalOpen = false;
+let recoveryResolve = null;
+let recoveryReturnFocus = null;
 
-  const FRIENDLY_NAMES = {
-    'offense_coach_card.pdf': 'Offense Coach Card',
-    'defense_coach_card.pdf': 'Defense Coach Card',
-    'offense_wristband.pdf': 'Offense Wristband',
-    'defense_wristband.pdf': 'Defense Wristband',
-  };
+function setAuthBusy(busy) {
+  authBusy = busy;
+  loginBtn.disabled = busy;
+  registerBtn.disabled = busy;
+  recoverBtn.disabled = busy;
+  $('forgotLink').setAttribute('aria-disabled', String(busy));
+  $('backToSignin').setAttribute('aria-disabled', String(busy));
+  $('forgotLink').style.pointerEvents = busy ? 'none' : '';
+  $('backToSignin').style.pointerEvents = busy ? 'none' : '';
+}
 
-  const FRIENDLY_ICONS = {
-    'offense_coach_card.pdf': '\u{1F3C8}',
-    'defense_coach_card.pdf': '\u{1F6E1}\uFE0F',
-    'offense_wristband.pdf': '\u23F0',
-    'defense_wristband.pdf': '\u23F0',
-  };
+function setError(element, message) {
+  element.textContent = message || '';
+  element.classList.toggle('active', Boolean(message));
+}
 
-  // Drop zone events
-  dropZone.addEventListener('click', () => {
-    if (signedIn && !generating) fileInput.click();
-  });
-  dropZone.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    e.preventDefault();
-    if (signedIn && !generating) fileInput.click();
-  });
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) selectFile(file);
-  });
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) selectFile(fileInput.files[0]);
-  });
+function setDeletionHelp(visible) {
+  $('deletionHelp').hidden = !visible;
+}
 
-  function selectFile(file) {
-    if (!signedIn || generating) return;
-    if (!file || !file.name.toLowerCase().endsWith('.pptx')) {
-      selectedFile = null;
-      fileInput.value = '';
-      fileName.textContent = '';
-      showError('Choose a .pptx PowerPoint file');
-      syncGenerateButton();
-      return;
-    }
-    if (file.size > 50 * 1024 * 1024) {
-      selectedFile = null;
-      fileInput.value = '';
-      fileName.textContent = '';
-      showError('File too large (max 50 MB)');
-      syncGenerateButton();
-      return;
-    }
-    selectedFile = file;
-    fileName.textContent = file.name;
-    hideError();
-    syncGenerateButton();
+function showAuth(message = '') {
+  loadingView.hidden = true;
+  hubView.hidden = true;
+  authView.hidden = false;
+  setError(authError, message);
+  if (!message) setDeletionHelp(false);
+  if (!recoverFormWrap.hidden) setError(recError, '');
+}
+
+function showHub(account, focusHeading = false) {
+  if (!account || typeof account.userId !== 'string' || !account.userId ||
+      typeof account.email !== 'string' || !account.email) {
+    throw new Error('The server returned an invalid account');
+  }
+  $('userEmail').textContent = account.email;
+  setError($('hubError'), '');
+  loadingView.hidden = true;
+  authView.hidden = true;
+  hubView.hidden = false;
+  if (focusHeading) $('hubHeading').focus();
+}
+
+async function verifyAccount(expectedUserId, epoch) {
+  const res = await fetch('/api/auth/me', { cache: 'no-store' });
+  if (epoch !== authEpoch) return null;
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.userId !== expectedUserId ||
+      typeof data.email !== 'string' || !data.email) {
+    throw new Error('Could not verify the signed-in account');
+  }
+  return data;
+}
+
+function showRecoveryCode(code, context) {
+  if (typeof code !== 'string' || !code) return Promise.reject(new Error('The server did not return a recovery code'));
+  recoveryReturnFocus = document.activeElement;
+  recoveryCode.textContent = code;
+  recoveryDescription.textContent = (context || 'This code is the only way to reset your password.') +
+    ' Write it down or store it in a password manager. It will not be shown again.';
+  copyRecoveryBtn.textContent = 'Copy code';
+  recoveryModal.hidden = false;
+  recoveryModal.setAttribute('aria-hidden', 'false');
+  document.querySelector('.topbar').inert = true;
+  document.querySelector('main').inert = true;
+  document.querySelector('footer').inert = true;
+  recoveryModalOpen = true;
+  saveRecoveryBtn.focus();
+  return new Promise(resolve => { recoveryResolve = resolve; });
+}
+
+copyRecoveryBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(recoveryCode.textContent);
+    copyRecoveryBtn.textContent = 'Copied \u2713';
+  } catch {
+    copyRecoveryBtn.textContent = 'Select & copy manually';
+    recoveryCode.focus();
+  }
+});
+
+saveRecoveryBtn.addEventListener('click', () => {
+  if (!recoveryModalOpen) return;
+  recoveryModalOpen = false;
+  recoveryModal.hidden = true;
+  recoveryModal.setAttribute('aria-hidden', 'true');
+  document.querySelector('.topbar').inert = false;
+  document.querySelector('main').inert = false;
+  document.querySelector('footer').inert = false;
+  const resolve = recoveryResolve;
+  recoveryResolve = null;
+  if (recoveryReturnFocus && recoveryReturnFocus.isConnected) recoveryReturnFocus.focus();
+  recoveryReturnFocus = null;
+  if (resolve) resolve(true);
+});
+
+recoveryModal.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusable = [recoveryCode, copyRecoveryBtn, saveRecoveryBtn];
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+
+window.addEventListener('beforeunload', event => {
+  if (!recoveryModalOpen) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
+async function authSubmit(path) {
+  if (authBusy) return;
+  const email = authEmail.value.trim().toLowerCase();
+  const password = authPassword.value;
+  setError(authError, '');
+  setDeletionHelp(false);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setError(authError, 'Enter a valid email address');
+    return;
+  }
+  if (!password) {
+    setError(authError, 'Enter your password');
+    return;
+  }
+  if (path.endsWith('/register') && password.length < 8) {
+    setError(authError, 'Password must be at least 8 characters');
+    return;
   }
 
-  const outputChecks = [chkOffenseCoach, chkOffenseWrist, chkDefenseCoach, chkDefenseWrist];
-  outputChecks.forEach(box => box.addEventListener('change', hideError));
-
-  function syncGenerateButton() {
-    generateBtn.disabled = generating || !signedIn || !selectedFile;
-    const canChooseFile = signedIn && !generating;
-    dropZone.classList.toggle('disabled', !canChooseFile);
-    dropZone.toggleAttribute('aria-disabled', !canChooseFile);
-    dropZone.tabIndex = canChooseFile ? 0 : -1;
-  }
-
-  function isGenerationCurrent(epoch) {
-    return generating && generationEpoch === epoch;
-  }
-
-  function cancelGeneration({ clearUI = false } = {}) {
-    generationEpoch++;
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-    if (activeRequest) activeRequest.abort();
-    activeRequest = null;
-    generating = false;
-    if (clearUI) {
-      progressSection.classList.remove('active');
-      downloads.classList.remove('active');
-      resetLink.classList.remove('active');
-      hideError();
-      dlGrid.replaceChildren();
-    }
-    syncGenerateButton();
-  }
-
-  function finishGeneration(epoch) {
-    if (!isGenerationCurrent(epoch)) return false;
-    generationEpoch++;
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-    if (activeRequest) activeRequest.abort();
-    activeRequest = null;
-    generating = false;
-    syncGenerateButton();
-    return true;
-  }
-
-  function failGeneration(epoch, message) {
-    if (!finishGeneration(epoch)) return;
-    showError(message);
-    resetLink.classList.add('active');
-  }
-
-  async function generationFetch(url, options, epoch, timeoutMs) {
-    if (!isGenerationCurrent(epoch)) throw new Error('Generation was cancelled');
-    const controller = new AbortController();
-    activeRequest = controller;
-    let timedOut = false;
-    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
-    try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } catch (err) {
-      if (timedOut) throw new Error('The server request timed out');
-      throw err;
-    } finally {
-      clearTimeout(timeout);
-      if (activeRequest === controller) activeRequest = null;
-    }
-  }
-
-  function transitionToSignedOut(message) {
-    cancelGeneration({ clearUI: true });
-    signedIn = false;
-    selectedFile = null;
-    fileInput.value = '';
-    fileName.textContent = '';
-    authNotice.classList.add('active');
-    signedInLine.classList.remove('active');
-    signedInLine.textContent = '';
-    syncGenerateButton();
-    if (message) showError(message);
-  }
-
-  generateBtn.addEventListener('click', async () => {
-    if (!selectedFile || !signedIn) return;
-    const epoch = ++generationEpoch;
-    generating = true;
-    syncGenerateButton();
-    showProgress('Uploading...');
-    hideError();
-    downloads.classList.remove('active');
-    resetLink.classList.remove('active');
-
-    try {
-      if (!chkOffenseCoach.checked && !chkOffenseWrist.checked &&
-          !chkDefenseCoach.checked && !chkDefenseWrist.checked) {
-        showError('Select at least one output');
-        finishGeneration(epoch);
-        return;
-      }
-
-      const form = new FormData();
-      form.append('file', selectedFile);
-      form.append('offense_coach_card', chkOffenseCoach.checked);
-      form.append('offense_wristband', chkOffenseWrist.checked);
-      form.append('defense_coach_card', chkDefenseCoach.checked);
-      form.append('defense_wristband', chkDefenseWrist.checked);
-      form.append('show_offense_title', chkOffenseTitle.checked);
-      form.append('show_defense_title', chkDefenseTitle.checked);
-
-      const res = await generationFetch('/api/upload', { method: 'POST', body: form }, epoch, 120000);
-      if (!isGenerationCurrent(epoch)) return;
-      if (res.status === 401) {
-        transitionToSignedOut('Your session expired — sign in again to upload.');
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      if (!data || typeof data.jobId !== 'string' || !JOB_ID_RE.test(data.jobId)) {
-        throw new Error('Upload started, but the server returned an invalid job ID');
-      }
-
-      showProgress('Processing your playbook...');
-      startPolling(data.jobId, epoch);
-    } catch (err) {
-      if (isGenerationCurrent(epoch)) failGeneration(epoch, err.message || 'Upload failed');
-    }
-  });
-
-  function startPolling(jobId, epoch) {
-    const startedAt = Date.now();
-    let failures = 0;
-
-    const schedule = () => {
-      if (!isGenerationCurrent(epoch)) return;
-      pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
-    };
-
-    const poll = async () => {
-      pollTimer = null;
-      if (!isGenerationCurrent(epoch)) return;
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
-        failGeneration(epoch, 'Processing took too long. Please try again with a smaller playbook.');
-        return;
-      }
-      try {
-        const res = await generationFetch('/api/status/' + encodeURIComponent(jobId), {}, epoch, POLL_REQUEST_TIMEOUT_MS);
-        if (!isGenerationCurrent(epoch)) return;
-        if (res.status === 401) {
-          transitionToSignedOut('Your session expired — sign in again to continue.');
-          return;
-        }
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          const err = new Error(data && data.error || 'Could not check processing status (' + res.status + ')');
-          err.fatal = res.status >= 400 && res.status < 500;
-          throw err;
-        }
-        if (!data || typeof data !== 'object' || Array.isArray(data) ||
-            !['processing', 'complete', 'error'].includes(data.status)) {
-          const err = new Error('The server returned an invalid processing status');
-          err.fatal = true;
-          throw err;
-        }
-        failures = 0;
-
-        if (data.status === 'complete') {
-          if (!Array.isArray(data.files) || !data.files.length ||
-              !data.files.every(f => typeof f === 'string' && f.length > 0 && f.length <= 200)) {
-            const err = new Error('Processing completed without a valid file list');
-            err.fatal = true;
-            throw err;
-          }
-          if (!finishGeneration(epoch)) return;
-          progressSection.classList.remove('active');
-          showDownloads(jobId, data.files);
-        } else if (data.status === 'error') {
-          let errText = data.message || 'Processing failed';
-          if (data.detail) errText += `\n\nDetail: ${data.detail}`;
-          failGeneration(epoch, errText);
-        } else {
-          const step = data.step || 'processing';
-          const msgs = {
-            downloading: 'Downloading your file...',
-            generating: 'Generating coach cards & wristbands...',
-            uploading: 'Uploading results...',
-          };
-          statusText.textContent = msgs[step] || `Processing... (${elapsed}s)`;
-          schedule();
-        }
-      } catch (err) {
-        if (!isGenerationCurrent(epoch)) return;
-        failures++;
-        if (err.fatal || failures >= MAX_POLL_FAILURES) {
-          failGeneration(epoch, err.message || 'Could not check processing status');
-        } else {
-          statusText.textContent = `Connection issue — retrying... (${elapsed}s)`;
-          schedule();
-        }
-      }
-    };
-
-    schedule();
-  }
-
-  function showProgress(msg) {
-    progressSection.classList.add('active');
-    statusText.textContent = msg;
-    progressBar.classList.add('indeterminate');
-  }
-
-  function showDownloads(jobId, files) {
-    dlGrid.replaceChildren();
-    files.forEach(f => {
-      const a = document.createElement('a');
-      a.className = 'dl-btn';
-      a.href = '/api/download/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(f);
-      const icon = document.createElement('span');
-      icon.className = 'dl-icon';
-      icon.textContent = FRIENDLY_ICONS[f] || '\u{1F4C4}';
-      a.appendChild(icon);
-      a.appendChild(document.createTextNode(FRIENDLY_NAMES[f] || f));
-      dlGrid.appendChild(a);
+  const epoch = ++authEpoch;
+  setAuthBusy(true);
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
-    downloads.classList.add('active');
-    resetLink.classList.add('active');
+    const data = await res.json().catch(() => ({}));
+    if (epoch !== authEpoch) return;
+    if (res.status === 423 && data.deletionPending === true) {
+      setDeletionHelp(true);
+      throw new Error('Account deletion is pending.');
+    }
+    if (!res.ok) throw new Error(data.error || (path.endsWith('/register') ? 'Registration failed' : 'Sign-in failed'));
+    if (!data || typeof data.userId !== 'string' || !data.userId) throw new Error('The server returned an invalid account');
+    authPassword.value = '';
+    if (data.recoveryCode) {
+      await showRecoveryCode(data.recoveryCode,
+        'Your account was created. This code is the only way to reset your password if you forget it.');
+    }
+    if (epoch !== authEpoch) return;
+    const verified = await verifyAccount(data.userId, epoch);
+    if (verified && epoch === authEpoch) showHub(verified, true);
+  } catch (error) {
+    if (epoch === authEpoch) setError(authError, error.message || 'Could not sign in');
+  } finally {
+    if (epoch === authEpoch) setAuthBusy(false);
   }
+}
 
-  function showError(msg) {
-    errorMsg.style.whiteSpace = 'pre-wrap';
-    errorMsg.textContent = msg;
-    errorMsg.classList.add('active');
-    progressSection.classList.remove('active');
+$('signinForm').addEventListener('submit', event => {
+  event.preventDefault();
+  authSubmit('/api/auth/login');
+});
+
+registerBtn.addEventListener('click', () => authSubmit('/api/auth/register'));
+
+$('forgotLink').addEventListener('click', event => {
+  event.preventDefault();
+  if (authBusy) return;
+  recEmail.value = authEmail.value;
+  signinFormWrap.hidden = true;
+  recoverFormWrap.hidden = false;
+  setError(recError, '');
+  recEmail.focus();
+});
+
+$('backToSignin').addEventListener('click', event => {
+  event.preventDefault();
+  if (authBusy) return;
+  recoverFormWrap.hidden = true;
+  signinFormWrap.hidden = false;
+  setError(recError, '');
+  authEmail.focus();
+});
+
+$('recoverForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (authBusy) return;
+  const email = recEmail.value.trim().toLowerCase();
+  const recoveryCodeValue = recCode.value.trim();
+  const newPassword = recPassword.value;
+  setError(recError, '');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError(recError, 'Enter a valid email address');
+  if (!recoveryCodeValue) return setError(recError, 'Enter your recovery code');
+  if (newPassword.length < 8) return setError(recError, 'New password must be at least 8 characters');
+
+  const epoch = ++authEpoch;
+  setAuthBusy(true);
+  try {
+    const res = await fetch('/api/auth/recover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, recoveryCode: recoveryCodeValue, newPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (epoch !== authEpoch) return;
+    if (!res.ok) throw new Error(data.error || 'Recovery failed');
+    if (!data || typeof data.userId !== 'string' || !data.userId) throw new Error('The server returned an invalid account');
+    recCode.value = '';
+    recPassword.value = '';
+    if (data.recoveryCode) {
+      await showRecoveryCode(data.recoveryCode,
+        'Password reset. Your old recovery code no longer works; this is the new one.');
+    }
+    if (epoch !== authEpoch) return;
+    const verified = await verifyAccount(data.userId, epoch);
+    if (verified && epoch === authEpoch) showHub(verified, true);
+  } catch (error) {
+    if (epoch === authEpoch) setError(recError, error.message || 'Recovery failed');
+  } finally {
+    if (epoch === authEpoch) setAuthBusy(false);
   }
+});
 
-  function hideError() {
-    errorMsg.classList.remove('active');
+$('signOutBtn').addEventListener('click', async () => {
+  const button = $('signOutBtn');
+  if (button.disabled) return;
+  const epoch = ++authEpoch;
+  button.disabled = true;
+  setError($('hubError'), '');
+  try {
+    const res = await fetch('/api/auth/logout', { method: 'POST' });
+    if (epoch !== authEpoch) return;
+    if (!res.ok) throw new Error('Could not sign out');
+    recoverFormWrap.hidden = true;
+    signinFormWrap.hidden = false;
+    authPassword.value = '';
+    showAuth();
+    authEmail.focus();
+  } catch (error) {
+    if (epoch === authEpoch) setError($('hubError'), error.message || 'Could not sign out');
+  } finally {
+    if (epoch === authEpoch) button.disabled = false;
   }
+});
 
-  function resetUI() {
-    cancelGeneration({ clearUI: true });
-    selectedFile = null;
-    fileInput.value = '';
-    fileName.textContent = '';
-    chkOffenseCoach.checked = true;
-    chkOffenseWrist.checked = true;
-    chkDefenseCoach.checked = true;
-    chkDefenseWrist.checked = true;
-    syncGenerateButton();
+(async function init() {
+  if (new URLSearchParams(window.location.search).get('signin') === 'converter') {
+    $('converterSigninNotice').hidden = false;
   }
-
-  resetBtn.addEventListener('click', resetUI);
-
-  // ---------- Init ----------
-
-  syncGenerateButton();
-  (async function initAuth() {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        if (!data || typeof data.email !== 'string' || !data.email) {
-          throw new Error('Invalid account response');
-        }
-        signedIn = true;
-        signedInLine.textContent = `Signed in as ${data.email}`;
-        signedInLine.classList.add('active');
-        authNotice.classList.remove('active');
-        syncGenerateButton();
-        return;
+  const epoch = ++authEpoch;
+  try {
+    const res = await fetch('/api/auth/me', { cache: 'no-store' });
+    if (epoch !== authEpoch) return;
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (!data || typeof data.userId !== 'string' || !data.userId ||
+          typeof data.email !== 'string' || !data.email) {
+        throw new Error('The server returned an invalid account');
       }
-    } catch { /* fall through */ }
-    transitionToSignedOut();
-  })();
+      showHub(data);
+      return;
+    }
+    if (res.status !== 401) throw new Error('Could not check your account');
+    showAuth();
+  } catch (error) {
+    showAuth(error.message || 'Could not check your account. You can still try signing in.');
+  }
+})();
 </script>
-
 </body>
 </html>
