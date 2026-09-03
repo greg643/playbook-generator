@@ -101,23 +101,52 @@ test('download labels are built without an HTML injection sink', () => {
 
 test('responsive and keyboard contracts stay present', () => {
   assert.match(editor, /@media \(max-width: 820px\)/);
+  assert.match(editor, /\.renum-btn \{ width: auto;/);
+  assert.match(editor, /@media \(hover: none\) \{ \.play-row\.active \.row-btns \{ display: flex; \} \}/);
+  assert.match(index, /\.auth-layout > \.card \{ order: -1;/);
   assert.match(converter, /id="dropZone" role="button" tabindex="0"/);
   assert.match(converter, /dropZone\.addEventListener\('keydown'/);
   assert.match(editor, /role="dialog" aria-modal="true"/);
 });
 
 test('home is an authenticated two-choice hub, not an upload surface', () => {
-  assert.match(index, /<title>GSS Playbook/);
+  assert.match(index, /<title>GSS Playbook Editor/);
   assert.match(index, /<form id="signinForm"/);
   assert.match(index, /authSubmit\('\/api\/auth\/login'\)/);
   assert.match(index, /authSubmit\('\/api\/auth\/register'\)/);
   assert.match(index, /fetch\('\/api\/auth\/recover'/);
   assert.match(index, /class="choice editor-choice" href="\/editor"/);
   assert.match(index, /class="choice converter" href="\/pptx-guide"/);
-  assert.match(index, />Play Editor<\/h2>/);
+  assert.match(index, />GSS Playbook Editor<\/h2>/);
   assert.match(index, />PPTX Converter<\/h2>/);
   assert.doesNotMatch(index, /id="dropZone"/);
   assert.doesNotMatch(index, /['"]\/api\/upload['"]/);
+});
+
+test('home presents account creation as a clear, dedicated mode', () => {
+  assert.match(index, /id="startRegisterBtn"[^>]*>Create a free account<\/button>/);
+  assert.match(index, /function setAuthMode\(mode, focusHeading = false\)/);
+  assert.match(index, /Create your free account/);
+  assert.match(index, /one-time recovery code/i);
+  assert.match(index, /authPassword\.autocomplete = registering \? 'new-password' : 'current-password'/);
+  assert.match(index, /authPassword\.minLength = 8/);
+  assert.match(index, /if \(authMode === 'register'\)[\s\S]*?authSubmit\('\/api\/auth\/register'\)/);
+  assert.match(index, /Already have an account\?[^<]*<a id="signinInsteadLink"/);
+});
+
+test('editor keeps 5v5 and 6v6 formats per play', () => {
+  assert.match(editor, /const OFFENSE_5_CHIP_KEYS = \['1', '2', '3', 'C', 'QB'\]/);
+  assert.match(editor, /const DEFENSE_5_CHIP_KEYS = \['1', '2', '3', '4', 'N'\]/);
+  assert.match(editor, /const PLAYER_FORMATS = \{/);
+  assert.match(editor, /const playersPerSide = normalizePlayersPerSide\(p\.playersPerSide, 6\)/);
+  assert.match(editor, /defaultPlayersPerSide:\s*normalizePlayersPerSide\(d && d\.defaultPlayersPerSide, 6\)/);
+  assert.match(editor, /const playersPerSide = normalizePlayersPerSide\(doc && doc\.defaultPlayersPerSide, 6\)/);
+  assert.match(editor, /Existing plays keep their format\./);
+  assert.match(editor, /className = 'format-badge'/);
+  assert.match(editor, /title: 'What format are you coaching\?'/);
+  assert.match(editor, /choices:\s*\[[\s\S]*?label: '5v5'[\s\S]*?label: '6v6'/);
+  assert.match(editor, /dismissible:\s*false/);
+  assert.match(editor, /schema:\s*2/);
 });
 
 test('home preserves one-time recovery codes until explicit acknowledgement', () => {
@@ -190,7 +219,7 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   assert.match(pptxGuide, /actual rectangle geometry/);
   assert.match(pptxGuide, /No LLM/);
   assert.match(pptxGuide, /class="converter-cta" href="\/converter">OK, take me to the converter/);
-  assert.match(pptxGuide, /href="\/">&larr; GSS Playbook home/);
+  assert.match(pptxGuide, /href="\/">&larr; GSS Playbook Editor home/);
   assert.doesNotMatch(pptxGuide, /<script\b/i);
   assert.doesNotMatch(pptxGuide, /(?:src|href)="https?:/i);
 });

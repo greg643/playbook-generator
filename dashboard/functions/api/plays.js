@@ -13,6 +13,19 @@ const MAX_DOC_BYTES = 1000000;
 const MAX_OFFENSE = 64;
 const MAX_DEFENSE = 24;
 const MAX_NAME_LENGTH = 60;
+const CURRENT_SCHEMA = 2;
+const SUPPORTED_PLAYER_COUNTS = new Set([5, 6]);
+
+const CHIP_KEYS = {
+  offense: {
+    5: new Set(["1", "2", "3", "C", "QB"]),
+    6: new Set(["1", "2", "3", "4", "5", "QB"]),
+  },
+  defense: {
+    5: new Set(["1", "2", "3", "4", "N"]),
+    6: new Set(["1", "2", "3", "4", "5", "N"]),
+  },
+};
 
 function playbookKey(userId) {
   return `accounts/${userId}/playbook.json`;
@@ -27,7 +40,14 @@ export async function onRequestGet(context) {
 
     const obj = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
     if (!obj) {
-      return jsonNoStore({ schema: 1, offense: [], defense: [] });
+      // null distinguishes a genuinely new account from a legacy empty
+      // schema-1 playbook. The editor asks once, then persists 5 or 6.
+      return jsonNoStore({
+        schema: CURRENT_SCHEMA,
+        defaultPlayersPerSide: null,
+        offense: [],
+        defense: [],
+      });
     }
     const text = await obj.text();
     return new Response(text, {
@@ -39,12 +59,48 @@ export async function onRequestGet(context) {
   }
 }
 
-function validatePlays(list, max) {
+function hasExpectedChips(chips, section, playersPerSide) {
+  const expected = CHIP_KEYS[section][playersPerSide];
+  const keys = Object.keys(chips);
+  if (keys.length !== expected.size || keys.some((key) => !expected.has(key))) return false;
+  return keys.every((key) => {
+    const chip = chips[key];
+    return (
+      chip &&
+      typeof chip === "object" &&
+      !Array.isArray(chip) &&
+      Number.isFinite(chip.x) &&
+      Number.isFinite(chip.y) &&
+      chip.x >= 0 &&
+      chip.x <= 1 &&
+      chip.y >= 0 &&
+      chip.y <= 1
+    );
+  });
+}
+
+function validatePlays(list, max, section, schema) {
   if (!Array.isArray(list) || list.length > max) return false;
   for (const play of list) {
     if (!play || typeof play !== "object" || Array.isArray(play)) return false;
     if (typeof play.name !== "string" || play.name.length > MAX_NAME_LENGTH) return false;
     if (!play.chips || typeof play.chips !== "object" || Array.isArray(play.chips)) return false;
+    if (schema === CURRENT_SCHEMA) {
+      if (!SUPPORTED_PLAYER_COUNTS.has(play.playersPerSide)) return false;
+      if (!hasExpectedChips(play.chips, section, play.playersPerSide)) return false;
+      if (
+        Array.isArray(play.routes) &&
+        play.routes.some(
+          (route) =>
+            !route ||
+            typeof route !== "object" ||
+            typeof route.chip !== "string" ||
+            !Object.hasOwn(play.chips, route.chip)
+        )
+      ) {
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -71,12 +127,15 @@ export async function onRequestPut(context) {
       return jsonNoStore({ error: "Invalid JSON" }, { status: 400 });
     }
 
+    const schema = doc && doc.schema;
     if (
       !doc ||
       typeof doc !== "object" ||
       Array.isArray(doc) ||
-      !validatePlays(doc.offense, MAX_OFFENSE) ||
-      !validatePlays(doc.defense, MAX_DEFENSE)
+      ![1, CURRENT_SCHEMA].includes(schema) ||
+      (schema === CURRENT_SCHEMA && !SUPPORTED_PLAYER_COUNTS.has(doc.defaultPlayersPerSide)) ||
+      !validatePlays(doc.offense, MAX_OFFENSE, "offense", schema) ||
+      !validatePlays(doc.defense, MAX_DEFENSE, "defense", schema)
     ) {
       return jsonNoStore({ error: "Invalid playbook document" }, { status: 400 });
     }
@@ -96,9 +155,22 @@ export async function onRequestPut(context) {
     const baseUpdatedAt = doc.baseUpdatedAt;
     delete doc.baseUpdatedAt;
     const existing = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
+    const stored = existing && (schema === 1 || baseUpdatedAt !== undefined)
+      ? await existing.json()
+      : null;
+
+    // A stale schema-1 editor cannot represent 5v5 plays. Keep it compatible
+    // with absent/schema-1 playbooks, but never let it downgrade schema 2 and
+    // silently replace C-based plays with the old six-player model.
+    if (schema === 1 && stored && Number(stored.schema) >= CURRENT_SCHEMA) {
+      return jsonNoStore(
+        { error: "This editor is out of date. Refresh the page before saving." },
+        { status: 422 }
+      );
+    }
+
     if (baseUpdatedAt !== undefined) {
       if (existing) {
-        const stored = await existing.json();
         if (stored && stored.updatedAt && stored.updatedAt !== baseUpdatedAt) {
           return jsonNoStore(
             { error: "conflict", serverUpdatedAt: stored.updatedAt },

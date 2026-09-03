@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 pptx_to_editor.py — Convert a flag-football PPTX playbook into the play-editor
-playbook JSON (schema 1, see dashboard/editor.html normalizePlay()).
+playbook JSON (schema 2, see dashboard/editor.html normalizePlay()).
 
 Usage:
     python pptx_to_editor.py <playbook.pptx> <out.json>
@@ -11,7 +11,7 @@ Per play, the FIELD region in slide EMU is
 and every shape coordinate is normalized into 0..1 within that region.
 
 Imported per play:
-  - CHIPS  : shapes whose text is exactly 1-5/QB (offense) or 1-5/N (defense)
+  - CHIPS  : shapes whose text matches a supported 5v5 or 6v6 player label
   - ROUTES : hand-drawn InkML strokes (anchored to nearest chip) and native
              line/connector shapes that start at a chip (elbow pieces are
              chained into one polyline first)
@@ -44,8 +44,12 @@ PALETTE = {
     '#0070C0': (0, 112, 192),
     '#00B050': (0, 176, 80),
 }
-OFFENSE_KEYS = {'1', '2', '3', '4', '5', 'QB'}
-DEFENSE_KEYS = {'1', '2', '3', '4', '5', 'N'}
+OFFENSE_5_KEYS = frozenset({'1', '2', '3', 'C', 'QB'})
+OFFENSE_6_KEYS = frozenset({'1', '2', '3', '4', '5', 'QB'})
+DEFENSE_5_KEYS = frozenset({'1', '2', '3', '4', 'N'})
+DEFENSE_6_KEYS = frozenset({'1', '2', '3', '4', '5', 'N'})
+OFFENSE_KEYS = OFFENSE_5_KEYS | OFFENSE_6_KEYS
+DEFENSE_KEYS = DEFENSE_5_KEYS | DEFENSE_6_KEYS
 ARROW_TYPES = {'triangle', 'arrow', 'stealth', 'diamond', 'oval'}
 LINE_GEOMS = {'line', 'straightConnector1', 'bentConnector2', 'bentConnector3',
               'curvedConnector2', 'curvedConnector3'}
@@ -65,6 +69,26 @@ THEME_ALIAS = {'tx1': 'dk1', 'bg1': 'lt1', 'tx2': 'dk2', 'bg2': 'lt2'}
 
 def dist(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def infer_players_per_side(section, found_keys):
+    """Conservatively identify the editor's two supported player formats.
+
+    Only the exact, explicit 5v5 lineup selects five players. An incomplete or
+    unfamiliar set stays 6v6 so older decks never lose a player by inference.
+    """
+    keys = frozenset(found_keys)
+    if section == 'offense' and keys == OFFENSE_5_KEYS:
+        return 5
+    if section == 'defense' and keys == DEFENSE_5_KEYS:
+        return 5
+    return 6
+
+
+def expected_chip_keys(section, players_per_side):
+    if section == 'offense':
+        return OFFENSE_5_KEYS if players_per_side == 5 else OFFENSE_6_KEYS
+    return DEFENSE_5_KEYS if players_per_side == 5 else DEFENSE_6_KEYS
 
 
 def nearest_palette(rgb):
@@ -392,12 +416,13 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
             round(min(1.0, max(0.0, (pt[1] - field_y0) / field_h)), 4),
         ]
 
-    chip_keys = DEFENSE_KEYS if section == 'defense' else OFFENSE_KEYS
+    recognized_chip_keys = DEFENSE_KEYS if section == 'defense' else OFFENSE_KEYS
 
     flat = collect_shapes(slide.shapes, (0.0, 0.0, 1.0, 1.0), [])
 
     chips = {}          # key -> (x_emu, y_emu)
     labels = []
+    text_items = []     # defer chip-vs-label choice until format inference
     balls = []          # dicts {c:(x,y), used:False}
     segments = []       # native line-ish pieces
 
@@ -441,27 +466,36 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
             })
             continue
 
-        if text and text in chip_keys:
+        if text:
+            text_items.append((text, cx_pt, s))
+        # rectangles without text (field border, header, pylons) are skipped
+
+    candidate_keys = {text for text, _center, _shape in text_items
+                      if text in recognized_chip_keys}
+    players_per_side = infer_players_per_side(section, candidate_keys)
+    chip_keys = expected_chip_keys(section, players_per_side)
+
+    for text, cx_pt, shape in text_items:
+        if text in chip_keys:
             chips[text] = cx_pt
             continue
 
-        if text:
-            # Keep line breaks: the editor renders multi-line labels and
-            # auto-wraps long ones inside the field.
-            clean = re.sub(r'[\r\x0b]+', '\n', text)
-            clean = re.sub(r'[ \t]{2,}', ' ', clean).strip()[:160]
-            if clean:
-                size_emu, color_hex = first_run_style(s)
-                frac = (size_emu / field_h) if size_emu else 0.055
-                labels.append({
-                    'x': norm(cx_pt)[0], 'y': norm(cx_pt)[1],
-                    'text': clean,
-                    # PowerPoint's default text color is black (tx1), so use
-                    # black when no explicit run color is set
-                    'color': color_hex or '#000000',
-                    'size': round(min(0.2, max(0.02, frac)), 4),
-                })
-        # rectangles without text (field border, header, pylons) are skipped
+        # Keep line breaks: the editor renders multi-line labels and
+        # auto-wraps long ones inside the field. In a conservatively inferred
+        # 6v6 offense, a standalone C remains a label as it was in schema 1.
+        clean = re.sub(r'[\r\x0b]+', '\n', text)
+        clean = re.sub(r'[ \t]{2,}', ' ', clean).strip()[:160]
+        if clean:
+            size_emu, color_hex = first_run_style(shape)
+            frac = (size_emu / field_h) if size_emu else 0.055
+            labels.append({
+                'x': norm(cx_pt)[0], 'y': norm(cx_pt)[1],
+                'text': clean,
+                # PowerPoint's default text color is black (tx1), so use
+                # black when no explicit run color is set
+                'color': color_hex or '#000000',
+                'size': round(min(0.2, max(0.02, frac)), 4),
+            })
 
     routes = []
     lines = []
@@ -598,6 +632,7 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
     play = {
         'id': play_meta['import_id'],
         'name': (play_meta['play_name'] or play_meta['play_id'] or 'Untitled')[:60],
+        'playersPerSide': players_per_side,
         'chips': {k: {'x': norm(c)[0], 'y': norm(c)[1]} for k, c in chips.items()},
         'routes': routes,
         'lines': lines,
@@ -618,7 +653,12 @@ def convert(pptx_path, out_path):
     theme = load_theme_colors(pptx_zip)
 
     stem = re.sub(r'[^A-Za-z0-9_-]+', '-', Path(pptx_path).stem)
-    doc = {'schema': 1, 'offense': [], 'defense': []}
+    doc = {
+        'schema': 2,
+        'defaultPlayersPerSide': 6,
+        'offense': [],
+        'defense': [],
+    }
 
     for meta in plays_meta:
         if meta['section'] == 'OFFENSE':
@@ -629,6 +669,13 @@ def convert(pptx_path, out_path):
             meta['import_id'] = f"import-{stem}-D{meta['play_number']}"
             play = convert_play(meta, prs, pptx_zip, theme, 'defense')
             doc['defense'].append(play)
+
+    player_counts = [play['playersPerSide']
+                     for section in ('offense', 'defense')
+                     for play in doc[section]]
+    count_five = player_counts.count(5)
+    count_six = player_counts.count(6)
+    doc['defaultPlayersPerSide'] = 5 if count_five > count_six else 6
 
     pptx_zip.close()
 

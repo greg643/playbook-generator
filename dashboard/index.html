@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Draw flag football plays or convert a PowerPoint playbook into printable coach cards and wristband inserts.">
-  <title>GSS Playbook &mdash; Greenwich Sports Systems</title>
+  <meta name="description" content="Draw 5v5 or 6v6 flag football plays, or convert a PowerPoint playbook into printable coach cards and wristband inserts.">
+  <title>GSS Playbook Editor &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -211,6 +211,15 @@
 
     .field input:focus { border-color: var(--blue); outline: 2px solid transparent; }
 
+    .field-help {
+      display: block;
+      margin-top: 0.4rem;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 400;
+      line-height: 1.45;
+    }
+
     .error-msg {
       display: none;
       margin-bottom: 0.9rem;
@@ -248,6 +257,15 @@
     .auth-links { margin-top: 0.9rem; text-align: center; font-size: 0.8rem; }
     .auth-links a { color: var(--blue); text-decoration: none; }
     .auth-links a:hover { text-decoration: underline; }
+
+    .auth-switch {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .auth-switch p { margin-bottom: 0.6rem; color: #c9d1d9; font-size: 0.82rem; }
 
     .hub {
       max-width: 820px;
@@ -354,8 +372,9 @@
       .auth-layout { grid-template-columns: 1fr; gap: 2rem; }
       .auth-copy { text-align: center; }
       .intro, .play-preview { margin-right: auto; margin-left: auto; }
+      .play-preview { display: none; }
       .feature-list { max-width: 520px; margin-right: auto; margin-left: auto; text-align: left; }
-      .card { width: 100%; max-width: 440px; margin: 0 auto; }
+      .auth-layout > .card { order: -1; width: 100%; max-width: 440px; margin: 0 auto; }
     }
 
     @media (max-width: 620px) {
@@ -371,7 +390,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">GSS</span><span>GSS Playbook</span></a>
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">GSS</span><span>GSS Playbook Editor</span></a>
     <div class="spacer"></div>
     <a class="top-link" href="/help">Help</a>
   </header>
@@ -384,11 +403,11 @@
     <section id="authView" hidden>
       <div class="auth-layout">
         <div class="auth-copy">
-          <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook</p>
+          <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
           <h1>Build your playbook.<br>Print your game day.</h1>
-          <p class="intro">Draw plays in the browser or convert an existing PowerPoint deck into coach cards and wristband inserts.</p>
+          <p class="intro">Draw 5v5 or 6v6 plays in the browser, or convert an existing PowerPoint deck into coach cards and wristband inserts.</p>
           <ul class="feature-list">
-            <li><span class="check" aria-hidden="true">&#10003;</span>Design, organize, and save plays in the browser</li>
+            <li><span class="check" aria-hidden="true">&#10003;</span>Design, organize, and save 5v5 or 6v6 plays in the browser</li>
             <li><span class="check" aria-hidden="true">&#10003;</span>Convert compatible .pptx decks without sharing your scheme with an LLM</li>
             <li><span class="check" aria-hidden="true">&#10003;</span>Generate print-ready coach cards and wristband inserts</li>
           </ul>
@@ -402,21 +421,20 @@
               <line x1="25" y1="282" x2="895" y2="282" stroke="#1f6e8c" stroke-width="7" stroke-dasharray="22 16"/>
               <g font-family="Arial,sans-serif" font-size="34" font-weight="700" text-anchor="middle" dominant-baseline="central">
                 <circle cx="110" cy="315" r="35" fill="#c00000" stroke="#111" stroke-width="4"/><text x="110" y="315" fill="#fff">1</text>
-                <circle cx="250" cy="315" r="35" fill="#ffc000" stroke="#111" stroke-width="4"/><text x="250" y="315" fill="#1f3864">2</text>
-                <circle cx="390" cy="315" r="35" fill="#7030a0" stroke="#111" stroke-width="4"/><text x="390" y="315" fill="#fff">3</text>
-                <circle cx="530" cy="315" r="35" fill="#00b050" stroke="#111" stroke-width="4"/><text x="530" y="315" fill="#fff">4</text>
-                <circle cx="670" cy="365" r="35" fill="#ffff00" stroke="#111" stroke-width="4"/><text x="670" y="365" fill="#1f3864">5</text>
-                <circle cx="805" cy="315" r="35" fill="#111" stroke="#111" stroke-width="4"/><text x="805" y="315" fill="#fff" font-size="26">QB</text>
+                <circle cx="285" cy="315" r="35" fill="#ffc000" stroke="#111" stroke-width="4"/><text x="285" y="315" fill="#1f3864">2</text>
+                <circle cx="460" cy="315" r="35" fill="#00b050" stroke="#111" stroke-width="4"/><text x="460" y="315" fill="#fff">C</text>
+                <circle cx="810" cy="315" r="35" fill="#7030a0" stroke="#111" stroke-width="4"/><text x="810" y="315" fill="#fff">3</text>
+                <circle cx="525" cy="375" r="35" fill="#111" stroke="#111" stroke-width="4"/><text x="525" y="375" fill="#fff" font-size="26">QB</text>
               </g>
               <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
                 <path d="M110 278 C110 205 190 165 315 155 L375 155" stroke="#e31b23"/>
-                <path d="M250 278 L250 132" stroke="#0070c0"/>
-                <path d="M390 278 Q450 210 560 210" stroke="#111"/>
+                <path d="M285 278 L285 132" stroke="#0070c0"/>
+                <path d="M810 278 Q730 210 620 210" stroke="#111"/>
               </g>
               <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
                 <path d="M375 155 l-22 -14 M375 155 l-22 14" stroke="#e31b23"/>
-                <path d="M250 132 l-15 22 M250 132 l15 22" stroke="#0070c0"/>
-                <path d="M560 210 l-22 -14 M560 210 l-22 14" stroke="#111"/>
+                <path d="M285 132 l-15 22 M285 132 l15 22" stroke="#0070c0"/>
+                <path d="M620 210 l22 -14 M620 210 l22 14" stroke="#111"/>
               </g>
             </svg>
           </div>
@@ -424,22 +442,29 @@
 
         <div class="card" id="authCard">
           <div id="signinFormWrap">
-            <h2>Sign in</h2>
-            <p class="card-sub">One free account protects your saved plays and PowerPoint conversions.</p>
-            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in first. Afterward, choose <strong>PPTX Converter</strong> to review the deck guide and upload.</p>
-            <form id="signinForm" novalidate>
+            <h2 id="authTitle" tabindex="-1">Sign in</h2>
+            <p class="card-sub" id="authSubtitle">Access your saved plays and PowerPoint conversions.</p>
+            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. Afterward, choose <strong>PPTX Converter</strong> to review the deck guide and upload.</p>
+            <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it somewhere safe&mdash;it is the only way to reset a forgotten password.</p>
+            <form id="signinForm" aria-labelledby="authTitle" novalidate>
               <label class="field">Email
-                <input type="email" id="authEmail" autocomplete="email" maxlength="320">
+                <input type="email" id="authEmail" autocomplete="email" maxlength="320" required>
               </label>
               <label class="field">Password
-                <input type="password" id="authPassword" autocomplete="current-password" maxlength="1024">
+                <input type="password" id="authPassword" autocomplete="current-password" maxlength="1024" required>
+                <span class="field-help" id="passwordHelp" hidden>Use at least 8 characters.</span>
               </label>
               <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
               <p class="deletion-help" id="deletionHelp" hidden>Use the <a href="/editor?finish-deletion=1">account-cleanup sign-in</a> to resume an interrupted account deletion.</p>
               <button class="btn btn-primary" id="loginBtn" type="submit">Sign in</button>
-              <button class="btn btn-secondary" id="registerBtn" type="button">Create account</button>
+              <button class="btn btn-primary" id="registerBtn" type="submit" hidden>Create account</button>
+              <div class="auth-switch" id="signupPrompt">
+                <p>New to GSS Playbook Editor?</p>
+                <button class="btn btn-secondary" id="startRegisterBtn" type="button">Create a free account</button>
+              </div>
             </form>
-            <p class="auth-links"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
+            <p class="auth-links" id="signinLinks"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
+            <p class="auth-links" id="registerLinks" hidden>Already have an account? <a id="signinInsteadLink" href="#">Sign in</a></p>
           </div>
 
           <div id="recoverFormWrap" hidden>
@@ -465,7 +490,7 @@
     </section>
 
     <section class="hub" id="hubView" hidden>
-      <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook</p>
+      <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
       <h1 id="hubHeading" tabindex="-1">How do you want to build your playbook?</h1>
       <p class="hub-sub">Both paths make the same print-ready coach cards and wristband inserts.</p>
       <p class="account-line">Signed in as <strong id="userEmail"></strong><button class="link-button" id="signOutBtn" type="button">Sign out</button></p>
@@ -474,9 +499,9 @@
       <div class="choice-grid">
         <a class="choice editor-choice" href="/editor">
           <span class="choice-icon" aria-hidden="true">&#9999;&#65039;</span>
-          <h2>Play Editor</h2>
+          <h2>GSS Playbook Editor</h2>
           <p>Draw, organize, save, and print plays right in the browser.</p>
-          <span class="choice-action">Open the editor &rarr;</span>
+          <span class="choice-action">Open GSS Playbook Editor &rarr;</span>
         </a>
         <a class="choice converter" href="/pptx-guide">
           <span class="choice-icon" aria-hidden="true">&#128196;</span>
@@ -516,6 +541,7 @@ const authPassword = $('authPassword');
 const authError = $('authError');
 const loginBtn = $('loginBtn');
 const registerBtn = $('registerBtn');
+const startRegisterBtn = $('startRegisterBtn');
 const recoverBtn = $('recoverBtn');
 const signinFormWrap = $('signinFormWrap');
 const recoverFormWrap = $('recoverFormWrap');
@@ -534,15 +560,19 @@ let authBusy = false;
 let recoveryModalOpen = false;
 let recoveryResolve = null;
 let recoveryReturnFocus = null;
+let authMode = 'signin';
 
 function setAuthBusy(busy) {
   authBusy = busy;
   loginBtn.disabled = busy;
   registerBtn.disabled = busy;
+  startRegisterBtn.disabled = busy;
   recoverBtn.disabled = busy;
   $('forgotLink').setAttribute('aria-disabled', String(busy));
+  $('signinInsteadLink').setAttribute('aria-disabled', String(busy));
   $('backToSignin').setAttribute('aria-disabled', String(busy));
   $('forgotLink').style.pointerEvents = busy ? 'none' : '';
+  $('signinInsteadLink').style.pointerEvents = busy ? 'none' : '';
   $('backToSignin').style.pointerEvents = busy ? 'none' : '';
 }
 
@@ -553,6 +583,33 @@ function setError(element, message) {
 
 function setDeletionHelp(visible) {
   $('deletionHelp').hidden = !visible;
+}
+
+function setAuthMode(mode, focusHeading = false) {
+  const registering = mode === 'register';
+  authMode = registering ? 'register' : 'signin';
+  $('authTitle').textContent = registering ? 'Create your free account' : 'Sign in';
+  $('authSubtitle').textContent = registering
+    ? 'Save your plays and use the PowerPoint converter with one free account.'
+    : 'Access your saved plays and PowerPoint conversions.';
+  $('registerRecoveryNotice').hidden = !registering;
+  $('passwordHelp').hidden = !registering;
+  loginBtn.hidden = registering;
+  registerBtn.hidden = !registering;
+  $('signupPrompt').hidden = registering;
+  $('signinLinks').hidden = registering;
+  $('registerLinks').hidden = !registering;
+  authPassword.autocomplete = registering ? 'new-password' : 'current-password';
+  if (registering) {
+    authPassword.minLength = 8;
+    authPassword.setAttribute('aria-describedby', 'passwordHelp registerRecoveryNotice');
+  } else {
+    authPassword.removeAttribute('minlength');
+    authPassword.removeAttribute('aria-describedby');
+  }
+  setError(authError, '');
+  setDeletionHelp(false);
+  if (focusHeading) $('authTitle').focus();
 }
 
 function showAuth(message = '') {
@@ -706,10 +763,23 @@ async function authSubmit(path) {
 
 $('signinForm').addEventListener('submit', event => {
   event.preventDefault();
+  if (authMode === 'register') {
+    authSubmit('/api/auth/register');
+    return;
+  }
   authSubmit('/api/auth/login');
 });
 
-registerBtn.addEventListener('click', () => authSubmit('/api/auth/register'));
+startRegisterBtn.addEventListener('click', () => {
+  if (authBusy) return;
+  setAuthMode('register', true);
+});
+
+$('signinInsteadLink').addEventListener('click', event => {
+  event.preventDefault();
+  if (authBusy) return;
+  setAuthMode('signin', true);
+});
 
 $('forgotLink').addEventListener('click', event => {
   event.preventDefault();
@@ -726,6 +796,7 @@ $('backToSignin').addEventListener('click', event => {
   if (authBusy) return;
   recoverFormWrap.hidden = true;
   signinFormWrap.hidden = false;
+  setAuthMode('signin');
   setError(recError, '');
   authEmail.focus();
 });
@@ -781,6 +852,7 @@ $('signOutBtn').addEventListener('click', async () => {
     if (!res.ok) throw new Error('Could not sign out');
     recoverFormWrap.hidden = true;
     signinFormWrap.hidden = false;
+    setAuthMode('signin');
     authPassword.value = '';
     showAuth();
     authEmail.focus();

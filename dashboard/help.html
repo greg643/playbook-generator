@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GSS Playbook Help &mdash; Greenwich Sports Systems</title>
+  <title>GSS Playbook Editor Help &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -177,18 +177,18 @@
 </head>
 <body>
 
-  <h1>GSS Playbook Help</h1>
+  <h1>GSS Playbook Editor Help</h1>
   <p class="subtitle">Build a flag football playbook, print coach cards &amp; wristbands, keep your account safe</p>
 
   <div class="nav-links">
     <a class="pill" href="/">&#8962; Home</a>
-    <a class="pill" href="/editor">&#9999;&#65039; Play Editor</a>
+    <a class="pill" href="/editor">&#9999;&#65039; GSS Playbook Editor</a>
     <a class="pill" href="/pptx-guide">&#128209; Visual PPTX guide</a>
   </div>
 
   <nav class="toc">
     <a href="#overview">What this is</a>
-    <a href="#editor">Editor quick start</a>
+    <a href="#editor">GSS Playbook Editor quick start</a>
     <a href="#editing">Editing</a>
     <a href="#numbering">Editor playbook &amp; numbering</a>
     <a href="#printing">Generating &amp; printing</a>
@@ -201,8 +201,8 @@
     <h2>What this is</h2>
     <p>Two ways to make a playbook, one set of outputs:</p>
     <ul>
-      <li><strong>Upload a PowerPoint</strong> &mdash; choose <strong>PPTX Converter</strong> on the signed-in <a href="/">home page</a>, review the <a href="/pptx-guide">visual deck guide</a>, and continue to the protected upload screen. Every play slide needs one large rectangle shape marking the field. With no section separators, all recognized plays become offense; use OFFENSE and DEFENSE separators for a mixed deck.</li>
-      <li><strong>Play Editor</strong> &mdash; draw plays right in the browser at <a href="/editor">/editor</a>. No PowerPoint needed: drag the player chips, draw routes and zone lines, add text, and generate from there.</li>
+      <li><strong>Upload a PowerPoint</strong> &mdash; choose <strong>PPTX Converter</strong> on the signed-in <a href="/">home page</a>, review the <a href="/pptx-guide">visual deck guide</a>, and continue to the protected upload screen. Both 5v5 and 6v6 decks work. Every play slide needs one large rectangle shape marking the field. With no section separators, all recognized plays become offense; use OFFENSE and DEFENSE separators for a mixed deck.</li>
+      <li><strong>GSS Playbook Editor</strong> &mdash; draw 5v5 or 6v6 plays right in the browser at <a href="/editor">/editor</a>. No PowerPoint needed: drag the player chips, draw routes and zone lines, add text, and generate from there.</li>
     </ul>
     <p>Either way, generation runs in the cloud and produces the same four print-ready PDFs:</p>
     <div class="out-grid">
@@ -231,8 +231,9 @@
   </section>
 
   <section class="card" id="editor">
-    <h2>Editor quick start</h2>
+    <h2>GSS Playbook Editor quick start</h2>
     <ul>
+      <li><strong>Choose 5v5 or 6v6</strong> &mdash; in an empty account, choose a format under <strong>What format are you coaching?</strong> Later, use <strong>New plays:</strong> to choose the format for plays you add next. In 5v5, offense starts with <strong>C, 1, 2, 3 and QB</strong>; defense starts with <strong>1&ndash;4 and N</strong>. The center&rsquo;s <strong>C</strong> makes the snapper easy to spot.</li>
       <li><strong>Add a play</strong> &mdash; click <strong>+ Add play</strong> under OFFENSE or DEFENSE in the sidebar. New plays start with the standard formation already placed.</li>
       <li><strong>Move players</strong> &mdash; with the <strong>Select</strong> tool, drag any chip. Routes stay attached to their chip when it moves.</li>
       <li><strong>Draw an arrow route</strong> &mdash; pick the <strong>Arrow</strong> tool, click near the chip the route starts from, then click each waypoint. Press <kbd>Enter</kbd> or double-click to finish; <kbd>Esc</kbd> cancels without saving the route.</li>
@@ -242,7 +243,7 @@
       <li><strong>Ball</strong> &mdash; click the field to place a football marker.</li>
       <li><strong>Erase</strong> &mdash; click any route, line, label, or ball to remove it.</li>
     </ul>
-    <p class="muted">The hint line under the field always shows what the current tool does.</p>
+    <p class="muted">The choice under <strong>New plays:</strong> affects only plays added afterward. Existing and duplicated plays keep their format, and each play&rsquo;s 5v5 or 6v6 badge shows which one it uses. That means archived 6v6 plays and new 5v5 plays can stay together in the same account. The hint line under the field always shows what the current tool does.</p>
   </section>
 
   <section class="card" id="editing">
@@ -310,7 +311,7 @@
 
   <section class="card" id="pptx">
     <h2>PPTX upload format</h2>
-    <p>The PowerPoint pipeline is deterministic: no LLM interprets your football notation. It reads the slide objects, locates a field rectangle, renders the visible slide, and crops that rendering to the rectangle. For clean results it expects:</p>
+    <p>The PowerPoint pipeline is deterministic: no LLM interprets your football notation. It reads the slide objects, locates a field rectangle, renders the visible slide, and crops that rendering to the rectangle. It does not count, move or relabel players, so both 5v5 and 6v6 decks work without a format setting. For clean results it expects:</p>
     <ul>
       <li><strong>Modern PowerPoint file</strong> &mdash; upload a <strong>.pptx</strong>, not a legacy .ppt, PDF, Keynote file, or shared link.</li>
       <li><strong>One play per slide</strong> &mdash; keep the play name, number, players, and routes together inside the field.</li>
@@ -325,7 +326,7 @@
   </section>
 
   <footer>
-    Greenwich Sports Systems &middot; <a href="/">GSS Playbook home</a> &middot; <a href="/pptx-guide">Visual PPTX guide</a> &middot; <a href="/editor">Play Editor</a> &middot; <a href="#overview">Back to top</a>
+    Greenwich Sports Systems &middot; <a href="/">GSS Playbook Editor home</a> &middot; <a href="/pptx-guide">Visual PPTX guide</a> &middot; <a href="/editor">GSS Playbook Editor</a> &middot; <a href="#overview">Back to top</a>
   </footer>
 
 </body>

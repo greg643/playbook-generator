@@ -118,6 +118,61 @@
 
     /* Sidebar */
     .sidebar { border-right: 1px solid #30363d; overflow-y: auto; padding: 0.9rem 0.7rem; }
+    .new-play-format {
+      min-width: 0;
+      margin: 0 0 1rem;
+      padding: 0;
+      border: 0;
+    }
+    .new-play-format legend {
+      float: left;
+      margin: 0 0.55rem 0 0.25rem;
+      color: #8b949e;
+      font-size: 0.7rem;
+      font-weight: 600;
+      line-height: 1.75rem;
+      letter-spacing: 0.04em;
+    }
+    .format-options {
+      display: flex;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid #30363d;
+      border-radius: 7px;
+      background: #0d1117;
+    }
+    .format-options label { position: relative; flex: 1; cursor: pointer; }
+    .format-options input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .format-options span {
+      display: block;
+      padding: 0.32rem 0.45rem;
+      color: #8b949e;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .format-options label + label span { border-left: 1px solid #30363d; }
+    .format-options input:checked + span { background: #1f6feb; color: #fff; }
+    .format-options input:focus-visible + span {
+      position: relative;
+      z-index: 1;
+      outline: 2px solid #58a6ff;
+      outline-offset: -2px;
+    }
+    .format-hint {
+      display: block;
+      clear: both;
+      padding: 0.35rem 0.25rem 0;
+      color: #8b949e;
+      font-size: 0.72rem;
+      line-height: 1.25;
+    }
     .side-section + .side-section { margin-top: 1.4rem; }
     .side-section h2 {
       font-size: 0.7rem;
@@ -162,6 +217,17 @@
       font-size: 0.72rem;
       font-weight: 700;
     }
+    .format-badge {
+      flex-shrink: 0;
+      padding: 0.12rem 0.28rem;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      color: #8b949e;
+      font-size: 0.56rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
     .play-row .pname {
       flex: 1;
       min-width: 0;
@@ -176,7 +242,8 @@
       text-overflow: ellipsis;
     }
     .row-btns { display: none; gap: 1px; flex-shrink: 0; }
-    .play-row:hover .row-btns, .play-row.active .row-btns, .play-row:focus-within .row-btns { display: flex; }
+    .play-row:hover .row-btns, .play-row:focus-within .row-btns { display: flex; }
+    @media (hover: none) { .play-row.active .row-btns { display: flex; } }
     .icon-btn {
       background: none;
       border: none;
@@ -455,7 +522,7 @@
       letter-spacing: 0.08em; margin: 0.45rem 0 0.15rem; }
     .side-btn-row { display: flex; gap: 0.4rem; }
     .side-btn-row .add-btn { flex: 1; }
-    .renum-btn { flex: 0 0 auto !important; }
+    .renum-btn { width: auto; flex: 0 0 auto !important; }
     h2.over-cap { color: #f85149; }
     .mbtn-danger { background: #da3633; color: #fff; }
     .mbtn-danger:hover { background: #f85149; }
@@ -491,6 +558,7 @@
         border-bottom: 1px solid #30363d;
         overflow: visible;
       }
+      .new-play-format { grid-column: 1 / -1; margin-bottom: 0; }
       .side-section + .side-section { margin-top: 0; }
       .canvas-col { min-height: 56vh; padding: 0.75rem; overflow: visible; }
       #canvas { max-height: 72vh; }
@@ -530,7 +598,7 @@
     <div class="splash">
       <div class="splash-pitch">
         <h2 class="splash-title">Draw your plays.<br>Print your game day.</h2>
-        <p class="splash-sub">GSS Playbook by Greenwich Sports Systems is built for 6v6 flag football &mdash; design plays in the
+        <p class="splash-sub">GSS Playbook Editor by Greenwich Sports Systems is built for 5v5 and 6v6 flag football &mdash; design plays in the
           browser and generate coach cards and cut-out wristband inserts in one click.</p>
         <ul class="splash-points">
           <li>&#9989; Fixed player chips &mdash; drag the formation, draw the routes</li>
@@ -578,6 +646,20 @@
 
   <div class="editor" id="editorView">
     <aside class="sidebar" aria-label="Play list">
+      <fieldset class="new-play-format" aria-describedby="newPlayFormatHint">
+        <legend>New plays:</legend>
+        <div class="format-options">
+          <label>
+            <input type="radio" id="newPlays5" name="newPlayFormat" value="5">
+            <span>5v5</span>
+          </label>
+          <label>
+            <input type="radio" id="newPlays6" name="newPlayFormat" value="6">
+            <span>6v6</span>
+          </label>
+        </div>
+        <span class="format-hint" id="newPlayFormatHint">Existing plays keep their format.</span>
+      </fieldset>
       <div class="side-section">
         <h2 id="offenseHeading">OFFENSE (0 in playbook / 0)</h2>
         <div id="offenseList" aria-labelledby="offenseHeading"></div>
@@ -729,6 +811,45 @@ const DEFENSE_DEFAULT_POS = {
   '2': [0.30, 0.12], '3': [0.68, 0.12], '1': [0.50, 0.38],
   '4': [0.20, 0.62], 'N': [0.50, 0.62], '5': [0.80, 0.62],
 };
+
+const OFFENSE_5_CHIP_KEYS = ['1', '2', '3', 'C', 'QB'];
+const DEFENSE_5_CHIP_KEYS = ['1', '2', '3', '4', 'N'];
+const OFFENSE_5_CHIPS = {
+  '1': { fill: '#C00000', text: '#FFFFFF' },
+  '2': { fill: '#FFC000', text: '#1F3864' },
+  '3': { fill: '#7030A0', text: '#FFFFFF' },
+  'C': { fill: '#00B050', text: '#FFFFFF' },
+  'QB': { fill: '#000000', text: '#FFFFFF' },
+};
+const DEFENSE_5_CHIPS = {
+  '1': { fill: '#7030A0', text: '#FFFFFF' },
+  '2': { fill: '#FFFF00', text: '#1F3864' },
+  '3': { fill: '#000000', text: '#FFFFFF' },
+  '4': { fill: '#C00000', text: '#FFFFFF' },
+  'N': { fill: '#FFC000', text: '#1F3864' },
+};
+const OFFENSE_5_DEFAULT_POS = {
+  '1': [0.10, 0.66], '2': [0.30, 0.66], 'C': [0.50, 0.66],
+  '3': [0.70, 0.66], 'QB': [0.50, 0.88],
+};
+const DEFENSE_5_DEFAULT_POS = {
+  '1': [0.80, 0.62], '2': [0.30, 0.12], '3': [0.68, 0.12],
+  '4': [0.20, 0.62], 'N': [0.50, 0.62],
+};
+
+// Player count belongs to each play, so archived 6v6 material can coexist
+// with a new 5v5 season. A document-level default controls only future plays.
+// The 6v6 definitions above are deliberately unchanged for legacy playbooks.
+const PLAYER_FORMATS = {
+  offense: {
+    5: { keys: OFFENSE_5_CHIP_KEYS, chips: OFFENSE_5_CHIPS, defaults: OFFENSE_5_DEFAULT_POS },
+    6: { keys: OFFENSE_CHIP_KEYS, chips: OFFENSE_CHIPS, defaults: OFFENSE_DEFAULT_POS },
+  },
+  defense: {
+    5: { keys: DEFENSE_5_CHIP_KEYS, chips: DEFENSE_5_CHIPS, defaults: DEFENSE_5_DEFAULT_POS },
+    6: { keys: DEFENSE_CHIP_KEYS, chips: DEFENSE_CHIPS, defaults: DEFENSE_DEFAULT_POS },
+  },
+};
 const ROUTE_COLORS = ['#FF0000', '#000000', '#1F6E8C', '#0070C0', '#00B050'];
 
 const FRIENDLY_NAMES = {
@@ -743,6 +864,22 @@ const FRIENDLY_ICONS = {
   'offense_wristband.pdf': '⏰',
   'defense_wristband.pdf': '⏰',
 };
+
+function normalizePlayersPerSide(value, fallback = 6) {
+  const count = Number(value);
+  return count === 5 || count === 6 ? count : fallback;
+}
+
+function playersPerSideOf(play) {
+  return normalizePlayersPerSide(play && play.playersPerSide, 6);
+}
+
+function playerFormat(section, playOrCount) {
+  const count = typeof playOrCount === 'object'
+    ? playersPerSideOf(playOrCount)
+    : normalizePlayersPerSide(playOrCount, 6);
+  return PLAYER_FORMATS[section][count];
+}
 
 // ---------- Coordinate helpers ----------
 // Play coords are normalized 0..1 relative to the field (white area below the
@@ -1044,8 +1181,9 @@ function render(play, section, numLabel) {
     content.appendChild(labelBlockEl(lb));
   }
 
-  const chipSpec = section === 'defense' ? DEFENSE_CHIPS : OFFENSE_CHIPS;
-  const chipKeys = section === 'defense' ? DEFENSE_CHIP_KEYS : OFFENSE_CHIP_KEYS;
+  const format = playerFormat(section, play);
+  const chipSpec = format.chips;
+  const chipKeys = format.keys;
   for (const key of chipKeys) {
     const c = play.chips && play.chips[key];
     if (!c) continue;
@@ -1089,6 +1227,7 @@ const authView = $('authView'), editorView = $('editorView');
 const authEmail = $('authEmail'), authPassword = $('authPassword'), authError = $('authError');
 const loginBtn = $('loginBtn'), registerBtn = $('registerBtn'), signOutBtn = $('signOutBtn');
 const userEmail = $('userEmail');
+const newPlays5 = $('newPlays5'), newPlays6 = $('newPlays6');
 const offenseHeading = $('offenseHeading'), defenseHeading = $('defenseHeading');
 const offenseList = $('offenseList'), defenseList = $('defenseList');
 const addOffenseBtn = $('addOffenseBtn'), addDefenseBtn = $('addDefenseBtn');
@@ -1110,7 +1249,7 @@ const modalOverlay = $('modalOverlay'), modalBox = $('modalBox');
 
 // ---------- Editor state ----------
 
-let doc = null;                 // {schema, offense:[], defense:[]}
+let doc = null;                 // {schema, defaultPlayersPerSide, offense:[], defense:[]}
 let cur = null;                 // {section, index} of the open play
 let tool = 'select';
 const toolStyles = {
@@ -1812,8 +1951,12 @@ function setHint() {
 // ---------- Play document management ----------
 
 function makePlay(section) {
-  const play = { id: crypto.randomUUID(), name: 'New Play', chips: {}, routes: [], lines: [], labels: [], balls: [] };
-  const defaults = section === 'defense' ? DEFENSE_DEFAULT_POS : OFFENSE_DEFAULT_POS;
+  const playersPerSide = normalizePlayersPerSide(doc && doc.defaultPlayersPerSide, 6);
+  const play = {
+    id: crypto.randomUUID(), name: 'New Play', playersPerSide,
+    chips: {}, routes: [], lines: [], labels: [], balls: [],
+  };
+  const defaults = playerFormat(section, playersPerSide).defaults;
   for (const k in defaults) play.chips[k] = { x: defaults[k][0], y: defaults[k][1] };
   if (section === 'offense') {
     play.lines.push({
@@ -1828,14 +1971,16 @@ function makePlay(section) {
 
 function normalizePlay(p, section) {
   // (num is validated here, assigned in normalizeDoc if missing)
+  const playersPerSide = normalizePlayersPerSide(p.playersPerSide, 6);
   const play = {
     id: typeof p.id === 'string' && p.id ? p.id : crypto.randomUUID(),
     name: typeof p.name === 'string' ? p.name.slice(0, 60) : 'Untitled',
+    playersPerSide,
     chips: {}, routes: [], lines: [], labels: [], balls: [],
   };
   if (p.included === false) play.included = false;  // absent means included
   if (Number.isInteger(+p.num) && +p.num >= 1 && +p.num <= 999) play.num = Math.floor(+p.num);
-  const defaults = section === 'defense' ? DEFENSE_DEFAULT_POS : OFFENSE_DEFAULT_POS;
+  const defaults = playerFormat(section, playersPerSide).defaults;
   for (const k in defaults) {
     const c = p.chips && p.chips[k];
     play.chips[k] = {
@@ -1852,8 +1997,10 @@ function normalizePlay(p, section) {
     if (!r || !Array.isArray(r.points)) continue;
     const rpts = normPts(r.points);
     if (rpts.length < 2) continue;
+    const routeChip = typeof r.chip === 'string' ? r.chip : '1';
+    if (!Object.prototype.hasOwnProperty.call(play.chips, routeChip)) continue;
     play.routes.push({
-      chip: typeof r.chip === 'string' ? r.chip : '1',
+      chip: routeChip,
       color: typeof r.color === 'string' ? r.color : '#FF0000',
       dash: !!r.dash,
       end: ['arrow', 'ball', 'none', 'block'].includes(r.end) ? r.end : 'arrow',
@@ -1893,7 +2040,12 @@ function normalizePlay(p, section) {
 }
 
 function normalizeDoc(d) {
-  const out = { schema: 1, offense: [], defense: [] };
+  const out = {
+    schema: 2,
+    defaultPlayersPerSide: normalizePlayersPerSide(d && d.defaultPlayersPerSide, 6),
+    offense: [],
+    defense: [],
+  };
   for (const sec of ['offense', 'defense']) {
     const arr = Array.isArray(d && d[sec]) ? d[sec] : [];
     const max = sec === 'offense' ? MAX_OFFENSE : MAX_DEFENSE;
@@ -1943,6 +2095,7 @@ function duplicatePlay(section, i) {
   if (doc[section].length >= max) return;
   const copy = JSON.parse(JSON.stringify(doc[section][i]));
   copy.id = crypto.randomUUID();
+  copy.playersPerSide = playersPerSideOf(doc[section][i]);
   copy.num = lowestUnusedNum(section);
   copy.name = (copy.name + ' copy').slice(0, 60);
   doc[section].splice(i + 1, 0, copy);
@@ -2006,6 +2159,32 @@ $('renumDefenseBtn').addEventListener('click', () => confirmRenumber('defense'))
 
 // ---------- Sidebar ----------
 
+function syncNewPlayFormatControl() {
+  const count = normalizePlayersPerSide(doc && doc.defaultPlayersPerSide, 6);
+  newPlays5.checked = count === 5;
+  newPlays6.checked = count === 6;
+  newPlays5.disabled = !doc;
+  newPlays6.disabled = !doc;
+}
+
+function setDefaultPlayersPerSide(value) {
+  if (!doc) return;
+  const count = normalizePlayersPerSide(value, 6);
+  if (doc.defaultPlayersPerSide === count) {
+    syncNewPlayFormatControl();
+    return;
+  }
+  doc.defaultPlayersPerSide = count;
+  syncNewPlayFormatControl();
+  markDirty();
+}
+
+for (const radio of [newPlays5, newPlays6]) {
+  radio.addEventListener('change', () => {
+    if (radio.checked) setDefaultPlayersPerSide(radio.value);
+  });
+}
+
 function renderSidebar() {
   renderSection('offense', offenseList, offenseHeading, addOffenseBtn, MAX_OFFENSE);
   renderSection('defense', defenseList, defenseHeading, addDefenseBtn, MAX_DEFENSE);
@@ -2038,13 +2217,19 @@ function renderSection(section, listEl, headEl, addBtn, max) {
     badge.className = 'badge';
     badge.textContent = displayNum(section, play);
     badge.title = included ? 'Play number (sticky)' : 'Play number (on the bench)';
+    const formatBadge = document.createElement('span');
+    const formatText = playersPerSideOf(play) + 'v' + playersPerSideOf(play);
+    formatBadge.className = 'format-badge';
+    formatBadge.textContent = formatText;
+    formatBadge.title = formatText + ' play';
+    formatBadge.setAttribute('aria-label', playersPerSideOf(play) + ' versus ' + playersPerSideOf(play) + ' play');
     const name = document.createElement('button');
     name.type = 'button';
     name.className = 'pname';
     name.textContent = play.name || 'Untitled';
     name.title = play.name || '';
     name.setAttribute('aria-label', 'Open ' + section + ' play ' + displayNum(section, play) +
-      ', ' + (play.name || 'Untitled') + (included ? ', in playbook' : ', on bench'));
+      ', ' + formatText + ', ' + (play.name || 'Untitled') + (included ? ', in playbook' : ', on bench'));
     const btns = document.createElement('span');
     btns.className = 'row-btns';
     const mk = (txt, title, fn, disabled) => {
@@ -2061,7 +2246,7 @@ function renderSection(section, listEl, headEl, addBtn, max) {
     mk('↓', 'Move down', () => movePlay(section, i, 1), i === arr.length - 1);
     mk('⧉', 'Duplicate', () => duplicatePlay(section, i), arr.length >= max);
     mk('✕', 'Delete', () => deletePlay(section, i));
-    row.append(chk, badge, name, btns);
+    row.append(chk, badge, formatBadge, name, btns);
     row.addEventListener('click', () => openPlay(section, i));
     listEl.appendChild(row);
   });
@@ -2087,6 +2272,7 @@ function syncPlayName() {
 }
 
 function refreshAll() {
+  syncNewPlayFormatControl();
   renderSidebar();
   syncPlayName();
   refreshCanvas();
@@ -2188,7 +2374,7 @@ async function doSave() {
   saveState = 'saving';
   updateSaveIndicator();
   try {
-    savingDoc.schema = 1;
+    savingDoc.schema = 2;
     const body = { ...savingDoc, ownerId: savingOwner };
     // null is meaningful: it says this tab loaded an absent document. The
     // server then conditionally creates it, so two first saves cannot silently
@@ -2317,7 +2503,12 @@ saveBtn.addEventListener('click', () => saveDoc());
 
 $('exportBtn').addEventListener('click', () => {
   if (!doc) return;
-  const clean = { schema: 1, offense: doc.offense, defense: doc.defense };
+  const clean = {
+    schema: 2,
+    defaultPlayersPerSide: normalizePlayersPerSide(doc.defaultPlayersPerSide, 6),
+    offense: doc.offense,
+    defense: doc.defense,
+  };
   const blob = new Blob([JSON.stringify(clean, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2529,9 +2720,10 @@ modalOverlay.addEventListener('click', e => {
 });
 
 // Multi-choice modal: returns the chosen key, or cancelValue on Escape/backdrop.
-function showChoiceModal({ title, message, choices, cancelValue = null }) {
+function showChoiceModal({ title, message, choices, cancelValue = null, dismissible = true }) {
   return enqueueModal({
     cancelValue,
+    dismissible,
     render(close) {
       modalHeading(title, message);
       const row = document.createElement('div');
@@ -3030,6 +3222,27 @@ function discardLocalDoc() {
   refreshAll();
 }
 
+function isUnconfiguredEmptyPlaybook(data) {
+  return !!data && Number(data.schema) === 2 && data.defaultPlayersPerSide === null &&
+    Array.isArray(data.offense) && data.offense.length === 0 &&
+    Array.isArray(data.defense) && data.defense.length === 0;
+}
+
+async function chooseInitialPlayersPerSide(loadedDoc, userId, epoch) {
+  const choice = await showChoiceModal({
+    title: 'What format are you coaching?',
+    message: 'How many players are on each side? This sets up new offense and defense plays. You can change the New plays control later, and every existing play keeps its own format.',
+    choices: [
+      { key: '5', label: '5v5' },
+      { key: '6', label: '6v6' },
+    ],
+    dismissible: false,
+  });
+  if (doc !== loadedDoc || activeUserId !== userId || authEpoch !== epoch) return;
+  setDefaultPlayersPerSide(choice === '5' ? 5 : 6);
+  await saveDoc();
+}
+
 async function enterEditor(email, userId, expectedEpoch = null) {
   const epoch = expectedEpoch === null ? startAuthTransition() : expectedEpoch;
   if (epoch !== authEpoch) return;
@@ -3073,13 +3286,16 @@ async function enterEditor(email, userId, expectedEpoch = null) {
     if (playbookLoadRequest === controller) playbookLoadRequest = null;
   }
   if (epoch !== authEpoch || activeUserId !== userId) return;
+  const needsFormatChoice = isUnconfiguredEmptyPlaybook(data);
   doc = normalizeDoc(data || {});
+  const loadedDoc = doc;
   docOwner = userId;
   serverUpdatedAt = data && data.updatedAt || null;
   saveState = 'saved';
   updateSaveIndicator();
   cur = firstAvailable();
   refreshAll();
+  if (needsFormatChoice) await chooseInitialPlayersPerSide(loadedDoc, userId, epoch);
 }
 
 async function authSubmit(path) {
@@ -3297,14 +3513,14 @@ syncStyleUI();
 // editor and the PDFs — the landing pitch shows the actual product output.
 (function renderSplashSample() {
   const demo = {
-    id: 'splash-demo', name: 'Dagger',
-    chips: { '1': { x: 0.09, y: 0.66 }, '2': { x: 0.21, y: 0.66 }, '3': { x: 0.33, y: 0.66 },
-             '4': { x: 0.45, y: 0.66 }, '5': { x: 0.10, y: 0.88 }, 'QB': { x: 0.62, y: 0.66 } },
+    id: 'splash-demo', name: 'Dagger', playersPerSide: 5,
+    chips: { '1': { x: 0.10, y: 0.66 }, '2': { x: 0.30, y: 0.66 }, 'C': { x: 0.50, y: 0.66 },
+             '3': { x: 0.70, y: 0.66 }, 'QB': { x: 0.50, y: 0.88 } },
     routes: [
-      { chip: '2', color: '#0070C0', dash: false, end: 'arrow', corner: 'smooth', points: [[0.21, 0.66], [0.21, 0.40], [0.21, 0.10]] },
-      { chip: '1', color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth', points: [[0.09, 0.66], [0.09, 0.32], [0.55, 0.30]] },
-      { chip: '3', color: '#000000', dash: false, end: 'arrow', corner: 'smooth', points: [[0.33, 0.66], [0.40, 0.52], [0.62, 0.48]] },
-      { chip: '5', color: '#00B050', dash: false, end: 'arrow', corner: 'smooth', points: [[0.10, 0.88], [0.05, 0.80], [0.02, 0.72]] },
+      { chip: '2', color: '#0070C0', dash: false, end: 'arrow', corner: 'smooth', points: [[0.30, 0.66], [0.30, 0.40], [0.30, 0.10]] },
+      { chip: '1', color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth', points: [[0.10, 0.66], [0.10, 0.32], [0.55, 0.30]] },
+      { chip: '3', color: '#000000', dash: false, end: 'arrow', corner: 'smooth', points: [[0.70, 0.66], [0.62, 0.52], [0.46, 0.48]] },
+      { chip: 'C', color: '#00B050', dash: false, end: 'arrow', corner: 'smooth', points: [[0.50, 0.66], [0.50, 0.52], [0.60, 0.42]] },
     ],
     lines: [{ color: '#1F6E8C', dash: true, end: 'none', corner: 'sharp', points: [[0, 0.55], [1, 0.55]], width: 10, dashArray: '28 18' }],
     labels: [{ x: 0.38, y: 0.24, text: '10 YDS', color: '#0070C0', size: 0.055 }],

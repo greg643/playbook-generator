@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="A visual guide to building PowerPoint playbook decks that convert cleanly into coach cards and wristband PDFs.">
-  <title>GSS Playbook PPTX Guide &mdash; Greenwich Sports Systems</title>
+  <title>GSS Playbook Editor PPTX Guide &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -558,12 +558,12 @@
 
   <header class="page-header">
     <div class="guide-actions" aria-label="Guide actions">
-      <a class="home-action" href="/">&larr; GSS Playbook home</a>
+      <a class="home-action" href="/">&larr; GSS Playbook Editor home</a>
       <a class="converter-cta" href="/converter">OK, take me to the converter &rarr;</a>
     </div>
-    <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook</p>
+    <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
     <h1>Make a deck that converts cleanly</h1>
-    <p class="subtitle">You do not need our playbook or a proprietary template. Keep each slide simple, give the converter one clear field to crop, and your own diagrams stay yours.</p>
+    <p class="subtitle">5v5 and 6v6 decks both work, with no proprietary template. Keep each slide simple, give the converter one clear field to crop, and your own diagrams stay yours.</p>
     <nav class="nav-links" aria-label="Primary navigation">
       <a class="pill" href="/help">Help</a>
     </nav>
@@ -573,11 +573,12 @@
     <section class="card lede" aria-labelledby="ready-heading">
       <div>
         <h2 id="ready-heading">A familiar PowerPoint workflow</h2>
-        <p>Draw plays with ordinary PowerPoint text, lines, arrows, circles, and other shapes. The converter renders what is visible inside the field rectangle; it does not need to understand your terminology or your scheme.</p>
+        <p>Draw 5v5 or 6v6 plays with ordinary PowerPoint text, lines, arrows, circles, and other shapes. The converter renders what is visible inside the field rectangle; it does not need to understand your player labels, terminology or scheme.</p>
       </div>
       <ul class="status-list" aria-label="Supported deck basics">
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>.pptx files</strong> only</span></li>
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>One play</strong> per slide</span></li>
+        <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>5v5 and 6v6</strong> use the same conversion flow</span></li>
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>Up to 64 offense plays</strong> across additional pages</span></li>
       </ul>
     </section>
@@ -672,7 +673,7 @@
         </figure>
       </div>
 
-      <p class="callout"><strong>No separator slides?</strong> That is fine. If the deck contains no OFFENSE or DEFENSE separator, every recognized play slide is treated as <strong>offense</strong>. For a mixed deck, start the first offense section with OFFENSE and the first defense section with DEFENSE. Once any separator is present, slides before the first separator are ignored.</p>
+      <p class="callout"><strong>No separator slides?</strong> That is fine. If the deck contains no OFFENSE or DEFENSE separator, every recognized play slide is treated as <strong>offense</strong>. For a mixed deck, start the first offense section with OFFENSE and the first defense section with DEFENSE. Titles such as <strong>5v5 OFFENSE</strong> and <strong>6v6 DEFENSE</strong> work too. Once any separator is present, slides before the first separator are ignored.</p>
     </section>
 
     <section class="card" aria-labelledby="anatomy-heading">
@@ -711,7 +712,7 @@
         <ol class="anatomy-notes">
           <li><strong>Play name and number</strong><span>Put a short, readable label near the top, inside the rectangle.</span></li>
           <li><strong>One explicit field rectangle</strong><span>Use Insert &rarr; Shapes &rarr; Rectangle and leave it ungrouped. Its object name and PowerPoint language do not matter.</span></li>
-          <li><strong>Ordinary visible shapes</strong><span>Lines, arrows, freeforms, player circles, and text all render as part of the slide image.</span></li>
+          <li><strong>Ordinary visible shapes</strong><span>Lines, arrows, freeforms, player circles, and text all render as part of the slide image, whether the play is 5v5 or 6v6.</span></li>
           <li><strong>Safe inner margin</strong><span>Keep labels and route tips away from the rectangle edge so cropping and printing do not crowd them.</span></li>
         </ol>
       </div>
@@ -865,7 +866,7 @@
       <div>
         <h2 id="converter-heading">What the converter actually does</h2>
         <p>The conversion is deterministic, not AI-mediated. It reads the slide&rsquo;s object structure to locate the large field rectangle, renders the visible slide, and crops that rendering to the rectangle&rsquo;s bounds.</p>
-        <p>That is why an ordinary route arrow does not need a special meaning: it only needs to render visibly inside a field the converter can find. It is also why the field rectangle&rsquo;s object structure matters more than the football notation.</p>
+        <p>It does not count, move or relabel player markers, so 5v5 and 6v6 use the same converter with no format setting. An ordinary route arrow does not need a special meaning: it only needs to render visibly inside a field the converter can find. That is why the field rectangle&rsquo;s object structure matters more than the football notation.</p>
       </div>
     </section>
 
@@ -874,6 +875,7 @@
       <ul class="checklist">
         <li>The file extension is <strong>.pptx</strong>.</li>
         <li>Each play has its own slide.</li>
+        <li>The drawing shows the five or six players you want printed; the converter preserves them as drawn.</li>
         <li>Each play slide has one large, ungrouped rectangle.</li>
         <li>The field is a real rectangle shape, not a background image or table.</li>
         <li>The play name and number sit inside the field near the top.</li>
@@ -887,7 +889,7 @@
   </main>
 
   <footer>
-    <a href="/">GSS Playbook home</a> &middot; <a href="/converter">PPTX converter</a> &middot; <a href="/help">Help</a> &middot; <a href="#top">Back to top</a>
+    <a href="/">GSS Playbook Editor home</a> &middot; <a href="/editor">GSS Playbook Editor</a> &middot; <a href="/converter">PPTX converter</a> &middot; <a href="/help">Help</a> &middot; <a href="#top">Back to top</a>
   </footer>
 
 </body>

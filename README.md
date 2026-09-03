@@ -1,11 +1,11 @@
-# GSS Playbook
+# GSS Playbook Editor
 
 Greenwich Sports Systems web app for drawing flag football plays or converting a PowerPoint playbook (`.pptx`) into printable coach cards and wristband PDFs.
 
 ## Web routes
 
-- `/` — account sign-in and the two-choice GSS Playbook home
-- `/editor` — browser play editor
+- `/` — account sign-in and the two-choice GSS Playbook Editor home
+- `/editor` — GSS Playbook Editor for 5v5 and 6v6 plays
 - `/pptx-guide` — public, non-proprietary deck compatibility guide
 - `/converter` — signed-in PowerPoint upload and conversion screen
 - `/help` — editor, account, compatibility, and printing help
@@ -37,9 +37,19 @@ files are parsed by LibreOffice, Poppler, Pillow and python-pptx in the Actions
 runner; that runner must not have credentials for password records, saved
 playbooks, or the session-signing key.
 
-## Play Editor
+## GSS Playbook Editor
 
-Browser-based editor at `/editor` — sign in at `/`, choose **Play Editor**, build plays directly (drag the fixed player chips, draw routes/lines/labels), and generate the same four PDFs without PowerPoint.
+The browser-based **GSS Playbook Editor** lives at `/editor`. Sign in at `/`,
+choose **GSS Playbook Editor**, drag the player chips into position, draw routes,
+lines and labels, and generate the same four PDFs without PowerPoint.
+
+The editor supports both common formats:
+
+- **5v5 offense:** `C`, `1`, `2`, `3` and `QB`; **5v5 defense:** `1`–`4` and `N`
+- **6v6 offense:** `1`–`5` and `QB`; **6v6 defense:** `1`–`5` and `N`
+
+The format is saved with each play, so a coach can keep archived 6v6 plays and
+new 5v5 plays in the same account without changing the older diagrams.
 
 - **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
   salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
@@ -77,14 +87,17 @@ slide/play counts and images with unsafe dimensions.
 
 ### PPTX conversion behavior
 
-Conversion is deterministic; it does not use an LLM to interpret play marks.
-The pipeline identifies the largest top-level PowerPoint rectangle on each play
-slide, renders the slide, and crops the rendered image to that field. A deck
-with no recognized section separators is treated as offense-only. Mixed decks
-use nearly empty `OFFENSE` and `DEFENSE` separator slides. PPTX uploads support
-up to 64 offense plays (16 per coach-card page and 8 per wristband page) and 6
-defense plays. See the [visual PPTX guide](dashboard/pptx-guide.html) for example
-slides and known failure cases.
+Public PPTX-to-PDF conversion is deterministic; it does not use an LLM to
+interpret play marks or player positions. The pipeline identifies the largest
+top-level PowerPoint rectangle on each play slide, renders the visible slide,
+and crops that rendering to the field. Because it preserves the drawing rather
+than counting or relabeling players, it accepts both 5v5 and 6v6 decks without a
+separate format setting. A deck with no recognized section separators is
+treated as offense-only. Mixed decks use nearly empty `OFFENSE` and `DEFENSE`
+separator slides. PPTX uploads support up to 64 offense plays (16 per coach-card
+page and 8 per wristband page) and 6 defense plays. See the
+[visual PPTX guide](dashboard/pptx-guide.html) for example slides and known
+failure cases.
 
 Convert a supported PPTX into an editor JSON backup with:
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GSS Playbook PPTX Converter &mdash; Greenwich Sports Systems</title>
+  <title>GSS Playbook Editor PPTX Converter &mdash; Greenwich Sports Systems</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -317,8 +317,8 @@
 
   <main class="converter-app" id="converterApp" hidden>
     <p class="title-note">Greenwich Sports Systems</p>
-    <h1>GSS Playbook &mdash; PPTX Converter</h1>
-    <p class="subtitle">Upload a PowerPoint playbook &rarr; get coach cards &amp; wristband PDFs</p>
+    <h1>GSS Playbook Editor &mdash; PPTX Converter</h1>
+    <p class="subtitle">Turn a 5v5 or 6v6 PowerPoint playbook into coach cards &amp; wristband PDFs</p>
     <div class="pill-links">
       <a class="editor-link" href="/">&#8592; Home</a>
       <a class="editor-link" href="/pptx-guide">&#128209; PPTX Guide</a>
@@ -333,11 +333,13 @@
       </div>
       <input type="file" id="fileInput" accept=".pptx" aria-label="Choose PowerPoint playbook">
 
-      <p class="format-hint">Deck format: use one play per slide with one large rectangle shape
-      marking the field. If the deck has no section separators, every recognized play is treated
-      as <strong>offense</strong>. For a mixed deck, add <strong>Offense</strong> and
-      <strong>Defense</strong> separator slides. Offense playbooks continue onto extra PDF pages
-      after play 16, up to 64 plays. See the <a href="/pptx-guide">visual PPTX guide</a>.</p>
+      <p class="format-hint"><strong>5v5 and 6v6 both work.</strong> No player-count setting is needed:
+      the converter preserves the visible slide drawing instead of interpreting or relabeling its players.
+      Use one play per slide with one large rectangle shape marking the field. If the deck has
+      no section separators, every recognized play is treated as <strong>offense</strong>. For a mixed deck, add
+      <strong>Offense</strong> and <strong>Defense</strong> separator slides. Offense playbooks continue
+      onto extra PDF pages after play 16, up to 64 plays. See the
+      <a href="/pptx-guide">visual PPTX guide</a>.</p>
 
       <div class="section-select" role="group" aria-label="PDF outputs">
         <label>

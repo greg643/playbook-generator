@@ -26,7 +26,10 @@ import { onRequestGet as getMe } from "../../dashboard/functions/api/auth/me.js"
 import { onRequestPost as register } from "../../dashboard/functions/api/auth/register.js";
 import { onRequestPost as generate } from "../../dashboard/functions/api/generate.js";
 import { onRequestPost as upload } from "../../dashboard/functions/api/upload.js";
-import { onRequestPut as savePlays } from "../../dashboard/functions/api/plays.js";
+import {
+  onRequestGet as getPlays,
+  onRequestPut as savePlays,
+} from "../../dashboard/functions/api/plays.js";
 import { onRequestGet as getStatus } from "../../dashboard/functions/api/status/[[jobId]].js";
 import { onRequestGet as download } from "../../dashboard/functions/api/download/[[catchall]].js";
 
@@ -202,6 +205,13 @@ async function legacySessionRequest(env, account, url = "https://example.test/ap
 
 async function json(response) {
   return response.json();
+}
+
+function chips(keys) {
+  return Object.fromEntries(keys.map((key, index) => [key, {
+    x: (index + 1) / (keys.length + 1),
+    y: 0.7,
+  }]));
 }
 
 test("sessions are revoked by account version changes", async () => {
@@ -683,6 +693,167 @@ test("downloads require ownership, completion, and an explicitly listed basename
     params: { catchall: [JOB_ID, "unlisted.pdf"] },
   });
   assert.equal(missing.status, 404);
+});
+
+test("a new account receives an unconfigured schema-2 playbook", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const request = await sessionRequest(env, account, "https://example.test/api/plays");
+
+  const response = await getPlays({ request, env });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(await json(response), {
+    schema: 2,
+    defaultPlayersPerSide: null,
+    offense: [],
+    defense: [],
+  });
+});
+
+test("playbook saves preserve schema-1 compatibility and accept mixed schema-2 formats", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const session = await sessionRequest(env, account);
+  const cookie = session.headers.get("cookie");
+  const save = (body) => savePlays({
+    request: new Request("https://example.test/api/plays", {
+      method: "PUT",
+      headers: { cookie },
+      body: JSON.stringify(body),
+    }),
+    env,
+  });
+
+  const legacy = await save({
+    schema: 1,
+    offense: [{ name: "Legacy six", chips: chips(["1", "2", "3", "4", "5", "QB"]) }],
+    defense: [],
+    ownerId: USER_ID,
+  });
+  assert.equal(legacy.status, 200);
+
+  const mixed = await save({
+    schema: 2,
+    defaultPlayersPerSide: 5,
+    offense: [{
+      name: "Five-player offense",
+      playersPerSide: 5,
+      chips: chips(["1", "2", "3", "C", "QB"]),
+      routes: [{ chip: "C", points: [[0.5, 0.7], [0.5, 0.3]] }],
+    }],
+    defense: [{
+      name: "Archived six-player defense",
+      playersPerSide: 6,
+      chips: chips(["1", "2", "3", "4", "5", "N"]),
+      routes: [],
+    }],
+    ownerId: USER_ID,
+  });
+  assert.equal(mixed.status, 200);
+
+  const stored = await (
+    await env.PLAYBOOK_BUCKET.get(`accounts/${USER_ID}/playbook.json`)
+  ).json();
+  assert.equal(stored.schema, 2);
+  assert.equal(stored.defaultPlayersPerSide, 5);
+  assert.equal(stored.offense[0].playersPerSide, 5);
+  assert.equal(stored.defense[0].playersPerSide, 6);
+  assert.deepEqual(Object.keys(stored.offense[0].chips), ["1", "2", "3", "C", "QB"]);
+});
+
+test("schema-2 playbook saves reject invalid player formats and orphaned routes", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const session = await sessionRequest(env, account);
+  const save = (play, defaultPlayersPerSide = 5) => savePlays({
+    request: new Request("https://example.test/api/plays", {
+      method: "PUT",
+      headers: { cookie: session.headers.get("cookie") },
+      body: JSON.stringify({
+        schema: 2,
+        defaultPlayersPerSide,
+        offense: [play],
+        defense: [],
+        ownerId: USER_ID,
+      }),
+    }),
+    env,
+  });
+
+  const wrongLineup = await save({
+    name: "Wrong lineup",
+    playersPerSide: 5,
+    chips: chips(["1", "2", "3", "4", "QB"]),
+    routes: [],
+  });
+  assert.equal(wrongLineup.status, 400);
+
+  const orphanedRoute = await save({
+    name: "Orphaned route",
+    playersPerSide: 5,
+    chips: chips(["1", "2", "3", "C", "QB"]),
+    routes: [{ chip: "4", points: [[0.5, 0.7], [0.5, 0.3]] }],
+  });
+  assert.equal(orphanedRoute.status, 400);
+
+  const invalidDefault = await save({
+    name: "Invalid default",
+    playersPerSide: 5,
+    chips: chips(["1", "2", "3", "C", "QB"]),
+    routes: [],
+  }, 7);
+  assert.equal(invalidDefault.status, 400);
+});
+
+test("a stale schema-1 editor cannot downgrade a schema-2 playbook", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const session = await sessionRequest(env, account);
+  const cookie = session.headers.get("cookie");
+  const save = (body) => savePlays({
+    request: new Request("https://example.test/api/plays", {
+      method: "PUT",
+      headers: { cookie },
+      body: JSON.stringify({ ...body, ownerId: USER_ID }),
+    }),
+    env,
+  });
+
+  const current = await save({
+    schema: 2,
+    defaultPlayersPerSide: 5,
+    offense: [{
+      name: "Center choice",
+      playersPerSide: 5,
+      chips: chips(["1", "2", "3", "C", "QB"]),
+      routes: [{ chip: "C", points: [[0.5, 0.7], [0.5, 0.3]] }],
+    }],
+    defense: [],
+  });
+  assert.equal(current.status, 200);
+
+  // Omit baseUpdatedAt to model the old editor's explicit "Overwrite server"
+  // path. Schema protection must hold even when concurrency checks are waived.
+  const stale = await save({
+    schema: 1,
+    offense: [{
+      name: "Old six-player copy",
+      chips: chips(["1", "2", "3", "4", "5", "QB"]),
+      routes: [],
+    }],
+    defense: [],
+  });
+  assert.equal(stale.status, 422);
+  assert.match((await json(stale)).error, /out of date/i);
+
+  const stored = await (
+    await env.PLAYBOOK_BUCKET.get(`accounts/${USER_ID}/playbook.json`)
+  ).json();
+  assert.equal(stored.schema, 2);
+  assert.equal(stored.offense[0].playersPerSide, 5);
+  assert.ok(Object.hasOwn(stored.offense[0].chips, "C"));
 });
 
 test("playbook saves return 409 when the conditional write loses a race", async () => {
