@@ -17,7 +17,7 @@ account, and job results are owner-checked.
 ## What it produces
 
 - **Offense Coach Card** — 4x4 grid, automatically paginated every 16 plays
-- **Defense Coach Card** — Full-page grid of up to 6 defensive formations
+- **Defense Coach Card** — Full-page grid of up to 6 defensive formations per page
 - **Offense Wristband** — Cut-and-laminate cards, automatically paginated every 8 plays
 - **Defense Wristband** — Cut-and-laminate defense reference cards
 
@@ -48,8 +48,9 @@ The editor supports both common formats:
 - **5v5 offense:** `C`, `1`, `2`, `3` and `QB`; **5v5 defense:** `1`–`4` and `N`
 - **6v6 offense:** `1`–`5` and `QB`; **6v6 defense:** `1`–`5` and `N`
 
-The format is saved with each play, so a coach can keep archived 6v6 plays and
-new 5v5 plays in the same account without changing the older diagrams.
+New plays default to 5v5, and the editor saves the coach's latest selection for
+future plays. The format is also saved with each play, so changing the selection
+does not alter existing or duplicated diagrams.
 
 - **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
   salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
@@ -89,13 +90,18 @@ slide/play counts and images with unsafe dimensions.
 
 Public PPTX-to-PDF conversion is deterministic; it does not use an LLM to
 interpret play marks or player positions. The pipeline identifies the largest
-top-level PowerPoint rectangle on each play slide, renders the visible slide,
+top-level PowerPoint rectangle-family shape on each play slide (including
+standard, rounded, and snipped-corner rectangles), renders the visible slide,
 and crops that rendering to the field. Because it preserves the drawing rather
 than counting or relabeling players, it accepts both 5v5 and 6v6 decks without a
-separate format setting. A deck with no recognized section separators is
-treated as offense-only. Mixed decks use nearly empty `OFFENSE` and `DEFENSE`
-separator slides. PPTX uploads support up to 64 offense plays (16 per coach-card
-page and 8 per wristband page) and 6 defense plays. See the
+separate format setting. If a deck has no recognized `OFFENSE` divider, valid
+play slides before its first `DEFENSE` divider are treated as offense; a
+successful conversion warns when it uses this fallback or skips likely plays.
+A fully headerless deck remains offense-only. For explicitly sectioned decks,
+use nearly empty `OFFENSE` and `DEFENSE` divider slides and start with the
+appropriate divider. PPTX uploads
+support up to 64 offense plays (16 per coach-card page and 8 per wristband page)
+and 24 defense plays (6 per coach-card page and 8 per wristband page). See the
 [visual PPTX guide](dashboard/pptx-guide.html) for example slides and known
 failure cases.
 

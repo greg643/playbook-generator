@@ -99,6 +99,19 @@ test('download labels are built without an HTML injection sink', () => {
   assert.match(converter, /a\.appendChild\(document\.createTextNode/);
 });
 
+test('converter presents bounded PPTX assumptions separately from errors', () => {
+  assert.match(converter, /id="conversionWarning" role="status" aria-live="polite"/);
+  assert.match(converter, /function showWarnings\(warnings\)/);
+  assert.match(converter, /warning\.code === 'assumed_offense_before_defense'/);
+  assert.match(converter, /warning\.code === 'skipped_before_first_divider'/);
+  assert.match(converter, /warning\.code === 'skipped_no_field_rectangle'/);
+  assert.match(converter, /Number\.isSafeInteger\(count\)/);
+  assert.match(converter, /conversionWarning\.textContent\s*=/);
+  assert.match(converter, /showDownloads\(jobId, data\.files\);\s*showWarnings\(data\.warnings\);/);
+  assert.match(converter, /if \(clearUI\)[\s\S]*?hideWarnings\(\)/);
+  assert.doesNotMatch(converter, /errorMsg\.textContent\s*=\s*[^;]*assumed_offense_before_defense/);
+});
+
 test('responsive and keyboard contracts stay present', () => {
   assert.match(editor, /@media \(max-width: 820px\)/);
   assert.match(editor, /\.renum-btn \{ width: auto;/);
@@ -138,10 +151,15 @@ test('editor keeps 5v5 and 6v6 formats per play', () => {
   assert.match(editor, /const OFFENSE_5_CHIP_KEYS = \['1', '2', '3', 'C', 'QB'\]/);
   assert.match(editor, /const DEFENSE_5_CHIP_KEYS = \['1', '2', '3', '4', 'N'\]/);
   assert.match(editor, /const PLAYER_FORMATS = \{/);
+  assert.match(editor, /const DEFAULT_NEW_PLAYERS_PER_SIDE = 5/);
   assert.match(editor, /const playersPerSide = normalizePlayersPerSide\(p\.playersPerSide, 6\)/);
-  assert.match(editor, /defaultPlayersPerSide:\s*normalizePlayersPerSide\(d && d\.defaultPlayersPerSide, 6\)/);
-  assert.match(editor, /const playersPerSide = normalizePlayersPerSide\(doc && doc\.defaultPlayersPerSide, 6\)/);
-  assert.match(editor, /Existing plays keep their format\./);
+  assert.match(editor, /function inferDefaultPlayersPerSide\(d, normalizedDoc\)/);
+  assert.match(editor, /if \(five \+ six === 0\) return DEFAULT_NEW_PLAYERS_PER_SIDE/);
+  assert.match(editor, /return five > six \? 5 : 6/);
+  assert.match(editor, /out\.defaultPlayersPerSide = inferDefaultPlayersPerSide\(d, out\)/);
+  assert.match(editor, /function makePlay\(section\)[\s\S]*?DEFAULT_NEW_PLAYERS_PER_SIDE/);
+  assert.match(editor, /Saved for next time\. Existing plays keep their format\./);
+  assert.match(editor, /function setDefaultPlayersPerSide\(value\)[\s\S]*?doc\.defaultPlayersPerSide = count;[\s\S]*?markDirty\(\)/);
   assert.match(editor, /className = 'format-badge'/);
   assert.match(editor, /title: 'What format are you coaching\?'/);
   assert.match(editor, /choices:\s*\[[\s\S]*?label: '5v5'[\s\S]*?label: '6v6'/);
@@ -206,17 +224,20 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
     assert.match(html, /href="\/pptx-guide"/);
   }
   assert.match(converter, /no section separators[\s\S]*treated[\s\S]*offense/i);
+  assert.match(converter, /Defense separator but no[\s\S]*Offense separator[\s\S]*become offense/i);
   assert.match(help, /no LLM/i);
   assert.match(help, /64 offense/);
+  assert.match(help, /24 defense/);
   assert.match(help, /16 plays per page/);
+  assert.match(help, /defense coach cards every 6/i);
   assert.match(help, /paginate every 8/);
 
-  assert.match(pptxGuide, /Up to 64 offense plays/);
-  assert.match(pptxGuide, /No separator slides\?/);
-  assert.match(pptxGuide, /every recognized play slide is treated as <strong>offense<\/strong>/);
-  assert.match(pptxGuide, /Once any separator is present, slides before the first separator are ignored/);
-  assert.match(pptxGuide, /Start with OFFENSE if offense comes first/);
-  assert.match(pptxGuide, /actual rectangle geometry/);
+  assert.match(pptxGuide, /Up to 64 offense \/ 24 defense plays/);
+  assert.match(pptxGuide, /No OFFENSE divider\?/);
+  assert.match(pptxGuide, /Valid play slides before the first DEFENSE divider are treated as <strong>offense<\/strong>/);
+  assert.match(pptxGuide, /successful conversion warns you when it uses this fallback/);
+  assert.match(pptxGuide, /start with OFFENSE if offense comes first/i);
+  assert.match(pptxGuide, /rounded and snipped-corner rectangle variants/i);
   assert.match(pptxGuide, /No LLM/);
   assert.match(pptxGuide, /class="converter-cta" href="\/converter">OK, take me to the converter/);
   assert.match(pptxGuide, /href="\/">&larr; GSS Playbook Editor home/);

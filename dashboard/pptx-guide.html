@@ -579,7 +579,7 @@
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>.pptx files</strong> only</span></li>
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>One play</strong> per slide</span></li>
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>5v5 and 6v6</strong> use the same conversion flow</span></li>
-        <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>Up to 64 offense plays</strong> across additional pages</span></li>
+        <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>Up to 64 offense / 24 defense plays</strong> across additional pages</span></li>
       </ul>
     </section>
 
@@ -589,8 +589,8 @@
       <ol class="rules">
         <li><strong>Save as .pptx</strong><span>Export older PowerPoint, Keynote, or Google Slides decks to the modern PowerPoint format first.</span></li>
         <li><strong>One play per slide</strong><span>Do not place two fields or multiple play options on the same slide.</span></li>
-        <li><strong>Use one large rectangle</strong><span>Make an ordinary, ungrouped PowerPoint rectangle the largest rectangle on every play slide.</span></li>
-        <li><strong>Choose one section pattern</strong><span>Use no separators for offense-only, or start every section with OFFENSE or DEFENSE in a mixed deck.</span></li>
+        <li><strong>Use one large rectangle</strong><span>Make an ungrouped PowerPoint rectangle-family shape the largest recognized rectangle on every play slide. Standard, rounded, and snipped-corner variants work.</span></li>
+        <li><strong>Choose one section pattern</strong><span>Use no dividers for offense-only, or start an explicitly sectioned deck with the appropriate OFFENSE or DEFENSE divider.</span></li>
       </ol>
     </section>
 
@@ -673,7 +673,7 @@
         </figure>
       </div>
 
-      <p class="callout"><strong>No separator slides?</strong> That is fine. If the deck contains no OFFENSE or DEFENSE separator, every recognized play slide is treated as <strong>offense</strong>. For a mixed deck, start the first offense section with OFFENSE and the first defense section with DEFENSE. Titles such as <strong>5v5 OFFENSE</strong> and <strong>6v6 DEFENSE</strong> work too. Once any separator is present, slides before the first separator are ignored.</p>
+      <p class="callout"><strong>No OFFENSE divider?</strong> Valid play slides before the first DEFENSE divider are treated as <strong>offense</strong>, and a successful conversion warns you when it uses this fallback. A fully headerless deck remains offense-only. For an explicitly sectioned deck, start with the appropriate OFFENSE or DEFENSE divider. Titles such as <strong>5v5 OFFENSE</strong> and <strong>6v6 DEFENSE</strong> work too.</p>
     </section>
 
     <section class="card" aria-labelledby="anatomy-heading">
@@ -731,12 +731,12 @@
         <article class="behavior">
           <span class="label">Deck with defense</span>
           <h3>Mark every section</h3>
-          <p>Start with OFFENSE if offense comes first, then place DEFENSE before the first defensive play. Add another OFFENSE separator if the deck switches back.</p>
+          <p>For the clearest result, start with OFFENSE if offense comes first, then place DEFENSE before the first defensive play. Without any OFFENSE divider, valid plays before the first DEFENSE divider become offense and the successful conversion shows a warning.</p>
         </article>
         <article class="behavior">
-          <span class="label">17&ndash;64 offense plays</span>
+          <span class="label">Longer playbooks</span>
           <h3>Additional pages are automatic</h3>
-          <p>The sixteenth play is no longer the end. Recognized offense plays continue onto additional output pages, up to 64 total.</p>
+          <p>Uploads accept up to 64 offense and 24 defense plays. Coach cards continue every 16 offense or 6 defense plays; wristband sheets continue every 8.</p>
         </article>
         <article class="behavior">
           <span class="label">Play slides</span>
@@ -756,7 +756,7 @@
 
     <section class="card" aria-labelledby="failures-heading">
       <h2 id="failures-heading">What works&mdash;and what can fail</h2>
-      <p class="section-intro">Renaming a rectangle is safe. Most conversion issues come from how the field object is built, not from the routes themselves.</p>
+      <p class="section-intro">Renaming a rectangle is safe, and rounded and snipped-corner rectangle variants are supported. Most conversion issues come from how the field object is built, not from the routes themselves.</p>
 
       <div class="failure-grid">
         <article class="failure">
@@ -789,7 +789,7 @@
               <path d="M124 69 L128 73 L136 64" fill="none" stroke="#fff" stroke-width="3"/>
             </svg>
           </div>
-          <div><h3>Renamed rectangle: supported</h3><p>The converter recognizes actual rectangle geometry, even when the object is renamed or PowerPoint uses another language. Keep it ungrouped and top-level.</p></div>
+          <div><h3>Rectangle family: supported</h3><p>The converter recognizes standard, rounded, and snipped-corner rectangle geometry, even when the object is renamed or PowerPoint uses another language. Keep it ungrouped and top-level.</p></div>
         </article>
 
         <article class="failure">
@@ -858,14 +858,14 @@
         </article>
       </div>
 
-      <p class="callout warn"><strong>Quick check:</strong> In PowerPoint, open the Selection Pane and confirm the field is a separate, top-level rectangle object rather than part of a group, table, or background image. If several rectangles exist, make the field clearly the largest.</p>
+      <p class="callout warn"><strong>Quick check:</strong> In PowerPoint, open the Selection Pane and confirm the field is a separate, top-level rectangle-family object rather than part of a group, table, or background image. If several recognized rectangles exist, make the field clearly the largest. A completed conversion warns when likely play slides are skipped.</p>
     </section>
 
     <section class="card technical-note" aria-labelledby="converter-heading">
       <span class="badge">No LLM</span>
       <div>
         <h2 id="converter-heading">What the converter actually does</h2>
-        <p>The conversion is deterministic, not AI-mediated. It reads the slide&rsquo;s object structure to locate the large field rectangle, renders the visible slide, and crops that rendering to the rectangle&rsquo;s bounds.</p>
+        <p>The conversion is deterministic, not AI-mediated. It reads the slide&rsquo;s object structure to locate the large field rectangle-family shape, renders the visible slide, and crops that rendering to the shape&rsquo;s bounds.</p>
         <p>It does not count, move or relabel player markers, so 5v5 and 6v6 use the same converter with no format setting. An ordinary route arrow does not need a special meaning: it only needs to render visibly inside a field the converter can find. That is why the field rectangle&rsquo;s object structure matters more than the football notation.</p>
       </div>
     </section>
@@ -876,8 +876,8 @@
         <li>The file extension is <strong>.pptx</strong>.</li>
         <li>Each play has its own slide.</li>
         <li>The drawing shows the five or six players you want printed; the converter preserves them as drawn.</li>
-        <li>Each play slide has one large, ungrouped rectangle.</li>
-        <li>The field is a real rectangle shape, not a background image or table.</li>
+        <li>Each play slide has one large, ungrouped rectangle-family shape.</li>
+        <li>The field is a real standard, rounded, or snipped-corner rectangle shape, not a background image or table.</li>
         <li>The play name and number sit inside the field near the top.</li>
         <li>A mixed deck starts with the appropriate <strong>OFFENSE</strong> or <strong>DEFENSE</strong> separator.</li>
         <li>No decorative rectangle is larger than the field.</li>

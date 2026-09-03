@@ -186,6 +186,21 @@
     }
     .dl-btn .dl-icon { font-size: 1.1rem; }
 
+    /* Successful conversion guidance */
+    .conversion-warning {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(210, 153, 34, 0.1);
+      border: 1px solid #d29922;
+      border-radius: 8px;
+      color: #e3b341;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      white-space: pre-line;
+      display: none;
+    }
+    .conversion-warning.active { display: block; }
+
     /* Error */
     .error-msg {
       margin-top: 1rem;
@@ -337,8 +352,11 @@
       the converter preserves the visible slide drawing instead of interpreting or relabeling its players.
       Use one play per slide with one large rectangle shape marking the field. If the deck has
       no section separators, every recognized play is treated as <strong>offense</strong>. For a mixed deck, add
-      <strong>Offense</strong> and <strong>Defense</strong> separator slides. Offense playbooks continue
-      onto extra PDF pages after play 16, up to 64 plays. See the
+      <strong>Offense</strong> and <strong>Defense</strong> separator slides. If there is a Defense separator but no
+      Offense separator, plays before the first Defense separator become offense and the converter flags that assumption.
+      Completed conversions also flag likely play slides skipped because a field shape or opening divider is missing.
+      Offense playbooks continue onto extra PDF pages after play 16, up to 64 plays; defense continues
+      after play 6, up to 24 plays. Wristband PDFs continue every 8 plays. See the
       <a href="/pptx-guide">visual PPTX guide</a>.</p>
 
       <div class="section-select" role="group" aria-label="PDF outputs">
@@ -355,10 +373,10 @@
           <input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband
         </label>
         <label>
-          <input type="checkbox" id="chkOffenseTitle"> Offense wristband title <span class="title-note">(&le;6 plays)</span>
+          <input type="checkbox" id="chkOffenseTitle"> Offense wristband title <span class="title-note">(on pages with &le;6 plays)</span>
         </label>
         <label>
-          <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(&le;6 plays)</span>
+          <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(on pages with &le;6 plays)</span>
         </label>
       </div>
 
@@ -381,6 +399,8 @@
         </div>
         <p class="status-text" id="statusText">Uploading...</p>
       </div>
+
+      <div class="conversion-warning" id="conversionWarning" role="status" aria-live="polite"></div>
 
       <div class="downloads" id="downloads" aria-live="polite">
         <h3>Your PDFs are ready</h3>
@@ -407,6 +427,7 @@
   const statusText = document.getElementById('statusText');
   const downloads = document.getElementById('downloads');
   const dlGrid = document.getElementById('dlGrid');
+  const conversionWarning = document.getElementById('conversionWarning');
   const errorMsg = document.getElementById('errorMsg');
   const resetLink = document.getElementById('resetLink');
   const resetBtn = document.getElementById('resetBtn');
@@ -520,6 +541,7 @@
       progressSection.classList.remove('active');
       downloads.classList.remove('active');
       resetLink.classList.remove('active');
+      hideWarnings();
       hideError();
       dlGrid.replaceChildren();
     }
@@ -581,6 +603,7 @@
     generating = true;
     syncGenerateButton();
     showProgress('Uploading...');
+    hideWarnings();
     hideError();
     downloads.classList.remove('active');
     resetLink.classList.remove('active');
@@ -670,6 +693,7 @@
           if (!finishGeneration(epoch)) return;
           progressSection.classList.remove('active');
           showDownloads(jobId, data.files);
+          showWarnings(data.warnings);
         } else if (data.status === 'error') {
           let errText = data.message || 'Processing failed';
           if (data.detail) errText += `\n\nDetail: ${data.detail}`;
@@ -720,6 +744,53 @@
     });
     downloads.classList.add('active');
     resetLink.classList.add('active');
+  }
+
+  function showWarnings(warnings) {
+    hideWarnings();
+    if (!Array.isArray(warnings)) return;
+    const messages = [];
+    const seenCodes = new Set();
+    for (const warning of warnings) {
+      if (!warning || typeof warning !== 'object' || Array.isArray(warning) ||
+          seenCodes.has(warning.code)) continue;
+      if (warning.code === 'assumed_offense_before_defense') {
+        const count = warning.playCount;
+        if (!Number.isSafeInteger(count) || count < 1 || count > 64) continue;
+        const label = count === 1 ? 'play slide' : 'play slides';
+        messages.push(
+          `Check your offense output: this deck has a DEFENSE divider but no OFFENSE divider, ` +
+          `so we treated ${count} ${label} before the first DEFENSE divider as offense.`
+        );
+      } else if (warning.code === 'skipped_before_first_divider') {
+        const count = warning.slideCount;
+        if (!Number.isSafeInteger(count) || count < 1 || count > 100) continue;
+        const label = count === 1 ? 'field slide was' : 'field slides were';
+        messages.push(
+          `${count} ${label} skipped before the first section divider. Start an explicitly ` +
+          `sectioned deck with OFFENSE or DEFENSE if those slides should be included.`
+        );
+      } else if (warning.code === 'skipped_no_field_rectangle') {
+        const count = warning.slideCount;
+        if (!Number.isSafeInteger(count) || count < 1 || count > 100) continue;
+        const label = count === 1 ? 'slide was' : 'slides were';
+        messages.push(
+          `${count} ${label} skipped inside a detected section because no field rectangle ` +
+          `was found. Covers and notes may be intentional; otherwise add a separate, top-level field shape.`
+        );
+      } else {
+        continue;
+      }
+      seenCodes.add(warning.code);
+    }
+    if (!messages.length) return;
+    conversionWarning.textContent = messages.join('\n\n');
+    conversionWarning.classList.add('active');
+  }
+
+  function hideWarnings() {
+    conversionWarning.classList.remove('active');
+    conversionWarning.textContent = '';
   }
 
   function showError(msg) {

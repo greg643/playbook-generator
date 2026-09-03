@@ -658,7 +658,7 @@
             <span>6v6</span>
           </label>
         </div>
-        <span class="format-hint" id="newPlayFormatHint">Existing plays keep their format.</span>
+        <span class="format-hint" id="newPlayFormatHint">Saved for next time. Existing plays keep their format.</span>
       </fieldset>
       <div class="side-section">
         <h2 id="offenseHeading">OFFENSE (0 in playbook / 0)</h2>
@@ -783,6 +783,7 @@ const FIELD_X = 8, FIELD_W = 1060, FIELD_H = 822;
 const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
 const MAX_IMPORT_BYTES = 1000000;
 const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
+const DEFAULT_NEW_PLAYERS_PER_SIDE = 5;
 
 const OFFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'QB'];
 const DEFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'N'];
@@ -1951,7 +1952,10 @@ function setHint() {
 // ---------- Play document management ----------
 
 function makePlay(section) {
-  const playersPerSide = normalizePlayersPerSide(doc && doc.defaultPlayersPerSide, 6);
+  const playersPerSide = normalizePlayersPerSide(
+    doc && doc.defaultPlayersPerSide,
+    DEFAULT_NEW_PLAYERS_PER_SIDE,
+  );
   const play = {
     id: crypto.randomUUID(), name: 'New Play', playersPerSide,
     chips: {}, routes: [], lines: [], labels: [], balls: [],
@@ -2039,10 +2043,26 @@ function normalizePlay(p, section) {
   return play;
 }
 
+function inferDefaultPlayersPerSide(d, normalizedDoc) {
+  const saved = Number(d && d.defaultPlayersPerSide);
+  if (saved === 5 || saved === 6) return saved;
+
+  let five = 0;
+  let six = 0;
+  for (const section of ['offense', 'defense']) {
+    for (const play of normalizedDoc[section]) {
+      if (playersPerSideOf(play) === 5) five++;
+      else six++;
+    }
+  }
+  if (five + six === 0) return DEFAULT_NEW_PLAYERS_PER_SIDE;
+  return five > six ? 5 : 6;
+}
+
 function normalizeDoc(d) {
   const out = {
     schema: 2,
-    defaultPlayersPerSide: normalizePlayersPerSide(d && d.defaultPlayersPerSide, 6),
+    defaultPlayersPerSide: DEFAULT_NEW_PLAYERS_PER_SIDE,
     offense: [],
     defense: [],
   };
@@ -2062,6 +2082,7 @@ function normalizeDoc(d) {
     for (const p of out[sec]) if (p.included !== false && !Number.isInteger(p.num)) p.num = take();
     for (const p of out[sec]) if (!Number.isInteger(p.num)) p.num = take();
   }
+  out.defaultPlayersPerSide = inferDefaultPlayersPerSide(d, out);
   return out;
 }
 
@@ -2160,7 +2181,10 @@ $('renumDefenseBtn').addEventListener('click', () => confirmRenumber('defense'))
 // ---------- Sidebar ----------
 
 function syncNewPlayFormatControl() {
-  const count = normalizePlayersPerSide(doc && doc.defaultPlayersPerSide, 6);
+  const count = normalizePlayersPerSide(
+    doc && doc.defaultPlayersPerSide,
+    DEFAULT_NEW_PLAYERS_PER_SIDE,
+  );
   newPlays5.checked = count === 5;
   newPlays6.checked = count === 6;
   newPlays5.disabled = !doc;
@@ -2169,7 +2193,7 @@ function syncNewPlayFormatControl() {
 
 function setDefaultPlayersPerSide(value) {
   if (!doc) return;
-  const count = normalizePlayersPerSide(value, 6);
+  const count = normalizePlayersPerSide(value, DEFAULT_NEW_PLAYERS_PER_SIDE);
   if (doc.defaultPlayersPerSide === count) {
     syncNewPlayFormatControl();
     return;
@@ -2505,7 +2529,10 @@ $('exportBtn').addEventListener('click', () => {
   if (!doc) return;
   const clean = {
     schema: 2,
-    defaultPlayersPerSide: normalizePlayersPerSide(doc.defaultPlayersPerSide, 6),
+    defaultPlayersPerSide: normalizePlayersPerSide(
+      doc.defaultPlayersPerSide,
+      DEFAULT_NEW_PLAYERS_PER_SIDE,
+    ),
     offense: doc.offense,
     defense: doc.defense,
   };

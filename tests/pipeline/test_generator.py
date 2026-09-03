@@ -11,10 +11,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "pipeline"))
 
 from playbook_pipeline import (  # noqa: E402
+    MAX_RENDER_IMAGE_DIMENSION,
+    MAX_TOTAL_SOURCE_IMAGE_PIXELS,
     PlaybookGenerator,
     wristband_positions,
     wristband_title_allowed,
 )
+from input_safety import MAX_DEFENSE_PLAYS, MAX_OFFENSE_PLAYS  # noqa: E402
 
 
 def page_text(pdf_path, page=0):
@@ -213,6 +216,35 @@ class GeneratorContractTests(unittest.TestCase):
         self.assertEqual([xobject_draw_count(page) for page in wristband_pages], [48, 48, 6])
         self.assertTrue(all("OFFENSE" in page.extract_text() for page in coach_pages))
 
+    def test_defense_outputs_paginate_without_dropping_plays(self):
+        from pypdf import PdfReader
+
+        for index in range(1, 11):
+            color = ((index * 17) % 256, index, (index * 29) % 256)
+            Image.new("RGB", (32, 24), color).save(self.images / f"D{index}.png")
+
+        produced = self.generator().generate_all(
+            gen_offense=False,
+            gen_defense=True,
+            offense_coach_card=False,
+            offense_wristband=False,
+            defense_coach_card=True,
+            defense_wristband=True,
+        )
+
+        self.assertEqual(produced, ["defense_coach_card.pdf", "defense_wristband.pdf"])
+        coach_pages = PdfReader(str(self.output / "defense_coach_card.pdf")).pages
+        wristband_pages = PdfReader(str(self.output / "defense_wristband.pdf")).pages
+        self.assertEqual(len(coach_pages), 2)
+        self.assertEqual(len(wristband_pages), 2)
+        self.assertEqual([image_xobject_count(page) for page in coach_pages], [6, 4])
+        self.assertEqual([xobject_draw_count(page) for page in coach_pages], [6, 4])
+        self.assertEqual([image_xobject_count(page) for page in wristband_pages], [8, 2])
+        self.assertEqual([xobject_draw_count(page) for page in wristband_pages], [48, 12])
+        self.assertTrue(all("DEFENSE" in page.extract_text() for page in coach_pages))
+        self.assertNotIn("DEFENSE", wristband_pages[0].extract_text())
+        self.assertIn("DEFENSE", wristband_pages[1].extract_text())
+
     def test_loads_full_sixty_four_play_capacity(self):
         from pypdf import PdfReader
 
@@ -238,6 +270,31 @@ class GeneratorContractTests(unittest.TestCase):
         self.assertEqual([image_xobject_count(page) for page in wristband_pages], [8] * 8)
         self.assertEqual([xobject_draw_count(page) for page in wristband_pages], [48] * 8)
 
+    def test_loads_full_twenty_four_defense_play_capacity(self):
+        from pypdf import PdfReader
+
+        for index in range(1, 25):
+            Image.new("RGB", (4, 4), (0, index, 0)).save(
+                self.images / f"D{index}.png"
+            )
+
+        generator = self.generator()
+        offense, defense = generator.load_images()
+
+        self.assertEqual(len(offense), 1)
+        self.assertEqual(len(defense), 24)
+
+        generator.create_coach_card_defense(defense)
+        generator.create_wristband_sheet_defense(defense)
+        coach_pages = PdfReader(str(self.output / "defense_coach_card.pdf")).pages
+        wristband_pages = PdfReader(str(self.output / "defense_wristband.pdf")).pages
+        self.assertEqual(len(coach_pages), 4)
+        self.assertEqual(len(wristband_pages), 3)
+        self.assertEqual([image_xobject_count(page) for page in coach_pages], [6] * 4)
+        self.assertEqual([xobject_draw_count(page) for page in coach_pages], [6] * 4)
+        self.assertEqual([image_xobject_count(page) for page in wristband_pages], [8] * 3)
+        self.assertEqual([xobject_draw_count(page) for page in wristband_pages], [48] * 3)
+
     def test_aggregate_budget_uses_bounded_render_pixels(self):
         source_path = self.images / "01.png"
         Image.new("RGB", (2000, 1000), "white").save(source_path)
@@ -252,8 +309,20 @@ class GeneratorContractTests(unittest.TestCase):
         self.assertEqual(image.size, (1800, 900))
         self.assertEqual(total, 1_620_000)
 
+    def test_aggregate_budget_allows_the_documented_combined_capacity(self):
+        worst_case = (
+            (MAX_OFFENSE_PLAYS + MAX_DEFENSE_PLAYS)
+            * MAX_RENDER_IMAGE_DIMENSION ** 2
+        )
+        self.assertGreaterEqual(MAX_TOTAL_SOURCE_IMAGE_PIXELS, worst_case)
+
     def test_rejects_images_outside_print_capacity(self):
         Image.new("RGB", (32, 32), "white").save(self.images / "65.png")
+        with self.assertRaisesRegex(ValueError, "Unsupported play image filename"):
+            self.generator().load_images()
+
+    def test_rejects_defense_images_outside_print_capacity(self):
+        Image.new("RGB", (32, 32), "white").save(self.images / "D25.png")
         with self.assertRaisesRegex(ValueError, "Unsupported play image filename"):
             self.generator().load_images()
 

@@ -629,6 +629,34 @@ test("status hides jobs owned by another account", async () => {
   assert.equal(response.headers.get("cache-control"), "private, no-store");
 });
 
+test("status returns optional conversion warnings to the job owner", async () => {
+  const env = makeEnv(undefined, { JOBS_BUCKET: new MemoryR2() });
+  const account = await seedAccount(env);
+  const warnings = [{
+    code: "assumed_offense_before_defense",
+    playCount: 2,
+  }];
+  await env.JOBS_BUCKET.put(
+    `jobs/${JOB_ID}/owner.json`,
+    JSON.stringify({ ownerId: USER_ID })
+  );
+  await env.JOBS_BUCKET.put(
+    `jobs/${JOB_ID}/status.json`,
+    JSON.stringify({
+      status: "complete",
+      files: ["offense_coach_card.pdf"],
+      warnings,
+    })
+  );
+
+  const request = await sessionRequest(env, account, `https://example.test/api/status/${JOB_ID}`);
+  const response = await getStatus({ request, env, params: { jobId: JOB_ID } });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual((await json(response)).warnings, warnings);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+});
+
 test("status persistently expires stale processing jobs and releases their slot", async () => {
   const env = makeEnv(undefined, {
     JOBS_BUCKET: new MemoryR2(),

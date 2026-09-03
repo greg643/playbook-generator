@@ -201,7 +201,7 @@
     <h2>What this is</h2>
     <p>Two ways to make a playbook, one set of outputs:</p>
     <ul>
-      <li><strong>Upload a PowerPoint</strong> &mdash; choose <strong>PPTX Converter</strong> on the signed-in <a href="/">home page</a>, review the <a href="/pptx-guide">visual deck guide</a>, and continue to the protected upload screen. Both 5v5 and 6v6 decks work. Every play slide needs one large rectangle shape marking the field. With no section separators, all recognized plays become offense; use OFFENSE and DEFENSE separators for a mixed deck.</li>
+      <li><strong>Upload a PowerPoint</strong> &mdash; choose <strong>PPTX Converter</strong> on the signed-in <a href="/">home page</a>, review the <a href="/pptx-guide">visual deck guide</a>, and continue to the protected upload screen. Both 5v5 and 6v6 decks work. Every play slide needs one large rectangle shape marking the field. A fully headerless deck is offense-only; an explicitly sectioned deck should start with the appropriate OFFENSE or DEFENSE divider.</li>
       <li><strong>GSS Playbook Editor</strong> &mdash; draw 5v5 or 6v6 plays right in the browser at <a href="/editor">/editor</a>. No PowerPoint needed: drag the player chips, draw routes and zone lines, add text, and generate from there.</li>
     </ul>
     <p>Either way, generation runs in the cloud and produces the same four print-ready PDFs:</p>
@@ -214,7 +214,7 @@
       <div class="out">
         <span class="out-icon">&#128737;&#65039;</span>
         <span><span class="out-name">Defense Coach Card</span><br>
-        <span class="out-desc">Full-page grid of your defensive formations (up to 6).</span></span>
+        <span class="out-desc">Full-page grid of your defensive formations (up to 6 per page).</span></span>
       </div>
       <div class="out">
         <span class="out-icon">&#9200;</span>
@@ -233,7 +233,7 @@
   <section class="card" id="editor">
     <h2>GSS Playbook Editor quick start</h2>
     <ul>
-      <li><strong>Choose 5v5 or 6v6</strong> &mdash; in an empty account, choose a format under <strong>What format are you coaching?</strong> Later, use <strong>New plays:</strong> to choose the format for plays you add next. In 5v5, offense starts with <strong>C, 1, 2, 3 and QB</strong>; defense starts with <strong>1&ndash;4 and N</strong>. The center&rsquo;s <strong>C</strong> makes the snapper easy to spot.</li>
+      <li><strong>Choose 5v5 or 6v6</strong> &mdash; new plays default to <strong>5v5</strong>. Use <strong>New plays:</strong> to choose the format for plays you add next; the editor saves your latest choice for your next visit. In 5v5, offense starts with <strong>C, 1, 2, 3 and QB</strong>; defense starts with <strong>1&ndash;4 and N</strong>. The center&rsquo;s <strong>C</strong> makes the snapper easy to spot.</li>
       <li><strong>Add a play</strong> &mdash; click <strong>+ Add play</strong> under OFFENSE or DEFENSE in the sidebar. New plays start with the standard formation already placed.</li>
       <li><strong>Move players</strong> &mdash; with the <strong>Select</strong> tool, drag any chip. Routes stay attached to their chip when it moves.</li>
       <li><strong>Draw an arrow route</strong> &mdash; pick the <strong>Arrow</strong> tool, click near the chip the route starts from, then click each waypoint. Press <kbd>Enter</kbd> or double-click to finish; <kbd>Esc</kbd> cancels without saving the route.</li>
@@ -243,7 +243,7 @@
       <li><strong>Ball</strong> &mdash; click the field to place a football marker.</li>
       <li><strong>Erase</strong> &mdash; click any route, line, label, or ball to remove it.</li>
     </ul>
-    <p class="muted">The choice under <strong>New plays:</strong> affects only plays added afterward. Existing and duplicated plays keep their format, and each play&rsquo;s 5v5 or 6v6 badge shows which one it uses. That means archived 6v6 plays and new 5v5 plays can stay together in the same account. The hint line under the field always shows what the current tool does.</p>
+    <p class="muted">The choice under <strong>New plays:</strong> affects only plays added afterward. Existing and duplicated plays keep their format, and each play&rsquo;s 5v5 or 6v6 badge shows which one it uses. The hint line under the field always shows what the current tool does.</p>
   </section>
 
   <section class="card" id="editing">
@@ -265,7 +265,7 @@
       <li><strong>In-playbook toggle</strong> &mdash; the checkbox on each sidebar row controls whether a play prints. Unchecked plays stay on the bench: kept in your account, shown faded, but left out of the PDFs.</li>
       <li><strong>Sticky numbers</strong> &mdash; a play keeps its number (offense <strong>1&ndash;16</strong>) or letter (defense <strong>A&ndash;F</strong>) once assigned, even as you bench or reorder other plays &mdash; so wristbands you printed earlier stay valid.</li>
       <li><strong>Renumber</strong> &mdash; when you want a clean sequence again, the <strong>Renumber</strong> button reassigns numbers in sidebar order.</li>
-      <li><strong>Editor print caps</strong> &mdash; a browser-editor generation includes at most <strong>16 offense</strong> and <strong>6 defense</strong> plays at once. PPTX uploads have a separate multi-page offense limit of 64.</li>
+      <li><strong>Editor print caps</strong> &mdash; a browser-editor generation includes at most <strong>16 offense</strong> and <strong>6 defense</strong> plays at once. PPTX uploads separately support 64 offense and 24 defense plays across multiple pages.</li>
       <li><strong>Storage caps</strong> &mdash; your account can keep up to <strong>64 offense</strong> and <strong>24 defense</strong> plays total (in playbook + benched), so you can archive plays between seasons.</li>
     </ul>
   </section>
@@ -274,8 +274,8 @@
     <h2>Generating &amp; printing</h2>
     <ul>
       <li>Check the outputs you want (any of the four PDFs), then hit <strong>Generate</strong>. Jobs usually take <strong>about 1&ndash;2 minutes</strong>; the page polls automatically and shows download buttons when everything is ready.</li>
-      <li><strong>Coach cards</strong> are full-page grids &mdash; print one set per coach. Uploaded offense decks use 16 plays per page and continue automatically when needed.</li>
-      <li><strong>Wristband sheets</strong> print six identical <strong>4.40 &times; 2.09 in</strong> cut-out groups per page, with dashed <strong>cut guides</strong> around each group. Each output page holds the next eight offense plays.</li>
+      <li><strong>Coach cards</strong> are full-page grids &mdash; print one set per coach. Uploaded decks continue automatically every 16 offense plays or 6 defensive formations.</li>
+      <li><strong>Wristband sheets</strong> print six identical <strong>4.40 &times; 2.09 in</strong> cut-out groups per page, with dashed <strong>cut guides</strong> around each group. Each output page holds the next eight offense or defense plays.</li>
     </ul>
     <p class="callout warn"><strong>Print at 100% scale and laminate before cutting.</strong> Turn off &ldquo;fit to page&rdquo; so the wristband inserts keep their exact size.</p>
     <p class="callout"><strong>Compatible holder:</strong> The cut-out group is designed to fit the
@@ -311,14 +311,14 @@
 
   <section class="card" id="pptx">
     <h2>PPTX upload format</h2>
-    <p>The PowerPoint pipeline is deterministic: no LLM interprets your football notation. It reads the slide objects, locates a field rectangle, renders the visible slide, and crops that rendering to the rectangle. It does not count, move or relabel players, so both 5v5 and 6v6 decks work without a format setting. For clean results it expects:</p>
+    <p>The PowerPoint pipeline is deterministic: no LLM interprets your football notation. It reads the slide objects, locates a field rectangle-family shape, renders the visible slide, and crops that rendering to the field. It does not count, move or relabel players, so both 5v5 and 6v6 decks work without a format setting. For clean results it expects:</p>
     <ul>
       <li><strong>Modern PowerPoint file</strong> &mdash; upload a <strong>.pptx</strong>, not a legacy .ppt, PDF, Keynote file, or shared link.</li>
       <li><strong>One play per slide</strong> &mdash; keep the play name, number, players, and routes together inside the field.</li>
-      <li><strong>Field rectangle</strong> &mdash; make the field one large, ungrouped PowerPoint rectangle at the top level of the slide. Its object name or PowerPoint language does not matter. If a slide has several rectangles, the largest one is used.</li>
-      <li><strong>Offense-only decks</strong> &mdash; if the entire deck has no recognized OFFENSE or DEFENSE separator, every slide with a field rectangle becomes an offense play.</li>
-      <li><strong>Mixed decks</strong> &mdash; use a nearly empty slide containing <strong>OFFENSE</strong> or <strong>DEFENSE</strong> before each section. Once any separator is present, play slides before the first separator are ignored.</li>
-      <li><strong>Capacity and pagination</strong> &mdash; uploads support up to <strong>64 offense</strong> and <strong>6 defense</strong> plays. Offense coach cards paginate every 16 plays; offense wristband sheets paginate every 8.</li>
+      <li><strong>Field rectangle</strong> &mdash; make the field one large, ungrouped PowerPoint rectangle at the top level of the slide. Standard, rounded, and snipped-corner rectangle variants work. Its object name or PowerPoint language does not matter. If a slide has several recognized rectangles, the largest one is used.</li>
+      <li><strong>Offense fallback</strong> &mdash; if the deck has no recognized <strong>OFFENSE</strong> divider anywhere, valid play slides before its first <strong>DEFENSE</strong> divider are treated as offense. A successful conversion warns when it uses this fallback. A fully headerless deck remains offense-only.</li>
+      <li><strong>Explicit sections</strong> &mdash; use a nearly empty slide containing <strong>OFFENSE</strong> or <strong>DEFENSE</strong> before each section, and start the deck with the appropriate divider. A completed conversion warns if likely play slides were skipped before that first divider or inside a section without a field shape.</li>
+      <li><strong>Capacity and pagination</strong> &mdash; uploads support up to <strong>64 offense</strong> and <strong>24 defense</strong> plays. Offense coach cards paginate every 16 plays; defense coach cards every 6; both wristband sheets paginate every 8.</li>
       <li>Slides containing <strong>PRINT IMAGES</strong>, <strong>APPENDIX</strong>, or <strong>TEMPLATE</strong> are skipped automatically.</li>
     </ul>
     <p class="callout">See the <a href="/pptx-guide">visual PPTX conversion guide</a> for original example slides, a pre-upload checklist, and the most common failure cases.</p>

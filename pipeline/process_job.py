@@ -33,6 +33,11 @@ class JobCancelled(RuntimeError):
 PLAY_IMAGE_NAME_RE = re.compile(r"(?:0[1-9]|1[0-6]|D[1-6])\.png")
 MAX_PLAY_IMAGES = 22
 MAX_PLAY_IMAGE_BYTES = 4 * 1024 * 1024
+ASSUMED_OFFENSE_WARNING_CODE = "assumed_offense_before_defense"
+SKIPPED_BEFORE_DIVIDER_WARNING_CODE = "skipped_before_first_divider"
+SKIPPED_NO_FIELD_WARNING_CODE = "skipped_no_field_rectangle"
+MAX_ASSUMED_OFFENSE_WARNING_PLAYS = 64
+MAX_WARNING_SLIDES = 100
 
 
 def job_is_cancelled(s3, bucket, job_id):
@@ -94,6 +99,56 @@ def update_status(s3, bucket, job_id, status_dict, request_fields=None):
     )
 
 
+def visible_pipeline_warnings(pipeline_result, *, include_offense):
+    """Return the small warning subset that is useful for this job's outputs."""
+    if not isinstance(pipeline_result, dict):
+        return []
+    raw_warnings = pipeline_result.get("warnings")
+    if not isinstance(raw_warnings, list):
+        return []
+
+    # Only fixed-code, bounded diagnostics are public. Ignore unknown or
+    # malformed values rather than turning an otherwise successful job into an
+    # error or reflecting arbitrary text through the status API.
+    visible = []
+    seen_codes = set()
+    for warning in raw_warnings:
+        if not isinstance(warning, dict):
+            continue
+        code = warning.get("code")
+        if code in seen_codes:
+            continue
+        if code == ASSUMED_OFFENSE_WARNING_CODE:
+            play_count = warning.get("playCount")
+            if (
+                include_offense
+                and type(play_count) is int
+                and 1 <= play_count <= MAX_ASSUMED_OFFENSE_WARNING_PLAYS
+            ):
+                visible.append({
+                    "code": ASSUMED_OFFENSE_WARNING_CODE,
+                    "playCount": play_count,
+                })
+                seen_codes.add(code)
+        elif code in {
+            SKIPPED_BEFORE_DIVIDER_WARNING_CODE,
+            SKIPPED_NO_FIELD_WARNING_CODE,
+        }:
+            slide_count = warning.get("slideCount")
+            if type(slide_count) is int and 1 <= slide_count <= MAX_WARNING_SLIDES:
+                visible.append({"code": code, "slideCount": slide_count})
+                seen_codes.add(code)
+    return visible
+
+
+def build_complete_status(files, warnings=None):
+    """Build the backward-compatible terminal status returned to the UI."""
+    status = {"status": "complete", "files": files}
+    if warnings:
+        status["warnings"] = warnings
+    return status
+
+
 def download_play_images(s3, bucket, job_id, plays_dir):
     """Download every object under jobs/<job_id>/plays/ from R2 (paginated)."""
     count = 0
@@ -151,6 +206,7 @@ def main():
     print(f"Processing job: {job_id}")
 
     request_fields = {}
+    pipeline_warnings = []
     try:
         # Read the job request first: the status update below overwrites
         # status.json, and the editor flow stores mode + options there.
@@ -285,7 +341,11 @@ def main():
                 os.chdir(str(tmpdir))
 
                 try:
-                    pipeline_main()
+                    pipeline_result = pipeline_main()
+                    pipeline_warnings = visible_pipeline_warnings(
+                        pipeline_result,
+                        include_offense=gen_offense,
+                    )
                 finally:
                     os.chdir(original_cwd)
                     sys.argv = original_argv
@@ -318,10 +378,8 @@ def main():
 
             # Write final success status
             ensure_job_active(s3, bucket, job_id)
-            update_status(s3, bucket, job_id, {
-                "status": "complete",
-                "files": uploaded,
-            }, request_fields)
+            complete_status = build_complete_status(uploaded, pipeline_warnings)
+            update_status(s3, bucket, job_id, complete_status, request_fields)
             ensure_job_active(s3, bucket, job_id)
             print(f"Job {job_id} complete. Uploaded: {uploaded}")
 

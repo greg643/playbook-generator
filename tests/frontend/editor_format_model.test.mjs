@@ -128,6 +128,55 @@ test('schema-1 offense stays an exact six-player, C-less play with positions and
   );
 });
 
+test('new plays default to 5v5 when no format has been selected', () => {
+  const normalized = plain(model.normalizeDoc({
+    schema: 2,
+    defaultPlayersPerSide: null,
+    offense: [],
+    defense: [],
+  }));
+  const offense = plain(model.makePlay('offense', normalized.defaultPlayersPerSide));
+  const defense = plain(model.makePlay('defense', undefined));
+
+  assert.equal(normalized.defaultPlayersPerSide, 5);
+  assert.equal(offense.playersPerSide, 5);
+  assert.equal(defense.playersPerSide, 5);
+});
+
+test('an absent selection is inferred from existing plays and a tie stays 6v6', () => {
+  const existingFive = plain(model.makePlay('offense', 5));
+  const existingSix = plain(model.makePlay('defense', 6));
+  const fiveMajority = plain(model.normalizeDoc({
+    schema: 2,
+    offense: [existingFive, plain(model.makePlay('offense', 5))],
+    defense: [existingSix],
+  }));
+  const tied = plain(model.normalizeDoc({
+    schema: 2,
+    offense: [existingFive],
+    defense: [existingSix],
+  }));
+
+  assert.equal(fiveMajority.defaultPlayersPerSide, 5);
+  assert.equal(tied.defaultPlayersPerSide, 6);
+});
+
+test('the saved new-play selection survives reload and controls only later plays', () => {
+  const existingFive = plain(model.makePlay('offense', 5));
+  const saved = plain(model.normalizeDoc({
+    schema: 2,
+    defaultPlayersPerSide: 6,
+    offense: [existingFive],
+    defense: [],
+  }));
+  const reloaded = plain(model.normalizeDoc(JSON.parse(JSON.stringify(saved))));
+  const nextPlay = plain(model.makePlay('offense', reloaded.defaultPlayersPerSide));
+
+  assert.equal(reloaded.defaultPlayersPerSide, 6);
+  assert.equal(reloaded.offense[0].playersPerSide, 5);
+  assert.equal(nextPlay.playersPerSide, 6);
+});
+
 test('new 5v5 offense and defense use the exact agreed player chips', () => {
   const offense = plain(model.makePlay('offense', 5));
   const defense = plain(model.makePlay('defense', 5));

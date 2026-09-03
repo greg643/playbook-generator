@@ -61,14 +61,14 @@ class InputSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at most 64"):
             validate_print_play_counts(plays)
 
-        plays = [{"section": "DEFENSE"} for _ in range(7)]
-        with self.assertRaisesRegex(ValueError, "at most 6"):
+        plays = [{"section": "DEFENSE"} for _ in range(25)]
+        with self.assertRaisesRegex(ValueError, "at most 24"):
             validate_print_play_counts(plays)
 
     def test_accepts_capacity_boundaries(self):
         plays = (
             [{"section": "OFFENSE"} for _ in range(64)]
-            + [{"section": "DEFENSE"} for _ in range(6)]
+            + [{"section": "DEFENSE"} for _ in range(24)]
         )
         validate_print_play_counts(plays)
 
