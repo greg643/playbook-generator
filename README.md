@@ -45,7 +45,7 @@ lines and labels, and generate the same four PDFs without PowerPoint.
 
 The editor supports both common formats:
 
-- **5v5 offense:** `C`, `1`, `2`, `3` and `QB`; **5v5 defense:** `1`–`4` and `N`
+- **5v5 offense:** `C`, `1`, `2`, `3` and `QB`; **5v5 defense:** `1`–`5`
 - **6v6 offense:** `1`–`5` and `QB`; **6v6 defense:** `1`–`5` and `N`
 
 New plays default to 5v5, and the editor saves the coach's latest selection for

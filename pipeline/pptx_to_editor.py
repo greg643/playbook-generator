@@ -12,6 +12,7 @@ and every shape coordinate is normalized into 0..1 within that region.
 
 Imported per play:
   - CHIPS  : shapes whose text matches a supported 5v5 or 6v6 player label
+             (legacy 5v5 defense N labels are normalized to canonical key 5)
   - ROUTES : hand-drawn InkML strokes (anchored to nearest chip) and native
              line/connector shapes that start at a chip (elbow pieces are
              chained into one polyline first)
@@ -46,10 +47,11 @@ PALETTE = {
 }
 OFFENSE_5_KEYS = frozenset({'1', '2', '3', 'C', 'QB'})
 OFFENSE_6_KEYS = frozenset({'1', '2', '3', '4', '5', 'QB'})
-DEFENSE_5_KEYS = frozenset({'1', '2', '3', '4', 'N'})
+DEFENSE_5_KEYS = frozenset({'1', '2', '3', '4', '5'})
+LEGACY_DEFENSE_5_KEYS = frozenset({'1', '2', '3', '4', 'N'})
 DEFENSE_6_KEYS = frozenset({'1', '2', '3', '4', '5', 'N'})
 OFFENSE_KEYS = OFFENSE_5_KEYS | OFFENSE_6_KEYS
-DEFENSE_KEYS = DEFENSE_5_KEYS | DEFENSE_6_KEYS
+DEFENSE_KEYS = DEFENSE_5_KEYS | LEGACY_DEFENSE_5_KEYS | DEFENSE_6_KEYS
 ARROW_TYPES = {'triangle', 'arrow', 'stealth', 'diamond', 'oval'}
 LINE_GEOMS = {'line', 'straightConnector1', 'bentConnector2', 'bentConnector3',
               'curvedConnector2', 'curvedConnector3'}
@@ -80,7 +82,7 @@ def infer_players_per_side(section, found_keys):
     keys = frozenset(found_keys)
     if section == 'offense' and keys == OFFENSE_5_KEYS:
         return 5
-    if section == 'defense' and keys == DEFENSE_5_KEYS:
+    if section == 'defense' and keys in (DEFENSE_5_KEYS, LEGACY_DEFENSE_5_KEYS):
         return 5
     return 6
 
@@ -476,8 +478,16 @@ def convert_play(play_meta, prs, pptx_zip, theme, section):
     chip_keys = expected_chip_keys(section, players_per_side)
 
     for text, cx_pt, shape in text_items:
-        if text in chip_keys:
-            chips[text] = cx_pt
+        # Older 5v5 decks used N for their fifth defender. Preserve the source
+        # position while emitting the editor's current canonical key, 5. The
+        # exact six-player lineup still infers 6v6 and retains both 5 and N.
+        canonical_text = (
+            '5'
+            if section == 'defense' and players_per_side == 5 and text == 'N'
+            else text
+        )
+        if canonical_text in chip_keys:
+            chips[canonical_text] = cx_pt
             continue
 
         # Keep line breaks: the editor renders multi-line labels and

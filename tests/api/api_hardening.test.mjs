@@ -740,6 +740,73 @@ test("a new account receives an unconfigured schema-2 playbook", async () => {
   });
 });
 
+test("legacy 5v5 defense N data migrates to 5 while 6v6 N and 5 stay unchanged", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const key = `accounts/${USER_ID}/playbook.json`;
+  const legacyFiveChips = chips(["1", "2", "3", "4", "N"]);
+  legacyFiveChips.N = { x: 0.47, y: 0.59 };
+  const sixChips = chips(["1", "2", "3", "4", "5", "N"]);
+  sixChips["5"] = { x: 0.79, y: 0.64 };
+  sixChips.N = { x: 0.51, y: 0.61 };
+  const legacyDoc = {
+    schema: 2,
+    defaultPlayersPerSide: 5,
+    offense: [],
+    defense: [{
+      name: "Legacy five",
+      playersPerSide: 5,
+      chips: legacyFiveChips,
+      routes: [{ chip: "N", points: [[0.47, 0.59], [0.47, 0.25]] }],
+    }, {
+      name: "Six stays six",
+      playersPerSide: 6,
+      chips: sixChips,
+      routes: [
+        { chip: "N", points: [[0.51, 0.61], [0.50, 0.30]] },
+        { chip: "5", points: [[0.79, 0.64], [0.80, 0.35]] },
+      ],
+    }],
+    updatedAt: "2026-09-02T12:00:00.000Z",
+  };
+  await env.PLAYBOOK_BUCKET.put(key, JSON.stringify(legacyDoc));
+
+  const getRequest = await sessionRequest(env, account, "https://example.test/api/plays");
+  const getResponse = await getPlays({ request: getRequest, env });
+  const loaded = await json(getResponse);
+
+  assert.equal(getResponse.status, 200);
+  assert.deepEqual(Object.keys(loaded.defense[0].chips).sort(), ["1", "2", "3", "4", "5"]);
+  assert.deepEqual(loaded.defense[0].chips["5"], { x: 0.47, y: 0.59 });
+  assert.equal(Object.hasOwn(loaded.defense[0].chips, "N"), false);
+  assert.equal(loaded.defense[0].routes[0].chip, "5");
+  assert.deepEqual(loaded.defense[0].routes[0].points, [[0.47, 0.59], [0.47, 0.25]]);
+  assert.deepEqual(loaded.defense[1].chips["5"], { x: 0.79, y: 0.64 });
+  assert.deepEqual(loaded.defense[1].chips.N, { x: 0.51, y: 0.61 });
+  assert.deepEqual(loaded.defense[1].routes.map((route) => route.chip), ["N", "5"]);
+
+  // A browser tab loaded before this rollout can still submit the old shape;
+  // the API canonicalizes it before validation and stores only the new key.
+  const session = await sessionRequest(env, account);
+  const putResponse = await savePlays({
+    request: new Request("https://example.test/api/plays", {
+      method: "PUT",
+      headers: { cookie: session.headers.get("cookie") },
+      body: JSON.stringify({ ...legacyDoc, ownerId: USER_ID }),
+    }),
+    env,
+  });
+  assert.equal(putResponse.status, 200);
+
+  const stored = await (await env.PLAYBOOK_BUCKET.get(key)).json();
+  assert.deepEqual(Object.keys(stored.defense[0].chips).sort(), ["1", "2", "3", "4", "5"]);
+  assert.deepEqual(stored.defense[0].chips["5"], { x: 0.47, y: 0.59 });
+  assert.equal(stored.defense[0].routes[0].chip, "5");
+  assert.deepEqual(stored.defense[1].chips["5"], { x: 0.79, y: 0.64 });
+  assert.deepEqual(stored.defense[1].chips.N, { x: 0.51, y: 0.61 });
+  assert.deepEqual(stored.defense[1].routes.map((route) => route.chip), ["N", "5"]);
+});
+
 test("playbook saves preserve schema-1 compatibility and accept mixed schema-2 formats", async () => {
   const env = makeEnv();
   const account = await seedAccount(env);

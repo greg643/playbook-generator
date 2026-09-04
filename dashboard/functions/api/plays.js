@@ -22,13 +22,58 @@ const CHIP_KEYS = {
     6: new Set(["1", "2", "3", "4", "5", "QB"]),
   },
   defense: {
-    5: new Set(["1", "2", "3", "4", "N"]),
+    5: new Set(["1", "2", "3", "4", "5"]),
     6: new Set(["1", "2", "3", "4", "5", "N"]),
   },
 };
+const LEGACY_DEFENSE_5_CHIP_KEYS = new Set(["1", "2", "3", "4", "N"]);
 
 function playbookKey(userId) {
   return `accounts/${userId}/playbook.json`;
+}
+
+function migrateLegacyFivePlayerDefense(doc) {
+  if (
+    !doc ||
+    typeof doc !== "object" ||
+    Array.isArray(doc) ||
+    doc.schema !== CURRENT_SCHEMA ||
+    !Array.isArray(doc.defense)
+  ) {
+    return doc;
+  }
+
+  for (const play of doc.defense) {
+    if (
+      !play ||
+      typeof play !== "object" ||
+      Array.isArray(play) ||
+      play.playersPerSide !== 5 ||
+      !play.chips ||
+      typeof play.chips !== "object" ||
+      Array.isArray(play.chips)
+    ) {
+      continue;
+    }
+    const chipKeys = Object.keys(play.chips);
+    const isLegacyLineup =
+      chipKeys.length === LEGACY_DEFENSE_5_CHIP_KEYS.size &&
+      chipKeys.every((key) => LEGACY_DEFENSE_5_CHIP_KEYS.has(key));
+    if (!isLegacyLineup) continue;
+
+    // Preserve the stored chip object (and therefore its exact position) while
+    // adopting the canonical numeric key. Routes follow the same one-way map.
+    play.chips["5"] = play.chips.N;
+    delete play.chips.N;
+    if (Array.isArray(play.routes)) {
+      for (const route of play.routes) {
+        if (route && typeof route === "object" && route.chip === "N") {
+          route.chip = "5";
+        }
+      }
+    }
+  }
+  return doc;
 }
 
 export async function onRequestGet(context) {
@@ -49,10 +94,8 @@ export async function onRequestGet(context) {
         defense: [],
       });
     }
-    const text = await obj.text();
-    return new Response(text, {
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-    });
+    const doc = migrateLegacyFivePlayerDefense(await obj.json());
+    return jsonNoStore(doc);
   } catch (err) {
     console.error("Plays GET error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });
@@ -126,6 +169,7 @@ export async function onRequestPut(context) {
     } catch (err) {
       return jsonNoStore({ error: "Invalid JSON" }, { status: 400 });
     }
+    migrateLegacyFivePlayerDefense(doc);
 
     const schema = doc && doc.schema;
     if (

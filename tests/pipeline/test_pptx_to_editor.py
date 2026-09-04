@@ -73,7 +73,7 @@ class PptxToEditorFormatTests(unittest.TestCase):
     def test_exact_five_player_lineups_emit_editable_schema_two(self):
         doc = self.convert_deck([
             ("offense", [("Center Choice", ["1", "2", "C", "3", "QB"])]),
-            ("defense", [("Five Across", ["1", "2", "3", "4", "N"])]),
+            ("defense", [("Five Across", ["1", "2", "3", "4", "5"])]),
         ])
 
         self.assertEqual(doc["schema"], 2)
@@ -86,7 +86,19 @@ class PptxToEditorFormatTests(unittest.TestCase):
 
         defense = doc["defense"][0]
         self.assertEqual(defense["playersPerSide"], 5)
-        self.assertEqual(set(defense["chips"]), {"1", "2", "3", "4", "N"})
+        self.assertEqual(set(defense["chips"]), {"1", "2", "3", "4", "5"})
+
+    def test_legacy_five_player_defense_n_is_normalized_to_five(self):
+        doc = self.convert_deck([
+            ("defense", [("Legacy Five", ["1", "2", "3", "4", "N"])]),
+        ])
+
+        defense = doc["defense"][0]
+        self.assertEqual(doc["defaultPlayersPerSide"], 5)
+        self.assertEqual(defense["playersPerSide"], 5)
+        self.assertEqual(set(defense["chips"]), {"1", "2", "3", "4", "5"})
+        self.assertNotIn("N", defense["chips"])
+        self.assertNotIn("N", {label["text"] for label in defense["labels"]})
 
     def test_existing_six_player_lineups_remain_six(self):
         doc = self.convert_deck([

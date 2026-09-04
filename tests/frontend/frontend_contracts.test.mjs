@@ -149,7 +149,8 @@ test('home presents account creation as a clear, dedicated mode', () => {
 
 test('editor keeps 5v5 and 6v6 formats per play', () => {
   assert.match(editor, /const OFFENSE_5_CHIP_KEYS = \['1', '2', '3', 'C', 'QB'\]/);
-  assert.match(editor, /const DEFENSE_5_CHIP_KEYS = \['1', '2', '3', '4', 'N'\]/);
+  assert.match(editor, /const DEFENSE_5_CHIP_KEYS = \['1', '2', '3', '4', '5'\]/);
+  assert.match(editor, /isFivePlayerDefense && routeChip === 'N'/);
   assert.match(editor, /const PLAYER_FORMATS = \{/);
   assert.match(editor, /const DEFAULT_NEW_PLAYERS_PER_SIDE = 5/);
   assert.match(editor, /const playersPerSide = normalizePlayersPerSide\(p\.playersPerSide, 6\)/);

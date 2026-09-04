@@ -814,7 +814,7 @@ const DEFENSE_DEFAULT_POS = {
 };
 
 const OFFENSE_5_CHIP_KEYS = ['1', '2', '3', 'C', 'QB'];
-const DEFENSE_5_CHIP_KEYS = ['1', '2', '3', '4', 'N'];
+const DEFENSE_5_CHIP_KEYS = ['1', '2', '3', '4', '5'];
 const OFFENSE_5_CHIPS = {
   '1': { fill: '#C00000', text: '#FFFFFF' },
   '2': { fill: '#FFC000', text: '#1F3864' },
@@ -827,7 +827,7 @@ const DEFENSE_5_CHIPS = {
   '2': { fill: '#FFFF00', text: '#1F3864' },
   '3': { fill: '#000000', text: '#FFFFFF' },
   '4': { fill: '#C00000', text: '#FFFFFF' },
-  'N': { fill: '#FFC000', text: '#1F3864' },
+  '5': { fill: '#00B050', text: '#FFFFFF' },
 };
 const OFFENSE_5_DEFAULT_POS = {
   '1': [0.10, 0.66], '2': [0.30, 0.66], 'C': [0.50, 0.66],
@@ -835,7 +835,7 @@ const OFFENSE_5_DEFAULT_POS = {
 };
 const DEFENSE_5_DEFAULT_POS = {
   '1': [0.80, 0.62], '2': [0.30, 0.12], '3': [0.68, 0.12],
-  '4': [0.20, 0.62], 'N': [0.50, 0.62],
+  '4': [0.20, 0.62], '5': [0.50, 0.62],
 };
 
 // Player count belongs to each play, so archived 6v6 material can coexist
@@ -1976,6 +1976,10 @@ function makePlay(section) {
 function normalizePlay(p, section) {
   // (num is validated here, assigned in normalizeDoc if missing)
   const playersPerSide = normalizePlayersPerSide(p.playersPerSide, 6);
+  const isFivePlayerDefense = section === 'defense' && playersPerSide === 5;
+  const hasCanonicalDefenseFive = !!(
+    p.chips && Object.prototype.hasOwnProperty.call(p.chips, '5')
+  );
   const play = {
     id: typeof p.id === 'string' && p.id ? p.id : crypto.randomUUID(),
     name: typeof p.name === 'string' ? p.name.slice(0, 60) : 'Untitled',
@@ -1986,7 +1990,12 @@ function normalizePlay(p, section) {
   if (Number.isInteger(+p.num) && +p.num >= 1 && +p.num <= 999) play.num = Math.floor(+p.num);
   const defaults = playerFormat(section, playersPerSide).defaults;
   for (const k in defaults) {
-    const c = p.chips && p.chips[k];
+    // Early 5v5 documents used N as the fifth defender. Prefer canonical 5
+    // data when present, otherwise retain the legacy N chip's exact position.
+    const sourceKey = isFivePlayerDefense && k === '5' && !hasCanonicalDefenseFive
+      ? 'N'
+      : k;
+    const c = p.chips && p.chips[sourceKey];
     play.chips[k] = {
       x: c && Number.isFinite(+c.x) ? clamp01(+c.x) : defaults[k][0],
       y: c && Number.isFinite(+c.y) ? clamp01(+c.y) : defaults[k][1],
@@ -2001,7 +2010,8 @@ function normalizePlay(p, section) {
     if (!r || !Array.isArray(r.points)) continue;
     const rpts = normPts(r.points);
     if (rpts.length < 2) continue;
-    const routeChip = typeof r.chip === 'string' ? r.chip : '1';
+    let routeChip = typeof r.chip === 'string' ? r.chip : '1';
+    if (isFivePlayerDefense && routeChip === 'N') routeChip = '5';
     if (!Object.prototype.hasOwnProperty.call(play.chips, routeChip)) continue;
     play.routes.push({
       chip: routeChip,

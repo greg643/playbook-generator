@@ -74,7 +74,7 @@ const sortedKeys = object => Object.keys(object).sort();
 
 const OFFENSE_SIX_KEYS = ['1', '2', '3', '4', '5', 'QB'];
 const OFFENSE_FIVE_KEYS = ['1', '2', '3', 'C', 'QB'];
-const DEFENSE_FIVE_KEYS = ['1', '2', '3', '4', 'N'];
+const DEFENSE_FIVE_KEYS = ['1', '2', '3', '4', '5'];
 const DEFENSE_SIX_KEYS = ['1', '2', '3', '4', '5', 'N'];
 
 function chips(keys, y = 0.7) {
@@ -190,8 +190,57 @@ test('new 5v5 offense and defense use the exact agreed player chips', () => {
 
   assert.equal(defense.playersPerSide, 5);
   assert.deepEqual(sortedKeys(defense.chips), [...DEFENSE_FIVE_KEYS].sort());
-  assert.deepEqual(defense.chips.N, { x: 0.5, y: 0.62 });
-  assert.equal(Object.hasOwn(defense.chips, '5'), false);
+  assert.deepEqual(defense.chips['5'], { x: 0.5, y: 0.62 });
+  assert.equal(Object.hasOwn(defense.chips, 'N'), false);
+});
+
+test('legacy 5v5 defense N positions and routes migrate to 5 without changing 6v6', () => {
+  const legacyFiveChips = chips(['1', '2', '3', '4', 'N']);
+  legacyFiveChips.N = { x: 0.47, y: 0.59 };
+  const sixChips = chips(DEFENSE_SIX_KEYS);
+  sixChips['5'] = { x: 0.79, y: 0.64 };
+  sixChips.N = { x: 0.51, y: 0.61 };
+
+  const normalized = plain(model.normalizeDoc({
+    schema: 2,
+    defaultPlayersPerSide: 5,
+    offense: [],
+    defense: [{
+      id: 'legacy-five-defense',
+      name: 'Legacy five',
+      playersPerSide: 5,
+      chips: legacyFiveChips,
+      routes: [{ chip: 'N', points: [[0.47, 0.59], [0.47, 0.25]] }],
+      lines: [],
+      labels: [],
+      balls: [],
+    }, {
+      id: 'six-defense',
+      name: 'Six stays six',
+      playersPerSide: 6,
+      chips: sixChips,
+      routes: [
+        { chip: 'N', points: [[0.51, 0.61], [0.50, 0.30]] },
+        { chip: '5', points: [[0.79, 0.64], [0.80, 0.35]] },
+      ],
+      lines: [],
+      labels: [],
+      balls: [],
+    }],
+  }));
+
+  const five = normalized.defense[0];
+  assert.deepEqual(sortedKeys(five.chips), [...DEFENSE_FIVE_KEYS].sort());
+  assert.deepEqual(five.chips['5'], { x: 0.47, y: 0.59 });
+  assert.equal(Object.hasOwn(five.chips, 'N'), false);
+  assert.equal(five.routes[0].chip, '5');
+  assert.deepEqual(five.routes[0].points, [[0.47, 0.59], [0.47, 0.25]]);
+
+  const six = normalized.defense[1];
+  assert.deepEqual(sortedKeys(six.chips), [...DEFENSE_SIX_KEYS].sort());
+  assert.deepEqual(six.chips['5'], { x: 0.79, y: 0.64 });
+  assert.deepEqual(six.chips.N, { x: 0.51, y: 0.61 });
+  assert.deepEqual(six.routes.map(route => route.chip), ['N', '5']);
 });
 
 test('unchanged 6v6 definitions still produce the established chip sets and positions', () => {
