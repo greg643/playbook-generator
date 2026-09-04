@@ -73,6 +73,26 @@
 
     .topbar .spacer { flex: 1; }
 
+    .top-account {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 0.65rem;
+      margin-left: 1rem;
+    }
+
+    .account-email {
+      min-width: 0;
+      max-width: min(30vw, 280px);
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-email strong { color: var(--text); font-weight: 600; }
+
     .top-link,
     .link-button {
       border: 0;
@@ -274,22 +294,20 @@
     }
 
     .hub h1 { max-width: none; font-size: clamp(1.8rem, 4vw, 2.6rem); }
-    .hub-sub { margin: 0.7rem auto 0; color: var(--muted); line-height: 1.6; }
-    .account-line { margin-top: 0.7rem; color: #c9d1d9; font-size: 0.85rem; }
-    .account-line strong { color: #fff; font-weight: 600; }
-    .account-line button { margin-left: 0.65rem; }
+    .hub-sub { margin: 0.7rem auto 0; color: var(--muted); font-size: 1rem; line-height: 1.6; }
 
     .choice-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       gap: 1rem;
-      margin-top: 2rem;
+      max-width: 620px;
+      margin: 2rem auto 0;
       text-align: left;
     }
 
     .choice {
       display: flex;
-      min-height: 210px;
+      min-height: 175px;
       flex-direction: column;
       padding: 1.5rem;
       border: 1px solid var(--border);
@@ -313,8 +331,9 @@
     .choice-action { margin-top: auto; padding-top: 1rem; color: var(--blue); font-size: 0.88rem; font-weight: 700; }
     .converter .choice-action { color: #7ee787; }
 
-    .hub-help { margin-top: 1.4rem; color: var(--muted); font-size: 0.82rem; }
+    .hub-help { margin-top: 1.4rem; color: var(--muted); font-size: 1rem; line-height: 1.6; }
     .hub-help a { color: var(--blue); }
+    .hub-help p + p { margin-top: 0.65rem; }
 
     .modal-overlay {
       position: fixed;
@@ -378,9 +397,9 @@
     }
 
     @media (max-width: 620px) {
-      .choice-grid { grid-template-columns: 1fr; }
-      .choice { min-height: 175px; }
-      .account-line button { display: block; margin: 0.55rem auto 0; }
+      .topbar { flex-wrap: wrap; gap: 0.55rem; }
+      .top-account { flex: 1 0 100%; justify-content: flex-end; margin-left: 0; }
+      .account-email { max-width: calc(100vw - 7rem); }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -393,6 +412,10 @@
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">GSS</span><span>GSS Playbook Editor</span></a>
     <div class="spacer"></div>
     <a class="top-link" href="/help">Help</a>
+    <div class="top-account" id="hubAccount" aria-label="Signed-in account" hidden>
+      <span class="account-email">Signed in as <strong id="userEmail"></strong></span>
+      <button class="link-button" id="signOutBtn" type="button">Sign out</button>
+    </div>
   </header>
 
   <main>
@@ -444,7 +467,7 @@
           <div id="signinFormWrap">
             <h2 id="authTitle" tabindex="-1">Sign in</h2>
             <p class="card-sub" id="authSubtitle">Access your saved plays and PowerPoint conversions.</p>
-            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. Afterward, choose <strong>PPTX Converter</strong> to review the deck guide and upload.</p>
+            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. Afterward, choose <strong>PPTX Import</strong> to upload your deck.</p>
             <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it somewhere safe&mdash;it is the only way to reset a forgotten password.</p>
             <form id="signinForm" aria-labelledby="authTitle" novalidate>
               <label class="field">Email
@@ -493,25 +516,28 @@
       <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
       <h1 id="hubHeading" tabindex="-1">How do you want to build your playbook?</h1>
       <p class="hub-sub">Both paths make the same print-ready coach cards and wristband inserts.</p>
-      <p class="account-line">Signed in as <strong id="userEmail"></strong><button class="link-button" id="signOutBtn" type="button">Sign out</button></p>
       <p class="error-msg" id="hubError" role="alert" aria-live="assertive"></p>
 
       <div class="choice-grid">
         <a class="choice editor-choice" href="/editor">
           <span class="choice-icon" aria-hidden="true">&#9999;&#65039;</span>
-          <h2>GSS Playbook Editor</h2>
+          <h2>Playbook Editor</h2>
           <p>Draw, organize, save, and print plays right in the browser.</p>
-          <span class="choice-action">Open GSS Playbook Editor &rarr;</span>
+          <span class="choice-action">Open Playbook Editor &rarr;</span>
         </a>
-        <a class="choice converter" href="/pptx-guide">
+        <a class="choice converter" href="/converter">
           <span class="choice-icon" aria-hidden="true">&#128196;</span>
-          <h2>PPTX Converter</h2>
-          <p>Review the visual deck guide, then upload your compatible .pptx.</p>
-          <span class="choice-action">Read the PPTX guide &rarr;</span>
+          <h2>PPTX Import</h2>
+          <p>Upload a compatible .pptx and turn it into print-ready cards.</p>
+          <span class="choice-action">Open PPTX Import &rarr;</span>
         </a>
       </div>
 
-      <p class="hub-help">New here? The <a href="/help">quick-start guide</a> explains editing, printing, accounts, and deck compatibility.</p>
+      <div class="hub-help">
+        <p>Need help?</p>
+        <p>The <a href="/help">quick-start guide</a> explains editing, printing, accounts, and deck compatibility.</p>
+        <p><a href="/pptx-guide">Read the PPTX Import Guide</a></p>
+      </div>
     </section>
   </main>
 
@@ -615,6 +641,8 @@ function setAuthMode(mode, focusHeading = false) {
 function showAuth(message = '') {
   loadingView.hidden = true;
   hubView.hidden = true;
+  $('hubAccount').hidden = true;
+  $('userEmail').textContent = '';
   authView.hidden = false;
   setError(authError, message);
   if (!message) setDeletionHelp(false);
@@ -627,6 +655,7 @@ function showHub(account, focusHeading = false) {
     throw new Error('The server returned an invalid account');
   }
   $('userEmail').textContent = account.email;
+  $('hubAccount').hidden = false;
   setError($('hubError'), '');
   loadingView.hidden = true;
   authView.hidden = true;

@@ -40,7 +40,7 @@ playbooks, or the session-signing key.
 ## GSS Playbook Editor
 
 The browser-based **GSS Playbook Editor** lives at `/editor`. Sign in at `/`,
-choose **GSS Playbook Editor**, drag the player chips into position, draw routes,
+choose **Playbook Editor**, drag the player chips into position, draw routes,
 lines and labels, and generate the same four PDFs without PowerPoint.
 
 The editor supports both common formats:
