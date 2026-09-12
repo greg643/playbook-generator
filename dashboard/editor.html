@@ -118,6 +118,41 @@
 
     /* Sidebar */
     .sidebar { border-right: 1px solid #30363d; overflow-y: auto; padding: 0.9rem 0.7rem; }
+    .playbook-manager {
+      min-width: 0;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #30363d;
+    }
+    .playbook-manager label {
+      display: block;
+      margin: 0 0 0.4rem 0.25rem;
+      color: #8b949e;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .playbook-manager select {
+      width: 100%;
+      min-width: 0;
+      padding: 0.48rem 0.55rem;
+      border: 1px solid #30363d;
+      border-radius: 7px;
+      background: #0d1117;
+      color: #e1e4e8;
+      font: inherit;
+      font-size: 0.82rem;
+    }
+    .playbook-manager-actions { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+    .playbook-manager-actions .add-btn { flex: 1; }
+    .playbook-status {
+      min-height: 1rem;
+      margin: 0.35rem 0.25rem 0;
+      color: #8b949e;
+      font-size: 0.68rem;
+      line-height: 1.3;
+    }
     .new-play-format {
       min-width: 0;
       margin: 0 0 1rem;
@@ -488,6 +523,30 @@
     }
     .modal input:focus, .modal textarea:focus { outline: none; border-color: #58a6ff; }
     .modal .input-hint { font-size: 0.72rem; color: #8b949e; margin-top: 0.3rem; }
+    .modal .playbook-name-label {
+      display: block;
+      margin: 0.2rem 0 0.35rem;
+      color: #c9d1d9;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .modal .playbook-format {
+      margin-top: 0.8rem;
+      padding: 0;
+      border: 0;
+    }
+    .modal .playbook-format legend {
+      margin-bottom: 0.35rem;
+      color: #c9d1d9;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .modal .playbook-form-error {
+      min-height: 1rem;
+      margin-top: 0.45rem;
+      color: #ff7b72;
+      font-size: 0.75rem;
+    }
     .modal .btn-row { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
     .modal .btn-row button {
       padding: 0.45rem 0.9rem;
@@ -527,7 +586,7 @@
     .mbtn-danger { background: #da3633; color: #fff; }
     .mbtn-danger:hover { background: #f85149; }
 
-    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
       outline: 2px solid #58a6ff;
       outline-offset: 2px;
     }
@@ -558,7 +617,7 @@
         border-bottom: 1px solid #30363d;
         overflow: visible;
       }
-      .new-play-format { grid-column: 1 / -1; margin-bottom: 0; }
+      .playbook-manager, .new-play-format { grid-column: 1 / -1; margin-bottom: 0; }
       .side-section + .side-section { margin-top: 0; }
       .canvas-col { min-height: 56vh; padding: 0.75rem; overflow: visible; }
       #canvas { max-height: 72vh; }
@@ -612,7 +671,7 @@
       <div class="card" id="authCard">
         <div id="signinForm">
           <h2>Sign in</h2>
-          <p class="auth-sub">Free account &mdash; your playbook is saved in the cloud.</p>
+          <p class="auth-sub">Free account &mdash; your playbooks are saved in the cloud.</p>
           <label class="field">Email
             <input type="email" id="authEmail" autocomplete="email">
           </label>
@@ -645,7 +704,16 @@
   </div>
 
   <div class="editor" id="editorView">
-    <aside class="sidebar" aria-label="Play list">
+    <aside class="sidebar" aria-label="Playbook and play list">
+      <section class="playbook-manager" aria-labelledby="playbookManagerLabel">
+        <label id="playbookManagerLabel" for="playbookSelect">Playbook</label>
+        <select id="playbookSelect" disabled></select>
+        <div class="playbook-manager-actions">
+          <button class="add-btn" id="newPlaybookBtn" type="button" disabled>+ New</button>
+          <button class="add-btn" id="renamePlaybookBtn" type="button" disabled>Rename</button>
+        </div>
+        <p class="playbook-status" id="playbookStatus" role="status" aria-live="polite"></p>
+      </section>
       <fieldset class="new-play-format" aria-describedby="newPlayFormatHint">
         <legend>New plays:</legend>
         <div class="format-options">
@@ -729,7 +797,7 @@
         <span id="saveIndicator" class="saved" role="status" aria-live="polite">Saved</span>
       </div>
       <div class="backup-row">
-        <button class="add-btn" id="exportBtn" title="Download your whole playbook as a JSON backup file">&#8681; Backup</button>
+        <button class="add-btn" id="exportBtn" title="Download this playbook as a JSON backup file">&#8681; Backup</button>
         <button class="add-btn" id="importBtn" title="Load plays from a backup file">&#8679; Import</button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       </div>
@@ -777,13 +845,17 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VB_W = 1076, VB_H = 1000, HEADER_H = 170;
 const FIELD_X = 8, FIELD_W = 1060, FIELD_H = 822;
-// Storage caps — how many plays an account can keep (active + archive). The
-// playbook itself (included plays) is separately capped at generate time:
+// Storage caps — how many plays each named playbook can keep (active + archive).
+// Included plays are separately capped at generate time:
 // 16 offense / 6 defense, the most the printed cards can hold.
 const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
 const MAX_IMPORT_BYTES = 1000000;
 const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
 const DEFAULT_NEW_PLAYERS_PER_SIDE = 5;
+const MAX_PLAYBOOK_NAME_LENGTH = 60;
+const LAST_PLAYBOOK_KEY_PREFIX = 'gss-playbook:last-selected:';
+const PLAYBOOK_ID_RE = /^(?:default|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
+const PLAYBOOK_NAME_CONTROL_RE = /[\u0000-\u001f\u007f-\u009f]/u;
 
 const OFFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'QB'];
 const DEFENSE_CHIP_KEYS = ['1', '2', '3', '4', '5', 'N'];
@@ -1228,6 +1300,8 @@ const authView = $('authView'), editorView = $('editorView');
 const authEmail = $('authEmail'), authPassword = $('authPassword'), authError = $('authError');
 const loginBtn = $('loginBtn'), registerBtn = $('registerBtn'), signOutBtn = $('signOutBtn');
 const userEmail = $('userEmail');
+const playbookSelect = $('playbookSelect'), newPlaybookBtn = $('newPlaybookBtn');
+const renamePlaybookBtn = $('renamePlaybookBtn'), playbookStatus = $('playbookStatus');
 const newPlays5 = $('newPlays5'), newPlays6 = $('newPlays6');
 const offenseHeading = $('offenseHeading'), defenseHeading = $('defenseHeading');
 const offenseList = $('offenseList'), defenseList = $('defenseList');
@@ -1252,6 +1326,14 @@ const modalOverlay = $('modalOverlay'), modalBox = $('modalBox');
 
 let doc = null;                 // {schema, defaultPlayersPerSide, offense:[], defense:[]}
 let cur = null;                 // {section, index} of the open play
+let playbooks = [];
+let maxPlaybooks = 1;
+let activePlaybookId = null;
+let docPlaybookId = null;
+let documentEpoch = 0;
+let playbookLoadEpoch = 0;
+let playbookLoadRequest = null;
+let playbookBusy = false;
 let tool = 'select';
 const toolStyles = {
   route: { color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth' },
@@ -1820,7 +1902,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
@@ -1947,6 +2029,134 @@ function syncStyleUI() {
 
 function setHint() {
   canvasHint.textContent = currentPlay() ? HINTS[tool] : '';
+}
+
+// ---------- Named playbooks ----------
+
+function normalizePlaybookName(value) {
+  if (typeof value !== 'string') return null;
+  const name = value.normalize('NFC').trim();
+  if (!name || Array.from(name).length > MAX_PLAYBOOK_NAME_LENGTH || PLAYBOOK_NAME_CONTROL_RE.test(name)) {
+    return null;
+  }
+  return name;
+}
+
+function samePlaybookName(left, right) {
+  return left.toLocaleLowerCase('en-US') === right.toLocaleLowerCase('en-US');
+}
+
+function isPlaybookId(value) {
+  return typeof value === 'string' && PLAYBOOK_ID_RE.test(value);
+}
+
+function normalizePlaybookCatalog(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      !Array.isArray(data.playbooks) || !Number.isSafeInteger(data.maxPlaybooks) ||
+      data.maxPlaybooks < 1 || data.maxPlaybooks > 100 || data.playbooks.length > data.maxPlaybooks) {
+    throw new Error('The server returned an invalid playbook list');
+  }
+  const ids = new Set();
+  const entries = data.playbooks.map(entry => {
+    const name = normalizePlaybookName(entry && entry.name);
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) ||
+        !isPlaybookId(entry.id) || ids.has(entry.id) || name !== entry.name ||
+        typeof entry.createdAt !== 'string' || !Number.isFinite(Date.parse(entry.createdAt)) ||
+        typeof entry.updatedAt !== 'string' || !Number.isFinite(Date.parse(entry.updatedAt)) ||
+        typeof entry.revision !== 'string' || !entry.revision) {
+      throw new Error('The server returned an invalid playbook list');
+    }
+    ids.add(entry.id);
+    return {
+      id: entry.id,
+      name,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      revision: entry.revision,
+    };
+  });
+  return { playbooks: entries, maxPlaybooks: data.maxPlaybooks };
+}
+
+function playbookById(playbookId) {
+  return playbooks.find(playbook => playbook.id === playbookId) || null;
+}
+
+function playbookDocumentUrl(playbookId) {
+  if (!isPlaybookId(playbookId)) throw new Error('Invalid playbook ID');
+  return '/api/plays?playbookId=' + encodeURIComponent(playbookId);
+}
+
+function rememberedPlaybookId(userId) {
+  try {
+    const value = localStorage.getItem(LAST_PLAYBOOK_KEY_PREFIX + userId);
+    return isPlaybookId(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberPlaybookId(userId, playbookId) {
+  if (!userId || !isPlaybookId(playbookId)) return;
+  try {
+    localStorage.setItem(LAST_PLAYBOOK_KEY_PREFIX + userId, playbookId);
+  } catch { /* browser storage is optional; the catalog's first book is the fallback */ }
+}
+
+function forgetRememberedPlaybook(userId) {
+  if (!userId) return;
+  try { localStorage.removeItem(LAST_PLAYBOOK_KEY_PREFIX + userId); }
+  catch { /* ignore unavailable browser storage */ }
+}
+
+function renderPlaybookManager(message = '') {
+  playbookSelect.replaceChildren();
+  for (const playbook of playbooks) {
+    const option = document.createElement('option');
+    option.value = playbook.id;
+    option.textContent = playbook.name;
+    playbookSelect.appendChild(option);
+  }
+  if (activePlaybookId && playbookById(activePlaybookId)) playbookSelect.value = activePlaybookId;
+  else playbookSelect.selectedIndex = -1;
+  const controlsBusy = playbookBusy || accountRequestBusy;
+  playbookSelect.disabled = controlsBusy || !activeUserId || !activePlaybookId || playbooks.length < 2;
+  newPlaybookBtn.disabled = controlsBusy || !activeUserId || playbooks.length >= maxPlaybooks;
+  renamePlaybookBtn.disabled = controlsBusy || !activeUserId || !playbookById(activePlaybookId);
+  playbookStatus.textContent = message || (playbooks.length
+    ? playbooks.length + ' of ' + maxPlaybooks + ' playbooks'
+    : 'No playbooks');
+}
+
+function applyPlaybookCatalog(data, message = '') {
+  const catalog = normalizePlaybookCatalog(data);
+  playbooks = catalog.playbooks;
+  maxPlaybooks = catalog.maxPlaybooks;
+  renderPlaybookManager(message);
+  return catalog;
+}
+
+function setPlaybookBusy(busy, message = '') {
+  playbookBusy = busy;
+  editorView.inert = busy;
+  if (busy) editorView.setAttribute('aria-busy', 'true');
+  else editorView.removeAttribute('aria-busy');
+  renderPlaybookManager(message);
+}
+
+function captureDocumentContext() {
+  return {
+    doc,
+    ownerId: docOwner,
+    playbookId: docPlaybookId,
+    epoch: documentEpoch,
+  };
+}
+
+function isCurrentDocumentContext(context) {
+  return !!context && context.doc === doc && context.ownerId === docOwner &&
+    context.ownerId === activeUserId && context.playbookId === docPlaybookId &&
+    context.playbookId === activePlaybookId && context.epoch === documentEpoch;
 }
 
 // ---------- Play document management ----------
@@ -2387,22 +2597,34 @@ function markDirty() {
 }
 
 // Saves are serialized: concurrent callers queue behind the in-flight PUT so a
-// stale body can never land after a newer one. Each save carries the server
-// timestamp it was based on; a 409 means another session saved in between.
+// stale body can never land after a newer one. Each normal save carries the
+// server revision it was based on; a 409 means another session saved in between.
 let saveChain = Promise.resolve(false);
 let serverUpdatedAt = null;   // updatedAt of the doc we loaded/last saved
+let serverRevision = null;    // immutable revision token of the selected document
 let overwriteNext = false;    // user chose "overwrite" after a conflict
 
 function saveDoc() {
-  const p = saveChain.then(() => doSave(), () => doSave());
+  // Capture identity when the save is QUEUED. doSave may run after another
+  // serialized request; it must never discover a newly selected playbook from
+  // mutable globals and send that document under the wrong request.
+  const context = {
+    ...captureDocumentContext(),
+    forceOverwrite: overwriteNext,
+  };
+  overwriteNext = false;
+  const p = saveChain.then(() => doSave(context), () => doSave(context));
   saveChain = p;
   return p;
 }
 
-async function doSave() {
-  const savingDoc = doc;
-  const savingOwner = docOwner;
-  if (!savingDoc || !savingOwner || activeUserId !== savingOwner) return false;
+async function doSave(context) {
+  const savingDoc = context && context.doc;
+  const savingOwner = context && context.ownerId;
+  const savingPlaybookId = context && context.playbookId;
+  const overwriteNext = !!(context && context.forceOverwrite);
+  if (!savingDoc || !savingOwner || activeUserId !== savingOwner ||
+      !isPlaybookId(savingPlaybookId) || !isCurrentDocumentContext(context)) return false;
   clearTimeout(saveTimer);
   const at = changeCounter;
   saveState = 'saving';
@@ -2414,13 +2636,14 @@ async function doSave() {
     // server then conditionally creates it, so two first saves cannot silently
     // overwrite one another.
     if (!overwriteNext) body.baseUpdatedAt = serverUpdatedAt;
-    overwriteNext = false;
-    const res = await fetch('/api/plays', {
+    if (!overwriteNext) body.baseRevision = serverRevision;
+    if (overwriteNext) body.forceOverwrite = true;
+    const res = await fetch(playbookDocumentUrl(savingPlaybookId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (doc !== savingDoc || docOwner !== savingOwner || activeUserId !== savingOwner) {
+    if (!isCurrentDocumentContext(context)) {
       return false;
     }
     if (res.status === 401) {
@@ -2432,7 +2655,7 @@ async function doSave() {
     if (res.status === 409) {
       saveState = 'unsaved';
       updateSaveIndicator('Conflict — playbook changed elsewhere');
-      resolveConflict();
+      resolveConflict(context);
       return false;
     }
     if (!res.ok) {
@@ -2454,11 +2677,12 @@ async function doSave() {
     }
     const data = await res.json().catch(() => ({}));
     if (data.updatedAt) serverUpdatedAt = data.updatedAt;
+    if (typeof data.revision === 'string' && data.revision) serverRevision = data.revision;
     saveState = changeCounter === at ? 'saved' : 'unsaved';
     updateSaveIndicator();
     return true;
   } catch (err) {
-    if (doc !== savingDoc || docOwner !== savingOwner || activeUserId !== savingOwner) {
+    if (!isCurrentDocumentContext(context)) {
       return false;
     }
     saveState = 'unsaved';
@@ -2466,17 +2690,20 @@ async function doSave() {
       updateSaveIndicator('Save rejected — ' + err.message);
     } else {
       updateSaveIndicator('Save failed — retrying…');
-      saveTimer = setTimeout(() => saveDoc(), err && err.retryAfterMs || 4000);
+      saveTimer = setTimeout(() => {
+        if (isCurrentDocumentContext(context)) saveDoc();
+      }, err && err.retryAfterMs || 4000);
     }
     return false;
   }
 }
 
 let conflictOpen = false;
-async function resolveConflict() {
+async function resolveConflict(context = captureDocumentContext()) {
   if (conflictOpen) return;
   conflictOpen = true;
-  const conflictedDoc = doc;
+  const conflictedDoc = context.doc;
+  const conflictedPlaybookId = context.playbookId;
   try {
     const choice = await showChoiceModal({
       title: 'Playbook changed elsewhere',
@@ -2490,13 +2717,13 @@ async function resolveConflict() {
     });
     // The dialog may have waited behind a recovery-code acknowledgement. Do
     // not apply an old conflict decision after sign-out or an account switch.
-    if (!doc || doc !== conflictedDoc) return;
+    if (!isCurrentDocumentContext(context) || doc !== conflictedDoc) return;
     if (choice === 'overwrite') {
       overwriteNext = true;
       saveDoc();
     } else if (choice === 'reload') {
       try {
-        const res = await fetch('/api/plays');
+        const res = await fetch(playbookDocumentUrl(conflictedPlaybookId));
         if (res.status === 401) {
           showAuthView('Your session expired — sign in to keep working.');
           return;
@@ -2506,18 +2733,10 @@ async function resolveConflict() {
         if (!data || typeof data !== 'object' || Array.isArray(data)) {
           throw new Error('The server returned an invalid playbook');
         }
-        if (!doc || doc !== conflictedDoc) return;
-        doc = normalizeDoc(data);
-        serverUpdatedAt = data.updatedAt || null;
-        for (const k in undoStacks) delete undoStacks[k];
-        saveState = 'saved';
-        updateSaveIndicator();
-        cur = firstAvailable();
-        selection = null;
-        drawing = null;
-        refreshAll();
+        if (!isCurrentDocumentContext(context) || doc !== conflictedDoc) return;
+        installPlaybookDocument(data, context.ownerId, conflictedPlaybookId);
       } catch (err) {
-        if (!doc || doc !== conflictedDoc) return;
+        if (!isCurrentDocumentContext(context) || doc !== conflictedDoc) return;
         saveState = 'unsaved';
         updateSaveIndicator('Conflict — local changes kept');
         await showModal({ title: 'Could not reload', message: err.message, confirmLabel: 'OK' });
@@ -2584,7 +2803,7 @@ $('importFile').addEventListener('change', async () => {
   }
   const choice = await showChoiceModal({
     title: 'Import ' + nOff + ' offense + ' + nDef + ' defense plays',
-    message: 'Replace your whole playbook with the backup, or add the plays to your bench (they arrive toggled out, with fresh numbers)?',
+    message: 'Replace this playbook with the backup, or add the plays to its bench (they arrive toggled out, with fresh numbers)?',
     choices: [
       { key: 'replace', label: 'Replace playbook', danger: true },
       { key: 'bench', label: 'Add to bench', primary: true },
@@ -2611,7 +2830,7 @@ $('importFile').addEventListener('change', async () => {
       }
     }
     if (clipped) {
-      await showModal({ title: 'Storage limit reached', message: clipped + ' play(s) were not imported — the account holds at most ' + MAX_OFFENSE + ' offense and ' + MAX_DEFENSE + ' defense plays. Delete some plays and import again.', confirmLabel: 'OK' });
+      await showModal({ title: 'Storage limit reached', message: clipped + ' play(s) were not imported — each playbook holds at most ' + MAX_OFFENSE + ' offense and ' + MAX_DEFENSE + ' defense plays. Delete some plays and import again.', confirmLabel: 'OK' });
     }
   }
   hideGenError();
@@ -2689,7 +2908,7 @@ function handleModalKeydown(e) {
   }
   if (e.key !== 'Tab') return;
   const focusable = Array.from(modalBox.querySelectorAll(
-    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
   ));
   if (!focusable.length) {
     e.preventDefault();
@@ -2776,6 +2995,113 @@ function showChoiceModal({ title, message, choices, cancelValue = null, dismissi
       }
       modalBox.appendChild(row);
       return row.querySelector('button');
+    },
+  });
+}
+
+function showPlaybookForm({ title, defaultName = '', defaultPlayersPerSide = null,
+                            confirmLabel, excludePlaybookId = null }) {
+  const includeFormat = defaultPlayersPerSide === 5 || defaultPlayersPerSide === 6;
+  return enqueueModal({
+    cancelValue: null,
+    render(close) {
+      modalHeading(title, includeFormat
+        ? 'Name this playbook and choose the starting format for new plays. Individual plays can still be 5v5 or 6v6.'
+        : 'Choose a name that is different from your other playbooks.');
+
+      const label = document.createElement('label');
+      label.className = 'playbook-name-label';
+      label.htmlFor = 'playbookNameInput';
+      label.textContent = 'Playbook name';
+      const input = document.createElement('input');
+      input.id = 'playbookNameInput';
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.maxLength = MAX_PLAYBOOK_NAME_LENGTH;
+      input.value = defaultName;
+      modalBox.append(label, input);
+
+      let five = null;
+      let six = null;
+      if (includeFormat) {
+        const fieldset = document.createElement('fieldset');
+        fieldset.className = 'playbook-format';
+        const legend = document.createElement('legend');
+        legend.textContent = 'New plays:';
+        const options = document.createElement('div');
+        options.className = 'format-options';
+        for (const count of [5, 6]) {
+          const optionLabel = document.createElement('label');
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'newPlaybookFormat';
+          radio.value = String(count);
+          radio.checked = count === defaultPlayersPerSide;
+          const text = document.createElement('span');
+          text.textContent = count + 'v' + count;
+          optionLabel.append(radio, text);
+          options.appendChild(optionLabel);
+          if (count === 5) five = radio;
+          else six = radio;
+        }
+        const hint = document.createElement('p');
+        hint.className = 'input-hint';
+        hint.textContent = 'This becomes the New plays default. Existing plays always keep their own format.';
+        fieldset.append(legend, options, hint);
+        modalBox.appendChild(fieldset);
+      }
+
+      const error = document.createElement('p');
+      error.className = 'playbook-form-error';
+      error.id = 'playbookFormError';
+      error.setAttribute('role', 'alert');
+      error.setAttribute('aria-live', 'assertive');
+      input.setAttribute('aria-describedby', error.id);
+      modalBox.appendChild(error);
+
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'mbtn-cancel';
+      cancel.textContent = 'Cancel';
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = 'mbtn-confirm';
+      confirm.textContent = confirmLabel;
+      row.append(cancel, confirm);
+      modalBox.appendChild(row);
+
+      const submit = () => {
+        const name = normalizePlaybookName(input.value);
+        if (!name) {
+          error.textContent = 'Enter a playbook name of 60 characters or fewer.';
+          input.focus();
+          return;
+        }
+        if (playbooks.some(playbook => playbook.id !== excludePlaybookId &&
+            samePlaybookName(playbook.name, name))) {
+          error.textContent = 'A playbook with that name already exists.';
+          input.focus();
+          return;
+        }
+        const result = { name };
+        if (includeFormat) result.defaultPlayersPerSide = five.checked ? 5 : six.checked ? 6 : null;
+        if (includeFormat && result.defaultPlayersPerSide === null) {
+          error.textContent = 'Choose 5v5 or 6v6.';
+          return;
+        }
+        close(result);
+      };
+      cancel.addEventListener('click', () => close(null));
+      confirm.addEventListener('click', submit);
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          submit();
+        }
+      });
+      return input;
     },
   });
 }
@@ -3144,7 +3470,6 @@ resetGenLink.addEventListener('click', () => {
 // ---------- Auth ----------
 
 let authEpoch = 0;
-let playbookLoadRequest = null;
 let activeUserId = null;
 let authBusy = false;
 let accountRequestBusy = false;
@@ -3165,15 +3490,21 @@ function setAccountRequestBusy(busy) {
   accountRequestBusy = busy;
   signOutBtn.disabled = busy;
   $('accountBtn').disabled = busy;
+  renderPlaybookManager();
 }
 
 function startAuthTransition() {
   authEpoch++;
+  playbookLoadEpoch++;
   if (playbookLoadRequest) playbookLoadRequest.abort();
   playbookLoadRequest = null;
   activeUserId = null;
   clearTimeout(saveTimer);
   saveTimer = null;
+  playbookBusy = false;
+  editorView.inert = false;
+  editorView.removeAttribute('aria-busy');
+  renderPlaybookManager();
   return authEpoch;
 }
 
@@ -3244,18 +3575,147 @@ function showAuthView(msg) {
 
 let docOwner = null;  // immutable user ID the in-memory doc was loaded for
 
+function beginPlaybookLoad(userId, expectedAuthEpoch) {
+  playbookLoadEpoch++;
+  if (playbookLoadRequest) playbookLoadRequest.abort();
+  const controller = new AbortController();
+  playbookLoadRequest = controller;
+  return { epoch: playbookLoadEpoch, controller, userId, authEpoch: expectedAuthEpoch };
+}
+
+function isPlaybookLoadCurrent(load) {
+  return !!load && load.epoch === playbookLoadEpoch &&
+    load.controller === playbookLoadRequest && load.userId === activeUserId &&
+    load.authEpoch === authEpoch;
+}
+
+function finishPlaybookLoad(load) {
+  if (load && playbookLoadRequest === load.controller) playbookLoadRequest = null;
+}
+
+async function fetchPlaybookLoadJson(url, load, failureMessage) {
+  let res;
+  try {
+    res = await fetch(url, { cache: 'no-store', signal: load.controller.signal });
+  } catch (err) {
+    if (!isPlaybookLoadCurrent(load) || err.name === 'AbortError') return null;
+    throw new Error(failureMessage);
+  }
+  if (!isPlaybookLoadCurrent(load)) return null;
+  const data = await res.json().catch(() => null);
+  if (res.status === 401) {
+    showAuthView('Your session expired — sign in to keep working.');
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(data && typeof data.error === 'string' ? data.error.slice(0, 160) : failureMessage);
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error(failureMessage);
+  return data;
+}
+
+function installPlaybookDocument(data, userId, playbookId) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      userId !== activeUserId || !playbookById(playbookId)) {
+    throw new Error('The server returned an invalid playbook');
+  }
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  documentEpoch++;
+  doc = normalizeDoc(data);
+  docOwner = userId;
+  docPlaybookId = playbookId;
+  activePlaybookId = playbookId;
+  rememberPlaybookId(userId, playbookId);
+  serverUpdatedAt = typeof data.updatedAt === 'string' ? data.updatedAt : null;
+  serverRevision = typeof data.revision === 'string' && data.revision ? data.revision : null;
+  overwriteNext = false;
+  changeCounter = 0;
+  saveState = 'saved';
+  cur = firstAvailable();
+  selection = null;
+  drawing = null;
+  drag = null;
+  nameUndoPushed = false;
+  for (const k in undoStacks) delete undoStacks[k];
+  invalidateGeneration({ clearUI: true, resetPreferences: true });
+  updateSaveIndicator();
+  renderPlaybookManager();
+  refreshAll();
+  return {
+    doc,
+    documentEpoch,
+    needsFormatChoice: isUnconfiguredEmptyPlaybook(data),
+  };
+}
+
+async function loadPlaybookDocument(playbookId, userId, expectedAuthEpoch) {
+  const load = beginPlaybookLoad(userId, expectedAuthEpoch);
+  try {
+    const data = await fetchPlaybookLoadJson(
+      playbookDocumentUrl(playbookId),
+      load,
+      'Could not load that playbook'
+    );
+    if (!data || !isPlaybookLoadCurrent(load)) return null;
+    return installPlaybookDocument(data, userId, playbookId);
+  } finally {
+    finishPlaybookLoad(load);
+  }
+}
+
+async function loadAccountPlaybooks(userId, expectedAuthEpoch, preferredPlaybookId = null) {
+  const load = beginPlaybookLoad(userId, expectedAuthEpoch);
+  try {
+    const catalogData = await fetchPlaybookLoadJson(
+      '/api/playbooks',
+      load,
+      'Could not load your playbook list'
+    );
+    if (!catalogData || !isPlaybookLoadCurrent(load)) return null;
+    const catalog = normalizePlaybookCatalog(catalogData);
+    if (!catalog.playbooks.length) throw new Error('Your account has no playbooks');
+    const targetId = preferredPlaybookId &&
+      catalog.playbooks.some(playbook => playbook.id === preferredPlaybookId)
+      ? preferredPlaybookId
+      : catalog.playbooks[0].id;
+    const data = await fetchPlaybookLoadJson(
+      playbookDocumentUrl(targetId),
+      load,
+      'Could not load your playbook'
+    );
+    if (!data || !isPlaybookLoadCurrent(load)) return null;
+    playbooks = catalog.playbooks;
+    maxPlaybooks = catalog.maxPlaybooks;
+    return installPlaybookDocument(data, userId, targetId);
+  } finally {
+    finishPlaybookLoad(load);
+  }
+}
+
 function discardLocalDoc() {
   clearTimeout(saveTimer);
+  saveTimer = null;
+  documentEpoch++;
   doc = null;
   docOwner = null;
+  docPlaybookId = null;
+  activePlaybookId = null;
+  playbooks = [];
+  maxPlaybooks = 1;
   serverUpdatedAt = null;
+  serverRevision = null;
   overwriteNext = false;
+  changeCounter = 0;
+  saveState = 'saved';
   cur = null;
   selection = null;
   drawing = null;
   drag = null;
   for (const k in undoStacks) delete undoStacks[k];
   invalidateGeneration({ clearUI: true, resetPreferences: true });
+  updateSaveIndicator();
+  renderPlaybookManager();
   refreshAll();
 }
 
@@ -3265,7 +3725,7 @@ function isUnconfiguredEmptyPlaybook(data) {
     Array.isArray(data.defense) && data.defense.length === 0;
 }
 
-async function chooseInitialPlayersPerSide(loadedDoc, userId, epoch) {
+async function chooseInitialPlayersPerSide(loadedDoc, userId, playbookId, loadedDocumentEpoch, epoch) {
   const choice = await showChoiceModal({
     title: 'What format are you coaching?',
     message: 'How many players are on each side? This sets up new offense and defense plays. You can change the New plays control later, and every existing play keeps its own format.',
@@ -3275,7 +3735,8 @@ async function chooseInitialPlayersPerSide(loadedDoc, userId, epoch) {
     ],
     dismissible: false,
   });
-  if (doc !== loadedDoc || activeUserId !== userId || authEpoch !== epoch) return;
+  if (doc !== loadedDoc || activeUserId !== userId || authEpoch !== epoch ||
+      docPlaybookId !== playbookId || documentEpoch !== loadedDocumentEpoch) return;
   setDefaultPlayersPerSide(choice === '5' ? 5 : 6);
   await saveDoc();
 }
@@ -3295,24 +3756,34 @@ async function enterEditor(email, userId, expectedEpoch = null) {
   authView.classList.remove('active');
   editorView.classList.add('active');
   hideAuthError();
-  if (doc && saveState !== 'saved' && docOwner === userId) {
-    // Same user re-authenticated with unsaved local work: keep it and push it up.
+  if (doc && saveState !== 'saved' && docOwner === userId &&
+      isPlaybookId(docPlaybookId) && docPlaybookId === activePlaybookId) {
+    // Same user and named playbook re-authenticated with unsaved local work:
+    // keep it and push it back to that exact immutable playbook ID.
     saveDoc();
+    renderPlaybookManager();
     refreshAll();
     return;
   }
+  const preferredPlaybookId = docOwner === userId && isPlaybookId(docPlaybookId)
+    ? docPlaybookId
+    : rememberedPlaybookId(userId);
   // Anything held locally belongs to a different account (or nobody) — drop it
   // rather than risk writing one user's playbook into another's account.
   discardLocalDoc();
-  const controller = new AbortController();
-  playbookLoadRequest = controller;
-  let data = null;
+  setPlaybookBusy(true, 'Loading playbooks…');
   try {
-    const res = await fetch('/api/plays', { signal: controller.signal });
-    if (epoch !== authEpoch || activeUserId !== userId) return;
-    if (res.status === 401) { showAuthView(); return; }
-    if (!res.ok) throw new Error('load failed');
-    data = await res.json();
+    const loaded = await loadAccountPlaybooks(userId, epoch, preferredPlaybookId);
+    if (!loaded || epoch !== authEpoch || activeUserId !== userId) return;
+    if (loaded.needsFormatChoice) {
+      await chooseInitialPlayersPerSide(
+        loaded.doc,
+        userId,
+        docPlaybookId,
+        loaded.documentEpoch,
+        epoch
+      );
+    }
   } catch (err) {
     if (epoch !== authEpoch || activeUserId !== userId || err.name === 'AbortError') return;
     // Fail closed: editing an empty doc here would let autosave overwrite the
@@ -3320,20 +3791,228 @@ async function enterEditor(email, userId, expectedEpoch = null) {
     showAuthView('Could not load your playbook — check your connection and sign in again.');
     return;
   } finally {
-    if (playbookLoadRequest === controller) playbookLoadRequest = null;
+    if (epoch === authEpoch && activeUserId === userId) setPlaybookBusy(false);
   }
-  if (epoch !== authEpoch || activeUserId !== userId) return;
-  const needsFormatChoice = isUnconfiguredEmptyPlaybook(data);
-  doc = normalizeDoc(data || {});
-  const loadedDoc = doc;
-  docOwner = userId;
-  serverUpdatedAt = data && data.updatedAt || null;
-  saveState = 'saved';
-  updateSaveIndicator();
-  cur = firstAvailable();
-  refreshAll();
-  if (needsFormatChoice) await chooseInitialPlayersPerSide(loadedDoc, userId, epoch);
 }
+
+async function flushCurrentPlaybookForTransition() {
+  if (drawing) finishDrawing();
+  const context = captureDocumentContext();
+  if (!isCurrentDocumentContext(context)) return null;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  if (saveState === 'saved') return context;
+  const saved = await saveDoc();
+  return saved && saveState === 'saved' && isCurrentDocumentContext(context)
+    ? context
+    : null;
+}
+
+async function showPlaybookActionError(title, error) {
+  await showModal({
+    title,
+    message: error && error.message ? error.message : 'Please try again.',
+    confirmLabel: 'OK',
+  });
+}
+
+function restorePlaybookManagerFocus(fallback) {
+  if (!editorView.classList.contains('active') || activeModal) return;
+  const target = playbookSelect.disabled ? fallback : playbookSelect;
+  if (target && !target.disabled) target.focus();
+}
+
+async function switchPlaybook(targetId) {
+  if (playbookBusy || accountRequestBusy || targetId === activePlaybookId || !playbookById(targetId)) {
+    renderPlaybookManager();
+    return;
+  }
+  const userId = activeUserId;
+  const epoch = authEpoch;
+  const target = playbookById(targetId);
+  setPlaybookBusy(true, 'Saving before opening “' + target.name + '”…');
+  let finalMessage = '';
+  try {
+    const flushed = await flushCurrentPlaybookForTransition();
+    if (!flushed) {
+      if (epoch === authEpoch && userId === activeUserId && !conflictOpen) {
+        throw new Error('Your current playbook could not be saved, so it is still open. Check your connection and try again.');
+      }
+      return;
+    }
+    if (epoch !== authEpoch || userId !== activeUserId || !isCurrentDocumentContext(flushed)) return;
+    invalidateGeneration({ clearUI: true });
+    playbookStatus.textContent = 'Opening “' + target.name + '”…';
+    const loaded = await loadPlaybookDocument(targetId, userId, epoch);
+    if (!loaded || epoch !== authEpoch || userId !== activeUserId) return;
+    finalMessage = 'Opened “' + target.name + '”';
+    if (loaded.needsFormatChoice) {
+      await chooseInitialPlayersPerSide(
+        loaded.doc,
+        userId,
+        docPlaybookId,
+        loaded.documentEpoch,
+        epoch
+      );
+    }
+  } catch (error) {
+    if (epoch === authEpoch && userId === activeUserId) {
+      await showPlaybookActionError('Could not switch playbooks', error);
+    }
+  } finally {
+    if (epoch === authEpoch && userId === activeUserId) {
+      setPlaybookBusy(false, finalMessage);
+      restorePlaybookManagerFocus(playbookSelect);
+    }
+  }
+}
+
+function suggestedPlaybookName() {
+  let number = playbooks.length + 1;
+  let name = 'Playbook ' + number;
+  while (playbooks.some(playbook => samePlaybookName(playbook.name, name))) {
+    number++;
+    name = 'Playbook ' + number;
+  }
+  return name;
+}
+
+async function createPlaybook() {
+  if (playbookBusy || accountRequestBusy || !activeUserId || playbooks.length >= maxPlaybooks) return;
+  const defaultFormat = normalizePlayersPerSide(
+    doc && doc.defaultPlayersPerSide,
+    DEFAULT_NEW_PLAYERS_PER_SIDE
+  );
+  const form = await showPlaybookForm({
+    title: 'New playbook',
+    defaultName: suggestedPlaybookName(),
+    defaultPlayersPerSide: defaultFormat,
+    confirmLabel: 'Create playbook',
+  });
+  if (!form) return;
+
+  const userId = activeUserId;
+  const epoch = authEpoch;
+  const previousIds = new Set(playbooks.map(playbook => playbook.id));
+  setPlaybookBusy(true, 'Saving before creating “' + form.name + '”…');
+  let finalMessage = '';
+  try {
+    const flushed = await flushCurrentPlaybookForTransition();
+    if (!flushed) {
+      if (epoch === authEpoch && userId === activeUserId && !conflictOpen) {
+        throw new Error('Your current playbook could not be saved, so a new one was not created. Check your connection and try again.');
+      }
+      return;
+    }
+    const res = await fetch('/api/playbooks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    if (epoch !== authEpoch || userId !== activeUserId || !isCurrentDocumentContext(flushed)) return;
+    const data = await res.json().catch(() => null);
+    if (res.status === 401) {
+      showAuthView('Your session expired — sign in to keep working.');
+      return;
+    }
+    if (!res.ok) {
+      throw new Error(data && typeof data.error === 'string' ? data.error.slice(0, 160) : 'Could not create playbook');
+    }
+    const catalog = applyPlaybookCatalog(data);
+    const created = catalog.playbooks.find(playbook =>
+      !previousIds.has(playbook.id) && samePlaybookName(playbook.name, form.name));
+    if (!created) throw new Error('The server created the playbook but returned an invalid playbook list');
+    invalidateGeneration({ clearUI: true });
+    playbookStatus.textContent = 'Opening “' + created.name + '”…';
+    const loaded = await loadPlaybookDocument(created.id, userId, epoch);
+    if (!loaded || epoch !== authEpoch || userId !== activeUserId) return;
+    finalMessage = 'Created “' + created.name + '”';
+  } catch (error) {
+    if (epoch === authEpoch && userId === activeUserId) {
+      await showPlaybookActionError('Could not create playbook', error);
+    }
+  } finally {
+    if (epoch === authEpoch && userId === activeUserId) {
+      setPlaybookBusy(false, finalMessage);
+      restorePlaybookManagerFocus(newPlaybookBtn);
+    }
+  }
+}
+
+async function refreshPlaybookCatalog(userId, expectedAuthEpoch) {
+  const res = await fetch('/api/playbooks', { cache: 'no-store' });
+  if (expectedAuthEpoch !== authEpoch || userId !== activeUserId) return false;
+  const data = await res.json().catch(() => null);
+  if (res.status === 401) {
+    showAuthView('Your session expired — sign in to keep working.');
+    return false;
+  }
+  if (!res.ok) throw new Error('Could not refresh the playbook list');
+  applyPlaybookCatalog(data);
+  return true;
+}
+
+async function renamePlaybook() {
+  if (playbookBusy || accountRequestBusy || !activeUserId) return;
+  const current = playbookById(activePlaybookId);
+  if (!current) return;
+  const form = await showPlaybookForm({
+    title: 'Rename playbook',
+    defaultName: current.name,
+    confirmLabel: 'Rename',
+    excludePlaybookId: current.id,
+  });
+  if (!form || form.name === current.name) return;
+
+  const userId = activeUserId;
+  const epoch = authEpoch;
+  const playbookId = current.id;
+  setPlaybookBusy(true, 'Renaming “' + current.name + '”…');
+  let finalMessage = '';
+  try {
+    const res = await fetch('/api/playbooks', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playbookId,
+        name: form.name,
+        baseRevision: current.revision,
+      }),
+    });
+    if (epoch !== authEpoch || userId !== activeUserId || playbookId !== activePlaybookId) return;
+    const data = await res.json().catch(() => null);
+    if (res.status === 401) {
+      showAuthView('Your session expired — sign in to keep working.');
+      return;
+    }
+    if (!res.ok) {
+      if (res.status === 409 && data && data.error === 'conflict') {
+        await refreshPlaybookCatalog(userId, epoch);
+        throw new Error('This playbook was renamed elsewhere. The playbook list has been refreshed; try again.');
+      }
+      throw new Error(data && typeof data.error === 'string' ? data.error.slice(0, 160) : 'Could not rename playbook');
+    }
+    applyPlaybookCatalog(data);
+    finalMessage = 'Renamed to “' + form.name + '”';
+  } catch (error) {
+    if (epoch === authEpoch && userId === activeUserId) {
+      await showPlaybookActionError('Could not rename playbook', error);
+    }
+  } finally {
+    if (epoch === authEpoch && userId === activeUserId) {
+      setPlaybookBusy(false, finalMessage);
+      restorePlaybookManagerFocus(renamePlaybookBtn);
+    }
+  }
+}
+
+playbookSelect.addEventListener('change', () => {
+  const targetId = playbookSelect.value;
+  renderPlaybookManager();
+  switchPlaybook(targetId);
+});
+newPlaybookBtn.addEventListener('click', createPlaybook);
+renamePlaybookBtn.addEventListener('click', renamePlaybook);
 
 async function authSubmit(path) {
   if (authBusy) return;
@@ -3368,6 +4047,7 @@ async function authSubmit(path) {
         return;
       }
       if (await requestDeletionUntilSettled(password, epoch, data.userId, true, email)) {
+        forgetRememberedPlaybook(data.userId);
         discardLocalDoc();
         showAuthView('Account deleted.');
       } else if (epoch === authEpoch) {
@@ -3453,7 +4133,7 @@ recoverBtn.addEventListener('click', async () => {
 
 // ---- Account menu ----
 $('accountBtn').addEventListener('click', async () => {
-  if (accountRequestBusy) return;
+  if (accountRequestBusy || playbookBusy) return;
   const menuEpoch = authEpoch;
   const menuUserId = activeUserId;
   const choice = await showChoiceModal({
@@ -3491,7 +4171,7 @@ $('accountBtn').addEventListener('click', async () => {
   } else if (choice === 'delete') {
     const pw = await showModal({
       title: 'Delete account',
-      message: 'This permanently deletes your account AND your whole playbook. Type your password to confirm.',
+      message: 'This permanently deletes your account AND all of its playbooks. Type your password to confirm.',
       withInput: true,
       inputType: 'password',
       confirmLabel: 'Delete forever',
@@ -3503,6 +4183,7 @@ $('accountBtn').addEventListener('click', async () => {
     try {
       const completed = await requestDeletionUntilSettled(pw, menuEpoch, menuUserId);
       if (!completed || menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
+      forgetRememberedPlaybook(menuUserId);
       discardLocalDoc();
       showAuthView('Account deleted.');
     } catch (err) {
@@ -3521,7 +4202,7 @@ authPassword.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.
 authEmail.addEventListener('keydown', e => { if (e.key === 'Enter') authPassword.focus(); });
 
 signOutBtn.addEventListener('click', async () => {
-  if (accountRequestBusy) return;
+  if (accountRequestBusy || playbookBusy) return;
   if (doc && saveState !== 'saved') {
     const ok = await saveDoc();
     if (!ok) {

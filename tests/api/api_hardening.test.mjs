@@ -24,6 +24,11 @@ import { onRequestPost as deleteAccount } from "../../dashboard/functions/api/au
 import { onRequestPost as login } from "../../dashboard/functions/api/auth/login.js";
 import { onRequestGet as getMe } from "../../dashboard/functions/api/auth/me.js";
 import { onRequestPost as register } from "../../dashboard/functions/api/auth/register.js";
+import {
+  onRequestGet as getPlaybooks,
+  onRequestPatch as renamePlaybook,
+  onRequestPost as createPlaybook,
+} from "../../dashboard/functions/api/playbooks.js";
 import { onRequestPost as generate } from "../../dashboard/functions/api/generate.js";
 import { onRequestPost as upload } from "../../dashboard/functions/api/upload.js";
 import {
@@ -32,6 +37,11 @@ import {
 } from "../../dashboard/functions/api/plays.js";
 import { onRequestGet as getStatus } from "../../dashboard/functions/api/status/[[jobId]].js";
 import { onRequestGet as download } from "../../dashboard/functions/api/download/[[catchall]].js";
+import {
+  deleteAccountPlaybooks,
+  playbookCatalogKey,
+  playbookObjectKey,
+} from "../../dashboard/functions/_lib/playbooks.js";
 
 const SESSION_SECRET = "0123456789abcdef".repeat(4);
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -77,6 +87,7 @@ class MemoryR2 {
     const stored = {
       bytes,
       etag: `etag-${++this.sequence}`,
+      uploaded: new Date(),
       httpMetadata: options.httpMetadata || {},
     };
     this.objects.set(key, stored);
@@ -88,6 +99,7 @@ class MemoryR2 {
     return {
       key,
       etag: stored.etag,
+      uploaded: stored.uploaded,
       body: bytes,
       httpMetadata: stored.httpMetadata,
       async text() {
@@ -104,17 +116,30 @@ class MemoryR2 {
     return stored ? this.object(key, stored) : null;
   }
 
+  async head(key) {
+    const stored = this.objects.get(key);
+    return stored ? this.object(key, stored) : null;
+  }
+
   async delete(keys) {
     for (const key of Array.isArray(keys) ? keys : [keys]) this.objects.delete(key);
   }
 
-  async list({ prefix = "", limit = 1000 } = {}) {
-    const objects = [...this.objects.keys()]
+  async list({ prefix = "", limit = 1000, cursor } = {}) {
+    const offset = cursor === undefined ? 0 : Number.parseInt(cursor, 10);
+    const keys = [...this.objects.keys()]
       .filter((key) => key.startsWith(prefix))
-      .sort()
-      .slice(0, limit)
+      .sort();
+    const objects = keys
+      .slice(offset, offset + limit)
       .map((key) => ({ key }));
-    return { objects, truncated: false };
+    const nextOffset = offset + objects.length;
+    const truncated = nextOffset < keys.length;
+    return {
+      objects,
+      truncated,
+      ...(truncated ? { cursor: String(nextOffset) } : {}),
+    };
   }
 }
 
@@ -147,6 +172,26 @@ class FailFirstJobPayloadDeleteR2 extends MemoryR2 {
       throw new Error("temporary job-bucket failure");
     }
     return super.delete(keys);
+  }
+}
+
+class ThrowAfterCatalogPutR2 extends MemoryR2 {
+  constructor() {
+    super();
+    this.throwAfterCatalogPut = false;
+  }
+
+  async put(key, value, options = {}) {
+    const stored = await super.put(key, value, options);
+    if (
+      stored &&
+      this.throwAfterCatalogPut &&
+      key.endsWith("/playbooks/catalog.json")
+    ) {
+      this.throwAfterCatalogPut = false;
+      throw new Error("ambiguous catalog transport failure");
+    }
+    return stored;
   }
 }
 
@@ -212,6 +257,23 @@ function chips(keys) {
     x: (index + 1) / (keys.length + 1),
     y: 0.7,
   }]));
+}
+
+async function authenticatedRequest(env, account, url, init = {}) {
+  const session = await sessionRequest(env, account);
+  const headers = new Headers(init.headers || {});
+  headers.set("cookie", session.headers.get("cookie"));
+  return new Request(url, { ...init, headers });
+}
+
+async function callCreatePlaybook(env, account, name, defaultPlayersPerSide) {
+  return createPlaybook({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
+      method: "POST",
+      body: JSON.stringify({ name, defaultPlayersPerSide }),
+    }),
+    env,
+  });
 }
 
 test("sessions are revoked by account version changes", async () => {
@@ -738,6 +800,415 @@ test("a new account receives an unconfigured schema-2 playbook", async () => {
     offense: [],
     defense: [],
   });
+});
+
+test("the playbook catalog adopts the legacy document without copying or duplicating it", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const legacyKey = `accounts/${USER_ID}/playbook.json`;
+  const legacyDoc = {
+    schema: 2,
+    defaultPlayersPerSide: 6,
+    offense: [],
+    defense: [],
+    updatedAt: "2026-08-01T12:00:00.000Z",
+  };
+  await env.PLAYBOOK_BUCKET.put(legacyKey, JSON.stringify(legacyDoc));
+
+  const first = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  assert.equal(first.status, 200);
+  const firstBody = await json(first);
+  assert.equal(firstBody.maxPlaybooks, 20);
+  assert.equal(firstBody.playbooks.length, 1);
+  assert.equal(firstBody.playbooks[0].id, "default");
+  assert.equal(firstBody.playbooks[0].name, "My Playbook");
+  assert.deepEqual(await (await env.PLAYBOOK_BUCKET.get(legacyKey)).json(), legacyDoc);
+
+  const second = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  const secondBody = await json(second);
+  assert.deepEqual(secondBody.playbooks, firstBody.playbooks);
+  assert.ok(await env.PLAYBOOK_BUCKET.get(playbookCatalogKey(USER_ID)));
+});
+
+test("an ambiguously committed catalog append is reconciled as a successful create", async () => {
+  const bucket = new ThrowAfterCatalogPutR2();
+  const env = makeEnv(bucket);
+  const account = await seedAccount(env);
+  const initialized = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  assert.equal(initialized.status, 200);
+
+  bucket.throwAfterCatalogPut = true;
+  const created = await callCreatePlaybook(env, account, "Spring 2028", 5);
+  assert.equal(created.status, 201);
+  const body = await json(created);
+  const matches = body.playbooks.filter((entry) => entry.name === "Spring 2028");
+  assert.equal(matches.length, 1);
+  assert.ok(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, matches[0].id)));
+  assert.equal((await env.PLAYBOOK_BUCKET.list({
+    prefix: `accounts/${USER_ID}/playbooks/items/`,
+  })).objects.length, 1);
+});
+
+test("catalog early returns remove data recreated during an account-deletion race", async () => {
+  const bucket = new MemoryR2();
+  const env = makeEnv(bucket);
+  const account = await seedAccount(env);
+
+  bucket.beforeConditionalPut = async (key) => {
+    if (key !== playbookCatalogKey(USER_ID)) return;
+    const credentialKey = await emailKey(account.email);
+    const credential = await (await env.PLAYBOOK_BUCKET.get(credentialKey)).json();
+    credential.disabledAt = new Date().toISOString();
+    await env.PLAYBOOK_BUCKET.put(credentialKey, JSON.stringify(credential));
+    await deleteAccountPlaybooks(env, USER_ID);
+  };
+
+  // The request authenticated before the hook disables the credential. Its
+  // conditional create lands after the simulated deletion sweep, then the
+  // duplicate-name early return must perform its own liveness cleanup.
+  const raced = await callCreatePlaybook(env, account, "My Playbook", 5);
+  assert.equal(raced.status, 409);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookCatalogKey(USER_ID)), null);
+  assert.equal((await env.PLAYBOOK_BUCKET.list({
+    prefix: `accounts/${USER_ID}/playbooks/`,
+  })).objects.length, 0);
+});
+
+test("an account can create, load, and save independent named 5v5 and 6v6 playbooks", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+
+  const [fiveResponse, sixResponse] = await Promise.all([
+    callCreatePlaybook(env, account, "  Spring 2027 5v5  ", 5),
+    callCreatePlaybook(env, account, "Fall 2027 6v6", 6),
+  ]);
+  assert.equal(fiveResponse.status, 201);
+  assert.equal(sixResponse.status, 201);
+
+  const catalogResponse = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  const catalog = await json(catalogResponse);
+  assert.equal(catalog.playbooks.length, 3);
+  const five = catalog.playbooks.find((entry) => entry.name === "Spring 2027 5v5");
+  const six = catalog.playbooks.find((entry) => entry.name === "Fall 2027 6v6");
+  assert.ok(five);
+  assert.ok(six);
+
+  const load = async (id) => {
+    const response = await getPlays({
+      request: await authenticatedRequest(
+        env,
+        account,
+        `https://example.test/api/plays?playbookId=${id}`
+      ),
+      env,
+    });
+    assert.equal(response.status, 200);
+    return json(response);
+  };
+  const fiveDoc = await load(five.id);
+  const sixDoc = await load(six.id);
+  assert.equal(fiveDoc.defaultPlayersPerSide, 5);
+  assert.equal(sixDoc.defaultPlayersPerSide, 6);
+
+  const saveFive = await savePlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${five.id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          ...fiveDoc,
+          ownerId: USER_ID,
+          baseRevision: fiveDoc.revision,
+          offense: [{
+            name: "Five only",
+            playersPerSide: 5,
+            chips: chips(["1", "2", "3", "C", "QB"]),
+            routes: [],
+          }],
+        }),
+      }
+    ),
+    env,
+  });
+  assert.equal(saveFive.status, 200);
+  assert.equal((await load(five.id)).offense[0].name, "Five only");
+  assert.deepEqual((await load(six.id)).offense, []);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(`accounts/${USER_ID}/playbook.json`), null);
+});
+
+test("named playbook saves reject stale revisions but separate books never conflict", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  await callCreatePlaybook(env, account, "Book A", 5);
+  await callCreatePlaybook(env, account, "Book B", 6);
+  const listed = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  const entries = (await json(listed)).playbooks;
+  const a = entries.find((entry) => entry.name === "Book A");
+  const b = entries.find((entry) => entry.name === "Book B");
+
+  const getDocument = async (id) => json(await getPlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${id}`
+    ),
+    env,
+  }));
+  const originalA = await getDocument(a.id);
+  const originalB = await getDocument(b.id);
+  const save = async (id, document, name) => {
+    const request = await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          ...document,
+          ownerId: USER_ID,
+          baseRevision: document.revision,
+          offense: [{
+            name,
+            playersPerSide: document.defaultPlayersPerSide,
+            chips: document.defaultPlayersPerSide === 5
+              ? chips(["1", "2", "3", "C", "QB"])
+              : chips(["1", "2", "3", "4", "5", "QB"]),
+            routes: [],
+          }],
+        }),
+      }
+    );
+    return savePlays({ request, env });
+  };
+
+  const firstA = await save(a.id, originalA, "A wins");
+  const firstB = await save(b.id, originalB, "B wins");
+  assert.equal(firstA.status, 200);
+  assert.equal(firstB.status, 200);
+
+  const missingPrecondition = await savePlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${a.id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          ...originalA,
+          ownerId: USER_ID,
+          offense: [{
+            name: "No precondition",
+            playersPerSide: 5,
+            chips: chips(["1", "2", "3", "C", "QB"]),
+            routes: [],
+          }],
+        }),
+      }
+    ),
+    env,
+  });
+  assert.equal(missingPrecondition.status, 428);
+
+  const staleA = await save(a.id, originalA, "A stale");
+  assert.equal(staleA.status, 409);
+  const conflict = await json(staleA);
+  assert.equal(conflict.error, "conflict");
+  assert.notEqual(conflict.serverRevision, originalA.revision);
+  assert.equal((await getDocument(a.id)).offense[0].name, "A wins");
+  assert.equal((await getDocument(b.id)).offense[0].name, "B wins");
+
+  const forced = await savePlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${a.id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          ...originalA,
+          ownerId: USER_ID,
+          forceOverwrite: true,
+          offense: [{
+            name: "Explicit overwrite",
+            playersPerSide: 5,
+            chips: chips(["1", "2", "3", "C", "QB"]),
+            routes: [],
+          }],
+        }),
+      }
+    ),
+    env,
+  });
+  assert.equal(forced.status, 200);
+  assert.equal((await getDocument(a.id)).offense[0].name, "Explicit overwrite");
+});
+
+test("renaming a playbook is revision-safe and does not change its document", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const created = await callCreatePlaybook(env, account, "Winter 2027", 5);
+  const entry = (await json(created)).playbooks.find((item) => item.name === "Winter 2027");
+  const docBefore = await (await env.PLAYBOOK_BUCKET.get(
+    playbookObjectKey(USER_ID, entry.id)
+  )).json();
+
+  const renamedResponse = await renamePlaybook({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
+      method: "PATCH",
+      body: JSON.stringify({
+        playbookId: entry.id,
+        name: "  Spring 2027  ",
+        baseRevision: entry.revision,
+      }),
+    }),
+    env,
+  });
+  assert.equal(renamedResponse.status, 200);
+  const renamed = (await json(renamedResponse)).playbooks.find((item) => item.id === entry.id);
+  assert.equal(renamed.name, "Spring 2027");
+  assert.notEqual(renamed.revision, entry.revision);
+  assert.deepEqual(
+    await (await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, entry.id))).json(),
+    docBefore
+  );
+
+  const staleRename = await renamePlaybook({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
+      method: "PATCH",
+      body: JSON.stringify({
+        playbookId: entry.id,
+        name: "Summer 2027",
+        baseRevision: entry.revision,
+      }),
+    }),
+    env,
+  });
+  assert.equal(staleRename.status, 409);
+  assert.equal((await json(staleRename)).playbook.name, "Spring 2027");
+});
+
+test("playbook APIs reject invalid names, formats, malformed IDs, and unknown IDs", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  for (const [name, count] of [["   ", 5], ["x".repeat(61), 5], ["Bad\nName", 5], ["Valid", 7]]) {
+    const response = await callCreatePlaybook(env, account, name, count);
+    assert.equal(response.status, 400);
+  }
+
+  const malformed = await getPlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      "https://example.test/api/plays?playbookId=../playbook.json"
+    ),
+    env,
+  });
+  assert.equal(malformed.status, 400);
+
+  const unknownId = "99999999-9999-4999-8999-999999999999";
+  const unknown = await getPlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${unknownId}`
+    ),
+    env,
+  });
+  assert.equal(unknown.status, 404);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, unknownId)), null);
+
+  const created = await callCreatePlaybook(env, account, "Spring", 5);
+  assert.equal(created.status, 201);
+  const duplicate = await callCreatePlaybook(env, account, "  spring  ", 6);
+  assert.equal(duplicate.status, 409);
+
+  const otherAccount = await seedAccount(env, {
+    userId: OTHER_USER_ID,
+    email: "other@example.com",
+  });
+  const otherCreated = await callCreatePlaybook(env, otherAccount, "Private", 6);
+  const otherId = (await json(otherCreated)).playbooks.find(
+    (entry) => entry.name === "Private"
+  ).id;
+  const foreign = await getPlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${otherId}`
+    ),
+    env,
+  });
+  assert.equal(foreign.status, 404);
+});
+
+test("the concurrent account cap keeps successful playbooks and creates no extra item", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const creations = [];
+  for (let i = 1; i <= 19; i += 1) {
+    creations.push(callCreatePlaybook(env, account, `Season ${i}`, i % 2 ? 5 : 6));
+  }
+  const results = await Promise.all(creations);
+  assert.equal(results.filter((response) => response.status === 201).length, 19);
+
+  const listed = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  assert.equal((await json(listed)).playbooks.length, 20);
+  const before = await env.PLAYBOOK_BUCKET.list({
+    prefix: `accounts/${USER_ID}/playbooks/items/`,
+  });
+  assert.equal(before.objects.length, 19);
+
+  const over = await callCreatePlaybook(env, account, "One too many", 5);
+  assert.equal(over.status, 409);
+  const after = await env.PLAYBOOK_BUCKET.list({
+    prefix: `accounts/${USER_ID}/playbooks/items/`,
+  });
+  assert.equal(after.objects.length, 19);
+});
+
+test("account playbook cleanup paginates through cataloged and orphaned items only for that user", async () => {
+  const env = makeEnv();
+  await env.PLAYBOOK_BUCKET.put(`accounts/${USER_ID}/playbook.json`, "legacy");
+  await Promise.all(Array.from({ length: 1005 }, (_, index) =>
+    env.PLAYBOOK_BUCKET.put(
+      `accounts/${USER_ID}/playbooks/items/orphan-${String(index).padStart(4, "0")}.json`,
+      "sensitive"
+    )
+  ));
+  await env.PLAYBOOK_BUCKET.put(
+    `accounts/${OTHER_USER_ID}/playbooks/items/keep.json`,
+    "other-user"
+  );
+
+  await deleteAccountPlaybooks(env, USER_ID);
+
+  assert.equal(await env.PLAYBOOK_BUCKET.get(`accounts/${USER_ID}/playbook.json`), null);
+  assert.equal((await env.PLAYBOOK_BUCKET.list({
+    prefix: `accounts/${USER_ID}/playbooks/`,
+  })).objects.length, 0);
+  assert.ok(await env.PLAYBOOK_BUCKET.get(
+    `accounts/${OTHER_USER_ID}/playbooks/items/keep.json`
+  ));
 });
 
 test("legacy 5v5 defense N data migrates to 5 while 6v6 N and 5 stay unchanged", async () => {

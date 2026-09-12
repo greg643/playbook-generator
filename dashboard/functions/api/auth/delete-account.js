@@ -10,6 +10,7 @@ import {
   utf8ByteLength,
 } from "../../_lib/auth.js";
 import { createJson, putJsonIfCurrent } from "../../_lib/r2.js";
+import { deleteAccountPlaybooks } from "../../_lib/playbooks.js";
 import {
   cancelAndScrubUserJobs,
   deleteUserQuotaRecords,
@@ -72,10 +73,10 @@ async function completeDeletion(env, credentialKey, record) {
   // the first scan is now visible. Reservations made later observe disabledAt
   // and self-clean instead of dispatching.
   const deletion = await ensureDeletionRecord(env, record.userId);
-  await env.PLAYBOOK_BUCKET.delete(`accounts/${record.userId}/playbook.json`);
+  await deleteAccountPlaybooks(env, record.userId);
   await cancelAndScrubUserJobs(env, record.userId, deletion.jobIds);
   await deleteUserQuotaRecords(env, record.userId, deletion.jobIds);
-  await env.PLAYBOOK_BUCKET.delete(`accounts/${record.userId}/playbook.json`);
+  await deleteAccountPlaybooks(env, record.userId);
   await env.PLAYBOOK_BUCKET.delete(deletionKey(record.userId));
 
   // A minimal conditional tombstone allows email reuse without letting a
@@ -109,7 +110,7 @@ async function reconcileDeletion(env, credentialKey, record) {
       // One delayed sweep catches a mutation that authenticated immediately
       // before disabledAt and finished after the foreground cleanup.
       await delay(1000);
-      await env.PLAYBOOK_BUCKET.delete(`accounts/${record.userId}/playbook.json`);
+      await deleteAccountPlaybooks(env, record.userId);
       await cancelAndScrubUserJobs(env, record.userId, jobIds);
       await deleteUserQuotaRecords(env, record.userId, jobIds);
       return;
@@ -205,7 +206,7 @@ export async function onRequestPost(context) {
         context.waitUntil(
           (async () => {
             await delay(1000);
-            await env.PLAYBOOK_BUCKET.delete(`accounts/${record.userId}/playbook.json`);
+            await deleteAccountPlaybooks(env, record.userId);
             await cancelAndScrubUserJobs(env, record.userId, jobIds);
             await deleteUserQuotaRecords(env, record.userId, jobIds);
           })().catch((error) => console.error("Delayed account resweep failed:", error))

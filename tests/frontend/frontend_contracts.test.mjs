@@ -83,6 +83,24 @@ test('account loads and first saves are race-safe', () => {
   assert.match(editor, /if\s*\(!overwriteNext\)\s*body\.baseUpdatedAt\s*=\s*serverUpdatedAt/);
 });
 
+test('editor exposes an accessible named-playbook manager and immutable save identity', () => {
+  assert.match(editor, /<label id="playbookManagerLabel" for="playbookSelect">Playbook<\/label>/);
+  assert.match(editor, /<select id="playbookSelect" disabled><\/select>/);
+  assert.match(editor, /id="newPlaybookBtn"[^>]*>\+ New<\/button>/);
+  assert.match(editor, /id="renamePlaybookBtn"[^>]*>Rename<\/button>/);
+  assert.match(editor, /id="playbookStatus" role="status" aria-live="polite"/);
+  assert.match(editor, /\.playbook-manager, \.new-play-format \{ grid-column: 1 \/ -1;/);
+  assert.match(editor, /function showPlaybookForm[\s\S]*?label\.htmlFor = 'playbookNameInput'/);
+  assert.match(editor, /function showPlaybookForm[\s\S]*?document\.createElement\('fieldset'\)/);
+  assert.match(editor, /t\.tagName === 'SELECT'/);
+  assert.match(editor, /function captureDocumentContext\(\)[\s\S]*?playbookId: docPlaybookId[\s\S]*?epoch: documentEpoch/);
+  assert.match(editor, /function saveDoc\(\)[\s\S]*?captureDocumentContext\(\)[\s\S]*?doSave\(context\)/);
+  assert.match(editor, /fetch\(playbookDocumentUrl\(savingPlaybookId\)/);
+  assert.match(editor, /body\.baseRevision = serverRevision/);
+  assert.match(editor, /body\.forceOverwrite = true/);
+  assert.doesNotMatch(editor, /fetch\(['"]\/api\/plays['"]/);
+});
+
 test('authentication and account actions cannot apply stale responses', () => {
   assert.match(editor, /let authBusy\s*=\s*false/);
   assert.match(editor, /if\s*\(authBusy\)\s*return/);

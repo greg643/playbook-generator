@@ -52,6 +52,14 @@ New plays default to 5v5, and the editor saves the coach's latest selection for
 future plays. The format is also saved with each play, so changing the selection
 does not alter existing or duplicated diagrams.
 
+Each account can keep up to 20 named playbooks. The selector at the top of the
+editor sidebar switches between them, and **New** creates an empty playbook with
+a chosen 5v5 or 6v6 starting format. Seasons are intentionally part of the name
+in this first version (for example, `Fall 2026 5v5`). **Rename** changes only the
+catalog label; every playbook keeps its own plays, numbering, bench, format
+preference, backups and generated PDFs. Existing single-playbook accounts are
+adopted automatically as `My Playbook` without moving or rewriting their data.
+
 - **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
   salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
   legacy hashes upgrade on login). Sessions are
@@ -66,7 +74,9 @@ does not alter existing or duplicated diagrams.
   - `auth/secret` — legacy session signing secret fallback; use `SESSION_SECRET`
     in production
   - `users/byemail/<sha256(email)>.json` — credential record (userId, salt, hash)
-  - `accounts/<userId>/playbook.json` — the user's saved plays (JSON)
+  - `accounts/<userId>/playbook.json` — backward-compatible default playbook
+  - `accounts/<userId>/playbooks/catalog.json` — names and immutable playbook IDs
+  - `accounts/<userId>/playbooks/items/<playbookId>.json` — additional playbooks
 - **Images-mode jobs**: the editor exports each play to PNG (`01.png`–`16.png`
   offense, `D1.png`–`D6.png` defense). The job bucket stores immutable ownership
   metadata, images and status under `jobs/<jobId>/`. The same generator produces

@@ -5,6 +5,13 @@ import {
   requireUser,
   utf8ByteLength,
 } from "../_lib/auth.js";
+import {
+  DEFAULT_PLAYBOOK_ID,
+  findPlaybookEntry,
+  isPlaybookId,
+  playbookObjectKey,
+  readPlaybookCatalog,
+} from "../_lib/playbooks.js";
 import { putJsonIfCurrent } from "../_lib/r2.js";
 
 const MAX_DOC_BYTES = 1000000;
@@ -28,8 +35,30 @@ const CHIP_KEYS = {
 };
 const LEGACY_DEFENSE_5_CHIP_KEYS = new Set(["1", "2", "3", "4", "N"]);
 
-function playbookKey(userId) {
-  return `accounts/${userId}/playbook.json`;
+async function requestedPlaybook(request, env, userId) {
+  const requestedId = new URL(request.url).searchParams.get("playbookId");
+  const playbookId = requestedId === null ? DEFAULT_PLAYBOOK_ID : requestedId;
+  if (!isPlaybookId(playbookId)) {
+    return {
+      response: jsonNoStore({ error: "Invalid playbook ID" }, { status: 400 }),
+    };
+  }
+
+  // The default ID is the stable compatibility alias for the original
+  // single-playbook API. Additional UUIDs must be present in this account's
+  // catalog before their storage keys can be read or written.
+  if (playbookId !== DEFAULT_PLAYBOOK_ID) {
+    const { catalog } = await readPlaybookCatalog(env, userId);
+    if (!catalog || !findPlaybookEntry(catalog, playbookId)) {
+      return {
+        response: jsonNoStore({ error: "Playbook not found" }, { status: 404 }),
+      };
+    }
+  }
+  return {
+    playbookId,
+    key: playbookObjectKey(userId, playbookId),
+  };
 }
 
 function migrateLegacyFivePlayerDefense(doc) {
@@ -77,14 +106,20 @@ function migrateLegacyFivePlayerDefense(doc) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { request, env } = context;
 
   try {
     const { user, response } = await requireUser(context);
     if (!user) return response;
 
-    const obj = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
+    const target = await requestedPlaybook(request, env, user.userId);
+    if (target.response) return target.response;
+
+    const obj = await env.PLAYBOOK_BUCKET.get(target.key);
     if (!obj) {
+      if (target.playbookId !== DEFAULT_PLAYBOOK_ID) {
+        return jsonNoStore({ error: "Playbook not found" }, { status: 404 });
+      }
       // null distinguishes a genuinely new account from a legacy empty
       // schema-1 playbook. The editor asks once, then persists 5 or 6.
       return jsonNoStore({
@@ -155,6 +190,9 @@ export async function onRequestPut(context) {
     const { user, response } = await requireUser(context);
     if (!user) return response;
 
+    const target = await requestedPlaybook(request, env, user.userId);
+    if (target.response) return target.response;
+
     if (requestBodyTooLarge(request, MAX_DOC_BYTES)) {
       return jsonNoStore({ error: "Playbook too large (max 1 MB)" }, { status: 413 });
     }
@@ -198,8 +236,26 @@ export async function onRequestPut(context) {
     // Absent baseUpdatedAt means save unconditionally (back-compat/overwrite).
     const baseUpdatedAt = doc.baseUpdatedAt;
     delete doc.baseUpdatedAt;
-    const existing = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
-    const stored = existing && (schema === 1 || baseUpdatedAt !== undefined)
+    const baseRevision = doc.baseRevision;
+    delete doc.baseRevision;
+    const forceOverwrite = doc.forceOverwrite === true;
+    delete doc.forceOverwrite;
+    if (
+      target.playbookId !== DEFAULT_PLAYBOOK_ID &&
+      typeof baseRevision !== "string" &&
+      !forceOverwrite
+    ) {
+      return jsonNoStore(
+        { error: "Reload this playbook before saving" },
+        { status: 428 }
+      );
+    }
+    const existing = await env.PLAYBOOK_BUCKET.get(target.key);
+    if (!existing && target.playbookId !== DEFAULT_PLAYBOOK_ID) {
+      return jsonNoStore({ error: "Playbook not found" }, { status: 404 });
+    }
+    const stored = existing &&
+      (schema === 1 || baseUpdatedAt !== undefined || baseRevision !== undefined)
       ? await existing.json()
       : null;
 
@@ -213,7 +269,21 @@ export async function onRequestPut(context) {
       );
     }
 
-    if (baseUpdatedAt !== undefined) {
+    if (!forceOverwrite && baseRevision !== undefined) {
+      const storedRevision = stored && typeof stored.revision === "string"
+        ? stored.revision
+        : null;
+      if (existing ? storedRevision !== baseRevision : baseRevision !== null && baseRevision !== "") {
+        return jsonNoStore(
+          {
+            error: "conflict",
+            serverRevision: storedRevision,
+            serverUpdatedAt: stored && stored.updatedAt || null,
+          },
+          { status: 409 }
+        );
+      }
+    } else if (!forceOverwrite && baseUpdatedAt !== undefined) {
       if (existing) {
         if (stored && stored.updatedAt && stored.updatedAt !== baseUpdatedAt) {
           return jsonNoStore(
@@ -230,34 +300,41 @@ export async function onRequestPut(context) {
     }
 
     doc.updatedAt = new Date().toISOString();
+    doc.revision = crypto.randomUUID();
     const saved = await putJsonIfCurrent(
       env,
-      playbookKey(user.userId),
+      target.key,
       doc,
       existing
     );
     if (saved === null) {
-      const latest = await env.PLAYBOOK_BUCKET.get(playbookKey(user.userId));
+      const latest = await env.PLAYBOOK_BUCKET.get(target.key);
       let serverUpdatedAt = null;
+      let serverRevision = null;
       if (latest) {
         try {
-          serverUpdatedAt = (await latest.json()).updatedAt || null;
+          const latestDoc = await latest.json();
+          serverUpdatedAt = latestDoc.updatedAt || null;
+          serverRevision = latestDoc.revision || null;
         } catch (err) {
           console.error("Could not read conflicting playbook:", err);
         }
       }
-      return jsonNoStore({ error: "conflict", serverUpdatedAt }, { status: 409 });
+      return jsonNoStore(
+        { error: "conflict", serverRevision, serverUpdatedAt },
+        { status: 409 }
+      );
     }
 
     // Close the race with account deletion: either this check happens before
     // the deletion sweep (which then removes the playbook), or it observes the
     // tombstone and removes the just-finished save itself.
     if (!(await isAccountActive(env, user))) {
-      await env.PLAYBOOK_BUCKET.delete(playbookKey(user.userId));
+      await env.PLAYBOOK_BUCKET.delete(target.key);
       return jsonNoStore({ error: "Account is being deleted" }, { status: 409 });
     }
 
-    return jsonNoStore({ ok: true, updatedAt: doc.updatedAt });
+    return jsonNoStore({ ok: true, updatedAt: doc.updatedAt, revision: doc.revision });
   } catch (err) {
     console.error("Plays PUT error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });
