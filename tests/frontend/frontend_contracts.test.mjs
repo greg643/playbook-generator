@@ -9,6 +9,7 @@ const index = read('index.html');
 const converter = read('converter.html');
 const help = read('help.html');
 const pptxGuide = read('pptx-guide.html');
+const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
@@ -150,14 +151,14 @@ test('home is an authenticated two-choice hub, not an upload surface', () => {
   assert.match(index, /fetch\('\/api\/auth\/recover'/);
   assert.match(index, /class="choice editor-choice" href="\/editor"/);
   assert.match(index, /class="choice converter" href="\/converter"/);
-  assert.ok(converterChoice, 'missing PPTX Import choice');
+  assert.ok(converterChoice, 'missing PowerPoint (PPTX) Import choice');
   assert.doesNotMatch(converterChoice[0], /pptx-guide/);
   assert.match(index, /class="choice editor-choice"[\s\S]*?<h2>Playbook Editor<\/h2>[\s\S]*?Open Playbook Editor &rarr;/);
-  assert.match(index, /class="choice converter"[\s\S]*?<h2>PPTX Import<\/h2>[\s\S]*?Open PPTX Import &rarr;/);
+  assert.match(index, /class="choice converter"[\s\S]*?<h2>PowerPoint \(PPTX\) Import<\/h2>[\s\S]*?Open PowerPoint \(PPTX\) Import &rarr;/);
   assert.match(index, /\.choice-grid\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*max-width: 620px;/);
   assert.match(index, /\.hub-sub\s*\{[^}]*font-size: 1rem;[^}]*line-height: 1\.6;/);
   assert.match(index, /\.hub-help\s*\{[^}]*font-size: 1rem;[^}]*line-height: 1\.6;/);
-  assert.match(index, /<div class="hub-help">[\s\S]*?<p>Need help\?<\/p>[\s\S]*?quick-start guide[\s\S]*?href="\/pptx-guide">Read the PPTX Import Guide<\/a>/);
+  assert.match(index, /<div class="hub-help">[\s\S]*?<p>Need help\?<\/p>[\s\S]*?quick-start guide[\s\S]*?href="\/pptx-guide">Read the PowerPoint \(PPTX\) Import Guide<\/a>/);
   assert.match(index, /<header class="topbar">[\s\S]*?id="hubAccount"[^>]*hidden>[\s\S]*?id="userEmail"[\s\S]*?id="signOutBtn"[\s\S]*?<\/header>/);
   assert.match(index, /\.account-email\s*\{[^}]*min-width: 0;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/);
   assert.match(index, /@media \(max-width: 620px\)[\s\S]*?\.top-account \{ flex: 1 0 100%; justify-content: flex-end;/);
@@ -176,6 +177,35 @@ test('home presents account creation as a clear, dedicated mode', () => {
   assert.match(index, /authPassword\.minLength = 8/);
   assert.match(index, /if \(authMode === 'register'\)[\s\S]*?authSubmit\('\/api\/auth\/register'\)/);
   assert.match(index, /Already have an account\?[^<]*<a id="signinInsteadLink"/);
+});
+
+test('PowerPoint import naming and the allowlisted post-auth return stay consistent', () => {
+  assert.match(index, /id="converterSigninNotice"[^>]*hidden>[^<]*Sign in or create an account first\.[\s\S]*?return you automatically to <strong>PowerPoint \(PPTX\) Import<\/strong>/);
+  assert.match(index, /const POST_AUTH_DESTINATIONS = Object\.freeze\(\{ converter: '\/converter' \}\)/);
+  assert.match(index, /Object\.prototype\.hasOwnProperty\.call\([\s\S]*?POST_AUTH_DESTINATIONS,[\s\S]*?requestedPostAuthDestination[\s\S]*?\? POST_AUTH_DESTINATIONS\[requestedPostAuthDestination\] : null/);
+  assert.match(index, /function routeAfterAuthentication\(account, focusHeading = false\)[\s\S]*?window\.location\.replace\(postAuthDestination\)[\s\S]*?showHub\(account, focusHeading\)/);
+  assert.doesNotMatch(index, /window\.location\.assign\(postAuthDestination\)/);
+  assert.match(index, /async function authSubmit\(path\)[\s\S]*?routeAfterAuthentication\(verified, true\)/);
+  assert.match(index, /\$\('recoverForm'\)\.addEventListener[\s\S]*?routeAfterAuthentication\(verified, true\)/);
+  assert.match(index, /async function init\(\)[\s\S]*?routeAfterAuthentication\(data\)/);
+
+  assert.match(converter, /<title>GSS Playbook Editor PowerPoint \(PPTX\) Import/);
+  assert.match(converter, /<h1>GSS Playbook Editor &mdash; PowerPoint \(PPTX\) Import<\/h1>/);
+  assert.match(converter, /id="generateBtn" disabled>Create PDFs<\/button>/);
+  assert.match(converter, /href="\/pptx-guide">&#128209; PowerPoint \(PPTX\) Import Guide<\/a>/);
+  assert.match(pptxGuide, /<h1>PowerPoint \(PPTX\) Import Guide<\/h1>/);
+  assert.match(pptxGuide, /class="converter-cta" href="\/converter">Open PowerPoint \(PPTX\) Import &rarr;<\/a>/);
+});
+
+test('playbook deletion and portable backup guidance matches the named-book model', () => {
+  for (const doc of [help, readme]) {
+    assert.match(doc, /original playbook[^.]*cannot be deleted|original can instead be renamed and reused/i);
+    assert.match(doc, /exact name/i);
+    assert.match(doc, /backup[^.]*source playbook name/i);
+    assert.match(doc, /another coach/i);
+    assert.match(doc, /another playbook or account/i);
+    assert.match(doc, /Export(?:[^.]*before| first)/i);
+  }
 });
 
 test('editor keeps 5v5 and 6v6 formats per play', () => {
@@ -271,7 +301,7 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   assert.match(pptxGuide, /start with OFFENSE if offense comes first/i);
   assert.match(pptxGuide, /rounded and snipped-corner rectangle variants/i);
   assert.match(pptxGuide, /No LLM/);
-  assert.match(pptxGuide, /class="converter-cta" href="\/converter">OK, take me to the converter/);
+  assert.match(pptxGuide, /class="converter-cta" href="\/converter">Open PowerPoint \(PPTX\) Import/);
   assert.match(pptxGuide, /href="\/">&larr; GSS Playbook Editor home/);
   assert.doesNotMatch(pptxGuide, /<script\b/i);
   assert.doesNotMatch(pptxGuide, /(?:src|href)="https?:/i);

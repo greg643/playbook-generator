@@ -49,6 +49,7 @@ function loadSaveModel() {
     let activePlaybookId = null;
     let documentEpoch = 0;
     let saveTimer = null;
+    let saveBlockedPlaybookId = null;
     let changeCounter = 0;
     let saveState = 'saved';
     let saveChain = Promise.resolve(false);

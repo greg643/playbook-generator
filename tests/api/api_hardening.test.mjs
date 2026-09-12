@@ -25,6 +25,7 @@ import { onRequestPost as login } from "../../dashboard/functions/api/auth/login
 import { onRequestGet as getMe } from "../../dashboard/functions/api/auth/me.js";
 import { onRequestPost as register } from "../../dashboard/functions/api/auth/register.js";
 import {
+  onRequestDelete as deletePlaybook,
   onRequestGet as getPlaybooks,
   onRequestPatch as renamePlaybook,
   onRequestPost as createPlaybook,
@@ -65,6 +66,7 @@ class MemoryR2 {
     this.objects = new Map();
     this.sequence = 0;
     this.beforeConditionalPut = null;
+    this.beforeGetReturn = null;
   }
 
   async put(key, value, options = {}) {
@@ -113,6 +115,7 @@ class MemoryR2 {
 
   async get(key) {
     const stored = this.objects.get(key);
+    if (this.beforeGetReturn) await this.beforeGetReturn(key);
     return stored ? this.object(key, stored) : null;
   }
 
@@ -154,6 +157,29 @@ class FailFirstPlaybookDeleteR2 extends MemoryR2 {
     if (!this.failed && list.some((key) => key.endsWith("/playbook.json"))) {
       this.failed = true;
       throw new Error("temporary storage failure");
+    }
+    return super.delete(keys);
+  }
+}
+
+class FailNamedPlaybookDeletesR2 extends MemoryR2 {
+  constructor(failures = 1) {
+    super();
+    this.failuresRemaining = failures;
+    this.namedDeleteAttempts = 0;
+  }
+
+  async delete(keys) {
+    const list = Array.isArray(keys) ? keys : [keys];
+    if (list.some((key) => key.includes("/playbooks/items/"))) {
+      this.namedDeleteAttempts += 1;
+    }
+    if (
+      this.failuresRemaining > 0 &&
+      list.some((key) => key.includes("/playbooks/items/"))
+    ) {
+      this.failuresRemaining -= 1;
+      throw new Error("temporary named-playbook delete failure");
     }
     return super.delete(keys);
   }
@@ -271,6 +297,17 @@ async function callCreatePlaybook(env, account, name, defaultPlayersPerSide) {
     request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
       method: "POST",
       body: JSON.stringify({ name, defaultPlayersPerSide }),
+    }),
+    env,
+  });
+}
+
+async function callDeletePlaybook(env, account, playbookId, baseRevision) {
+  return deletePlaybook({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playbookId, baseRevision }),
     }),
     env,
   });
@@ -1102,6 +1139,187 @@ test("renaming a playbook is revision-safe and does not change its document", as
   });
   assert.equal(staleRename.status, 409);
   assert.equal((await json(staleRename)).playbook.name, "Spring 2027");
+});
+
+test("deleting a named playbook removes only its catalog entry and document", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const firstResponse = await callCreatePlaybook(env, account, "Delete me", 5);
+  const first = (await json(firstResponse)).playbooks.find((entry) => entry.name === "Delete me");
+  const secondResponse = await callCreatePlaybook(env, account, "Keep me", 6);
+  const second = (await json(secondResponse)).playbooks.find((entry) => entry.name === "Keep me");
+
+  const deleted = await callDeletePlaybook(env, account, first.id, first.revision);
+  assert.equal(deleted.status, 200);
+  const catalog = await json(deleted);
+  assert.equal(catalog.playbooks.some((entry) => entry.id === first.id), false);
+  assert.equal(catalog.playbooks.some((entry) => entry.id === second.id), true);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, first.id)), null);
+  assert.ok(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, second.id)));
+  assert.ok(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, "default")) === null);
+});
+
+test("playbook deletion rejects the default, malformed input, and a stale revision", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const initial = await getPlaybooks({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks"),
+    env,
+  });
+  const defaultEntry = (await json(initial)).playbooks[0];
+  assert.equal(
+    (await callDeletePlaybook(env, account, "default", defaultEntry.revision)).status,
+    409
+  );
+
+  const malformed = await deletePlaybook({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
+      method: "DELETE",
+      body: "not-json",
+    }),
+    env,
+  });
+  assert.equal(malformed.status, 400);
+
+  const created = await callCreatePlaybook(env, account, "Revision safe", 5);
+  const entry = (await json(created)).playbooks.find((item) => item.name === "Revision safe");
+  const renamed = await renamePlaybook({
+    request: await authenticatedRequest(env, account, "https://example.test/api/playbooks", {
+      method: "PATCH",
+      body: JSON.stringify({
+        playbookId: entry.id,
+        name: "Renamed first",
+        baseRevision: entry.revision,
+      }),
+    }),
+    env,
+  });
+  assert.equal(renamed.status, 200);
+  const stale = await callDeletePlaybook(env, account, entry.id, entry.revision);
+  assert.equal(stale.status, 409);
+  assert.equal((await json(stale)).playbook.name, "Renamed first");
+  assert.ok(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, entry.id)));
+});
+
+test("concurrent and repeated deletion is idempotent", async () => {
+  const env = makeEnv();
+  const account = await seedAccount(env);
+  const created = await callCreatePlaybook(env, account, "Delete concurrently", 5);
+  const entry = (await json(created)).playbooks.find(
+    (item) => item.name === "Delete concurrently"
+  );
+
+  const responses = await Promise.all([
+    callDeletePlaybook(env, account, entry.id, entry.revision),
+    callDeletePlaybook(env, account, entry.id, entry.revision),
+  ]);
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  const repeated = await callDeletePlaybook(env, account, entry.id, entry.revision);
+  assert.equal(repeated.status, 200);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, entry.id)), null);
+});
+
+test("an ambiguously committed catalog removal completes playbook deletion", async () => {
+  const bucket = new ThrowAfterCatalogPutR2();
+  const env = makeEnv(bucket);
+  const account = await seedAccount(env);
+  const created = await callCreatePlaybook(env, account, "Ambiguous delete", 6);
+  const entry = (await json(created)).playbooks.find((item) => item.name === "Ambiguous delete");
+
+  bucket.throwAfterCatalogPut = true;
+  const deleted = await callDeletePlaybook(env, account, entry.id, entry.revision);
+  assert.equal(deleted.status, 200);
+  assert.equal((await json(deleted)).playbooks.some((item) => item.id === entry.id), false);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, entry.id)), null);
+});
+
+test("a transient document-delete failure is reconciled after catalog removal", async () => {
+  const bucket = new FailNamedPlaybookDeletesR2();
+  const env = makeEnv(bucket);
+  const account = await seedAccount(env);
+  const created = await callCreatePlaybook(env, account, "Retry cleanup", 5);
+  const entry = (await json(created)).playbooks.find((item) => item.name === "Retry cleanup");
+
+  const deleted = await callDeletePlaybook(env, account, entry.id, entry.revision);
+  assert.equal(deleted.status, 200);
+  assert.equal(bucket.failuresRemaining, 0);
+  assert.equal(bucket.namedDeleteAttempts, 2);
+  assert.equal((await json(deleted)).playbooks.some((item) => item.id === entry.id), false);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, entry.id)), null);
+});
+
+test("repeated transient document-delete failures are retried after catalog removal", async () => {
+  // Three failures exhaust the first bounded cleanup. The catch-path confirms
+  // the catalog commit and starts another bounded cleanup, whose second try
+  // succeeds. This covers the old two-failure orphan edge.
+  const bucket = new FailNamedPlaybookDeletesR2(4);
+  const env = makeEnv(bucket);
+  const account = await seedAccount(env);
+  const created = await callCreatePlaybook(env, account, "Persistent cleanup", 5);
+  const entry = (await json(created)).playbooks.find((item) => item.name === "Persistent cleanup");
+
+  const deleted = await callDeletePlaybook(env, account, entry.id, entry.revision);
+  assert.equal(deleted.status, 200);
+  assert.equal(bucket.failuresRemaining, 0);
+  assert.equal(bucket.namedDeleteAttempts, 5);
+  assert.equal((await json(deleted)).playbooks.some((item) => item.id === entry.id), false);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(playbookObjectKey(USER_ID, entry.id)), null);
+});
+
+test("deletion prevents an in-flight playbook save from resurrecting its document", async () => {
+  const bucket = new MemoryR2();
+  const env = makeEnv(bucket);
+  const account = await seedAccount(env);
+  const created = await callCreatePlaybook(env, account, "Delete during save", 5);
+  const entry = (await json(created)).playbooks.find((item) => item.name === "Delete during save");
+  const key = playbookObjectKey(USER_ID, entry.id);
+  const original = await json(await getPlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${entry.id}`
+    ),
+    env,
+  }));
+
+  let releaseSave;
+  let saveReadObject;
+  const saveReadObjectPromise = new Promise((resolve) => { saveReadObject = resolve; });
+  const releaseSavePromise = new Promise((resolve) => { releaseSave = resolve; });
+  bucket.beforeGetReturn = async (readKey) => {
+    if (readKey !== key) return;
+    bucket.beforeGetReturn = null;
+    saveReadObject();
+    await releaseSavePromise;
+  };
+  const saving = savePlays({
+    request: await authenticatedRequest(
+      env,
+      account,
+      `https://example.test/api/plays?playbookId=${entry.id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          ...original,
+          ownerId: USER_ID,
+          baseRevision: original.revision,
+          offense: [{
+            name: "Racing save",
+            playersPerSide: 5,
+            chips: chips(["1", "2", "3", "C", "QB"]),
+            routes: [],
+          }],
+        }),
+      }
+    ),
+    env,
+  });
+  await saveReadObjectPromise;
+  const deleted = await callDeletePlaybook(env, account, entry.id, entry.revision);
+  assert.equal(deleted.status, 200);
+  releaseSave();
+  assert.equal((await saving).status, 409);
+  assert.equal(await env.PLAYBOOK_BUCKET.get(key), null);
 });
 
 test("playbook APIs reject invalid names, formats, malformed IDs, and unknown IDs", async () => {

@@ -146,6 +146,14 @@
     }
     .playbook-manager-actions { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
     .playbook-manager-actions .add-btn { flex: 1; }
+    .playbook-manager-actions .delete-playbook-btn {
+      border-color: #6e2c2c;
+      color: #ff7b72;
+    }
+    .playbook-manager-actions .delete-playbook-btn:not(:disabled):hover {
+      border-color: #f85149;
+      background: rgba(248, 81, 73, 0.12);
+    }
     .playbook-status {
       min-height: 1rem;
       margin: 0.35rem 0.25rem 0;
@@ -711,6 +719,8 @@
         <div class="playbook-manager-actions">
           <button class="add-btn" id="newPlaybookBtn" type="button" disabled>+ New</button>
           <button class="add-btn" id="renamePlaybookBtn" type="button" disabled>Rename</button>
+          <button class="add-btn delete-playbook-btn" id="deletePlaybookBtn" type="button" disabled
+                  title="The original playbook cannot be deleted.">Delete</button>
         </div>
         <p class="playbook-status" id="playbookStatus" role="status" aria-live="polite"></p>
       </section>
@@ -797,8 +807,8 @@
         <span id="saveIndicator" class="saved" role="status" aria-live="polite">Saved</span>
       </div>
       <div class="backup-row">
-        <button class="add-btn" id="exportBtn" title="Download this playbook as a JSON backup file">&#8681; Backup</button>
-        <button class="add-btn" id="importBtn" title="Load plays from a backup file">&#8679; Import</button>
+        <button class="add-btn" id="exportBtn" title="Download this playbook as a JSON backup file">&#8681; Export backup</button>
+        <button class="add-btn" id="importBtn" title="Load plays from a JSON backup file">&#8679; Import backup</button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       </div>
 
@@ -852,6 +862,7 @@ const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
 const MAX_IMPORT_BYTES = 1000000;
 const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
 const DEFAULT_NEW_PLAYERS_PER_SIDE = 5;
+const DEFAULT_PLAYBOOK_ID = 'default';
 const MAX_PLAYBOOK_NAME_LENGTH = 60;
 const LAST_PLAYBOOK_KEY_PREFIX = 'gss-playbook:last-selected:';
 const PLAYBOOK_ID_RE = /^(?:default|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
@@ -1301,7 +1312,8 @@ const authEmail = $('authEmail'), authPassword = $('authPassword'), authError = 
 const loginBtn = $('loginBtn'), registerBtn = $('registerBtn'), signOutBtn = $('signOutBtn');
 const userEmail = $('userEmail');
 const playbookSelect = $('playbookSelect'), newPlaybookBtn = $('newPlaybookBtn');
-const renamePlaybookBtn = $('renamePlaybookBtn'), playbookStatus = $('playbookStatus');
+const renamePlaybookBtn = $('renamePlaybookBtn'), deletePlaybookBtn = $('deletePlaybookBtn');
+const playbookStatus = $('playbookStatus');
 const newPlays5 = $('newPlays5'), newPlays6 = $('newPlays6');
 const offenseHeading = $('offenseHeading'), defenseHeading = $('defenseHeading');
 const offenseList = $('offenseList'), defenseList = $('defenseList');
@@ -1334,6 +1346,7 @@ let documentEpoch = 0;
 let playbookLoadEpoch = 0;
 let playbookLoadRequest = null;
 let playbookBusy = false;
+let saveBlockedPlaybookId = null;
 let tool = 'select';
 const toolStyles = {
   route: { color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth' },
@@ -2046,6 +2059,29 @@ function samePlaybookName(left, right) {
   return left.toLocaleLowerCase('en-US') === right.toLocaleLowerCase('en-US');
 }
 
+function backupNameSlug(value) {
+  const name = normalizePlaybookName(value) || 'playbook';
+  const slug = name.normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('en-US')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/g, '');
+  return slug || 'playbook';
+}
+
+function playbookBackupFilename(playbookName, date = new Date()) {
+  const stamp = date.getFullYear() + '-' +
+    String(date.getMonth() + 1).padStart(2, '0') + '-' +
+    String(date.getDate()).padStart(2, '0');
+  return 'playbook-backup-' + backupNameSlug(playbookName) + '-' + stamp + '.json';
+}
+
+function backupSourcePlaybookName(data) {
+  return normalizePlaybookName(data && data.playbookName);
+}
+
 function isPlaybookId(value) {
   return typeof value === 'string' && PLAYBOOK_ID_RE.test(value);
 }
@@ -2120,9 +2156,17 @@ function renderPlaybookManager(message = '') {
   if (activePlaybookId && playbookById(activePlaybookId)) playbookSelect.value = activePlaybookId;
   else playbookSelect.selectedIndex = -1;
   const controlsBusy = playbookBusy || accountRequestBusy;
+  const current = playbookById(activePlaybookId);
   playbookSelect.disabled = controlsBusy || !activeUserId || !activePlaybookId || playbooks.length < 2;
   newPlaybookBtn.disabled = controlsBusy || !activeUserId || playbooks.length >= maxPlaybooks;
-  renamePlaybookBtn.disabled = controlsBusy || !activeUserId || !playbookById(activePlaybookId);
+  renamePlaybookBtn.disabled = controlsBusy || !activeUserId || !current;
+  deletePlaybookBtn.disabled = controlsBusy || !activeUserId || !current || current.id === DEFAULT_PLAYBOOK_ID;
+  deletePlaybookBtn.title = current && current.id !== DEFAULT_PLAYBOOK_ID
+    ? 'Permanently delete this playbook'
+    : 'The original playbook cannot be deleted.';
+  deletePlaybookBtn.setAttribute('aria-label', current && current.id !== DEFAULT_PLAYBOOK_ID
+    ? 'Delete ' + current.name
+    : 'Delete playbook — the original playbook cannot be deleted');
   playbookStatus.textContent = message || (playbooks.length
     ? playbooks.length + ' of ' + maxPlaybooks + ' playbooks'
     : 'No playbooks');
@@ -2153,10 +2197,14 @@ function captureDocumentContext() {
   };
 }
 
-function isCurrentDocumentContext(context) {
+function isSameDocumentIdentity(context) {
   return !!context && context.doc === doc && context.ownerId === docOwner &&
     context.ownerId === activeUserId && context.playbookId === docPlaybookId &&
-    context.playbookId === activePlaybookId && context.epoch === documentEpoch;
+    context.playbookId === activePlaybookId;
+}
+
+function isCurrentDocumentContext(context) {
+  return isSameDocumentIdentity(context) && context.epoch === documentEpoch;
 }
 
 // ---------- Play document management ----------
@@ -2613,6 +2661,9 @@ function saveDoc() {
     forceOverwrite: overwriteNext,
   };
   overwriteNext = false;
+  if (context.playbookId && context.playbookId === saveBlockedPlaybookId) {
+    return Promise.resolve(false);
+  }
   const p = saveChain.then(() => doSave(context), () => doSave(context));
   saveChain = p;
   return p;
@@ -2756,8 +2807,13 @@ saveBtn.addEventListener('click', () => saveDoc());
 
 $('exportBtn').addEventListener('click', () => {
   if (!doc) return;
+  const current = playbookById(activePlaybookId);
+  if (!current) return;
   const clean = {
     schema: 2,
+    // Optional display metadata only. Imports never use this to rename or
+    // identify their destination, and old/CLI backups without it stay valid.
+    playbookName: current.name,
     defaultPlayersPerSide: normalizePlayersPerSide(
       doc.defaultPlayersPerSide,
       DEFAULT_NEW_PLAYERS_PER_SIDE,
@@ -2768,9 +2824,7 @@ $('exportBtn').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(clean, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  const d = new Date();
-  const stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  a.download = 'playbook-backup-' + stamp + '.json';
+  a.download = playbookBackupFilename(current.name);
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -2779,7 +2833,9 @@ $('importBtn').addEventListener('click', () => $('importFile').click());
 $('importFile').addEventListener('change', async () => {
   const file = $('importFile').files[0];
   $('importFile').value = '';
-  if (!file || !doc) return;
+  const importContext = captureDocumentContext();
+  const destination = playbookById(importContext.playbookId);
+  if (!file || !destination || !isCurrentDocumentContext(importContext)) return;
   if (file.size > MAX_IMPORT_BYTES) {
     await showModal({
       title: 'Import failed',
@@ -2795,15 +2851,28 @@ $('importFile').addEventListener('change', async () => {
     await showModal({ title: 'Import failed', message: 'That file is not a valid playbook backup (could not parse JSON).', confirmLabel: 'OK' });
     return;
   }
+  if (!isCurrentDocumentContext(importContext)) {
+    await showModal({
+      title: 'Import canceled',
+      message: 'The selected playbook changed while the backup was being read. Choose Import backup again for the playbook you want.',
+      confirmLabel: 'OK',
+    });
+    return;
+  }
   const incoming = normalizeDoc(data || {});
+  const sourceName = backupSourcePlaybookName(data);
   const nOff = incoming.offense.length, nDef = incoming.defense.length;
   if (!nOff && !nDef) {
     await showModal({ title: 'Nothing to import', message: 'That file has no plays in it.', confirmLabel: 'OK' });
     return;
   }
   const choice = await showChoiceModal({
-    title: 'Import ' + nOff + ' offense + ' + nDef + ' defense plays',
-    message: 'Replace this playbook with the backup, or add the plays to its bench (they arrive toggled out, with fresh numbers)?',
+    title: sourceName
+      ? 'Import backup from “' + sourceName + '”'
+      : 'Import ' + nOff + ' offense + ' + nDef + ' defense plays',
+    message: 'This backup contains ' + nOff + ' offense and ' + nDef + ' defense plays. ' +
+      'Replace “' + destination.name + '”, or add the plays to its bench (they arrive toggled out, with fresh numbers)? ' +
+      'The destination name will not change.',
     choices: [
       { key: 'replace', label: 'Replace playbook', danger: true },
       { key: 'bench', label: 'Add to bench', primary: true },
@@ -2811,6 +2880,14 @@ $('importFile').addEventListener('change', async () => {
     ],
   });
   if (!choice || choice === 'cancel') return;
+  if (!isCurrentDocumentContext(importContext)) {
+    await showModal({
+      title: 'Import canceled',
+      message: 'The selected playbook changed before the backup could be applied. No plays were imported.',
+      confirmLabel: 'OK',
+    });
+    return;
+  }
   if (choice === 'replace') {
     doc = incoming;
     for (const k in undoStacks) delete undoStacks[k];
@@ -3100,6 +3177,72 @@ function showPlaybookForm({ title, defaultName = '', defaultPlayersPerSide = nul
           event.preventDefault();
           submit();
         }
+      });
+      return input;
+    },
+  });
+}
+
+function showDeletePlaybookConfirmation(playbook) {
+  return enqueueModal({
+    cancelValue: false,
+    render(close) {
+      modalHeading(
+        'Delete “' + playbook.name + '”?',
+        'This permanently deletes the playbook and all of its plays. This cannot be undone. ' +
+        'Export a backup first if you may want it later.'
+      );
+
+      const label = document.createElement('label');
+      label.className = 'playbook-name-label';
+      label.htmlFor = 'deletePlaybookNameInput';
+      label.textContent = 'Type “' + playbook.name + '” exactly to confirm';
+      const input = document.createElement('input');
+      input.id = 'deletePlaybookNameInput';
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      // maxlength counts UTF-16 units, while catalog validation counts Unicode
+      // code points. Allow the exact validated name even when it uses emoji.
+      input.maxLength = playbook.name.length;
+      modalBox.append(label, input);
+
+      const error = document.createElement('p');
+      error.className = 'playbook-form-error';
+      error.id = 'deletePlaybookNameError';
+      error.setAttribute('role', 'alert');
+      error.setAttribute('aria-live', 'assertive');
+      input.setAttribute('aria-describedby', error.id);
+      modalBox.appendChild(error);
+
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'mbtn-cancel';
+      cancel.textContent = 'Cancel';
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = 'mbtn-danger';
+      confirm.textContent = 'Delete permanently';
+      confirm.disabled = true;
+      row.append(cancel, confirm);
+      modalBox.appendChild(row);
+
+      const matches = () => input.value === playbook.name;
+      input.addEventListener('input', () => {
+        confirm.disabled = !matches();
+        error.textContent = input.value && !matches() ? 'The name must match exactly.' : '';
+      });
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (matches()) close(true);
+        }
+      });
+      cancel.addEventListener('click', () => close(false));
+      confirm.addEventListener('click', () => {
+        if (matches()) close(true);
       });
       return input;
     },
@@ -3501,6 +3644,7 @@ function startAuthTransition() {
   activeUserId = null;
   clearTimeout(saveTimer);
   saveTimer = null;
+  saveBlockedPlaybookId = null;
   playbookBusy = false;
   editorView.inert = false;
   editorView.removeAttribute('aria-busy');
@@ -3629,6 +3773,7 @@ function installPlaybookDocument(data, userId, playbookId) {
   rememberPlaybookId(userId, playbookId);
   serverUpdatedAt = typeof data.updatedAt === 'string' ? data.updatedAt : null;
   serverRevision = typeof data.revision === 'string' && data.revision ? data.revision : null;
+  saveBlockedPlaybookId = null;
   overwriteNext = false;
   changeCounter = 0;
   saveState = 'saved';
@@ -3705,6 +3850,7 @@ function discardLocalDoc() {
   maxPlaybooks = 1;
   serverUpdatedAt = null;
   serverRevision = null;
+  saveBlockedPlaybookId = null;
   overwriteNext = false;
   changeCounter = 0;
   saveState = 'saved';
@@ -4006,6 +4152,244 @@ async function renamePlaybook() {
   }
 }
 
+function deletionSurvivorId(previousIds, deletedId, catalog) {
+  const deletedIndex = previousIds.indexOf(deletedId);
+  const orderedCandidates = deletedIndex >= 0
+    ? previousIds.slice(deletedIndex + 1).concat(previousIds.slice(0, deletedIndex).reverse())
+    : previousIds;
+  for (const candidate of orderedCandidates) {
+    if (catalog.playbooks.some(playbook => playbook.id === candidate)) return candidate;
+  }
+  return catalog.playbooks.length ? catalog.playbooks[0].id : null;
+}
+
+async function reconcilePlaybookCatalogAfterDelete(
+  userId,
+  expectedAuthEpoch,
+  retiringPlaybookId,
+  retireIfUnauthorized
+) {
+  try {
+    const res = await fetch('/api/playbooks', { cache: 'no-store' });
+    if (expectedAuthEpoch !== authEpoch || userId !== activeUserId) return null;
+    const data = await res.json().catch(() => null);
+    if (res.status === 401) {
+      // Only discard the local document when the preceding DELETE had an
+      // ambiguous outcome. A direct 4xx/conflict means no deletion committed,
+      // so same-account reauthentication should still preserve local edits.
+      if (retireIfUnauthorized) retireDeletedPlaybookDocument(retiringPlaybookId);
+      showAuthView('Your session expired — sign in to keep working.');
+      return null;
+    }
+    if (!res.ok) return null;
+    return normalizePlaybookCatalog(data);
+  } catch {
+    return null;
+  }
+}
+
+function retireDeletedPlaybookDocument(playbookId) {
+  if (docPlaybookId !== playbookId) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  documentEpoch++;
+  doc = null;
+  docOwner = null;
+  docPlaybookId = null;
+  activePlaybookId = null;
+  serverUpdatedAt = null;
+  serverRevision = null;
+  overwriteNext = false;
+  changeCounter = 0;
+  saveState = 'saved';
+  cur = null;
+  selection = null;
+  drawing = null;
+  drag = null;
+  nameUndoPushed = false;
+  for (const key in undoStacks) delete undoStacks[key];
+  updateSaveIndicator();
+  refreshAll();
+}
+
+async function openDeletionSurvivor(catalog, previousIds, deletedPlaybook, userId, expectedAuthEpoch) {
+  if (!catalog.playbooks.length || catalog.playbooks.some(playbook => playbook.id === deletedPlaybook.id)) {
+    throw new Error('The server returned an invalid playbook list after deletion');
+  }
+  playbooks = catalog.playbooks;
+  maxPlaybooks = catalog.maxPlaybooks;
+  retireDeletedPlaybookDocument(deletedPlaybook.id);
+  renderPlaybookManager();
+  const survivorId = deletionSurvivorId(previousIds, deletedPlaybook.id, catalog);
+  if (!survivorId) throw new Error('No playbook remains to open');
+  invalidateGeneration({ clearUI: true });
+  const survivor = playbookById(survivorId);
+  playbookStatus.textContent = 'Opening “' + survivor.name + '”…';
+  const loaded = await loadPlaybookDocument(survivorId, userId, expectedAuthEpoch);
+  if (!loaded) return null;
+  if (loaded.needsFormatChoice) {
+    await chooseInitialPlayersPerSide(
+      loaded.doc,
+      userId,
+      docPlaybookId,
+      loaded.documentEpoch,
+      expectedAuthEpoch
+    );
+  }
+  return survivor;
+}
+
+async function deleteActivePlaybook() {
+  if (playbookBusy || accountRequestBusy || !activeUserId) return;
+  const selected = playbookById(activePlaybookId);
+  if (!selected || selected.id === DEFAULT_PLAYBOOK_ID) {
+    renderPlaybookManager('The original playbook cannot be deleted.');
+    return;
+  }
+  const confirmed = await showDeletePlaybookConfirmation(selected);
+  if (!confirmed) return;
+
+  const context = captureDocumentContext();
+  const current = playbookById(selected.id);
+  if (!isCurrentDocumentContext(context) || !current || current.revision !== selected.revision) {
+    await showPlaybookActionError(
+      'Could not delete playbook',
+      new Error('The selected playbook changed. Review it and try again.')
+    );
+    return;
+  }
+
+  const userId = activeUserId;
+  const epoch = authEpoch;
+  const previousIds = playbooks.map(playbook => playbook.id);
+  const wasSaved = saveState === 'saved';
+  let deletionCommitted = false;
+  let knownStillPresent = false;
+  let finalMessage = '';
+
+  setPlaybookBusy(true, 'Deleting “' + selected.name + '”…');
+  saveBlockedPlaybookId = selected.id;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  drawing = null;
+  documentEpoch++;
+  invalidateGeneration({ clearUI: true });
+
+  try {
+    // Any PUT that began before the confirmation must settle before DELETE.
+    // Queued PUTs hold the retired document epoch and new saves are blocked,
+    // so this tab cannot recreate an orphan after the catalog entry is gone.
+    await saveChain.catch(() => false);
+    if (epoch !== authEpoch || userId !== activeUserId || !isSameDocumentIdentity(context)) return;
+
+    let response = null;
+    let data = null;
+    let requestError = null;
+    try {
+      response = await fetch('/api/playbooks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playbookId: selected.id,
+          baseRevision: selected.revision,
+        }),
+      });
+      if (epoch !== authEpoch || userId !== activeUserId || !isSameDocumentIdentity(context)) return;
+      data = await response.json().catch(() => null);
+    } catch (error) {
+      requestError = error;
+    }
+    if (epoch !== authEpoch || userId !== activeUserId || !isSameDocumentIdentity(context)) return;
+    if (response && response.status === 401) {
+      showAuthView('Your session expired — sign in to keep working.');
+      return;
+    }
+
+    let catalog = null;
+    if (response && response.ok) {
+      try { catalog = normalizePlaybookCatalog(data); }
+      catch { requestError = new Error('The server returned an invalid playbook list'); }
+    }
+
+    // A lost response may hide a successful delete, while a 409 may carry a
+    // stale catalog revision. Re-read the catalog before deciding whether the
+    // local document should be retired or restored.
+    if (!catalog || catalog.playbooks.some(playbook => playbook.id === selected.id)) {
+      const outcomeIsAmbiguous = !!requestError || !!(response && (
+        response.ok || response.status >= 500 ||
+        (response.status === 409 && (!data || data.error !== 'conflict'))
+      ));
+      const reconciled = await reconcilePlaybookCatalogAfterDelete(
+        userId,
+        epoch,
+        selected.id,
+        outcomeIsAmbiguous
+      );
+      if (epoch !== authEpoch || userId !== activeUserId || !isSameDocumentIdentity(context)) return;
+      if (reconciled) catalog = reconciled;
+    }
+    if (!catalog && response && response.status === 409 && data &&
+        data.error === 'conflict' && data.playbook) {
+      // The conflict response carries the current entry. If the follow-up GET
+      // failed, validate and apply that narrow update so retrying does not stay
+      // pinned to a stale catalog revision.
+      try {
+        catalog = normalizePlaybookCatalog({
+          playbooks: playbooks.map(playbook =>
+            playbook.id === selected.id ? data.playbook : playbook),
+          maxPlaybooks,
+        });
+      } catch { /* keep the known-safe local catalog instead */ }
+    }
+
+    if (catalog && !catalog.playbooks.some(playbook => playbook.id === selected.id)) {
+      deletionCommitted = true;
+      const survivor = await openDeletionSurvivor(catalog, previousIds, selected, userId, epoch);
+      if (!survivor || epoch !== authEpoch || userId !== activeUserId) return;
+      finalMessage = 'Deleted “' + selected.name + '” · Opened “' + survivor.name + '”';
+      return;
+    }
+
+    if (catalog) {
+      knownStillPresent = true;
+      playbooks = catalog.playbooks;
+      maxPlaybooks = catalog.maxPlaybooks;
+      renderPlaybookManager();
+    }
+    const message = response && response.status === 409 && data && data.error === 'conflict'
+      ? 'This playbook changed elsewhere, so it was not deleted. The playbook list was refreshed; review its current name and try again.'
+      : requestError && requestError.message
+        ? requestError.message
+        : data && typeof data.error === 'string'
+          ? data.error.slice(0, 160)
+          : 'The delete could not be confirmed. Your local playbook is still open.';
+    throw new Error(message);
+  } catch (error) {
+    if (epoch !== authEpoch || userId !== activeUserId) return;
+    if (deletionCommitted) {
+      // Never reactivate a document whose catalog entry is gone. A fresh sign
+      // in retries loading the deterministic survivor without risking a save
+      // to the deleted immutable ID.
+      discardLocalDoc();
+      showAuthView('“' + selected.name + '” was deleted, but another playbook could not be loaded. Sign in again to continue.');
+      return;
+    }
+    if (isSameDocumentIdentity(context)) {
+      saveBlockedPlaybookId = null;
+      saveState = wasSaved ? 'saved' : 'unsaved';
+      updateSaveIndicator(wasSaved ? null : 'Delete not completed — local changes kept');
+      if (!wasSaved && knownStillPresent) saveTimer = setTimeout(() => saveDoc(), 1500);
+      await showPlaybookActionError('Could not delete playbook', error);
+    }
+  } finally {
+    if (epoch === authEpoch && userId === activeUserId) {
+      if (!deletionCommitted && saveBlockedPlaybookId === selected.id) saveBlockedPlaybookId = null;
+      setPlaybookBusy(false, finalMessage);
+      restorePlaybookManagerFocus(deletionCommitted ? newPlaybookBtn : deletePlaybookBtn);
+    }
+  }
+}
+
 playbookSelect.addEventListener('change', () => {
   const targetId = playbookSelect.value;
   renderPlaybookManager();
@@ -4013,6 +4397,7 @@ playbookSelect.addEventListener('change', () => {
 });
 newPlaybookBtn.addEventListener('click', createPlaybook);
 renamePlaybookBtn.addEventListener('click', renamePlaybook);
+deletePlaybookBtn.addEventListener('click', deleteActivePlaybook);
 
 async function authSubmit(path) {
   if (authBusy) return;

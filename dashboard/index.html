@@ -467,7 +467,7 @@
           <div id="signinFormWrap">
             <h2 id="authTitle" tabindex="-1">Sign in</h2>
             <p class="card-sub" id="authSubtitle">Access your saved plays and PowerPoint conversions.</p>
-            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. Afterward, choose <strong>PPTX Import</strong> to upload your deck.</p>
+            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. We&rsquo;ll return you automatically to <strong>PowerPoint (PPTX) Import</strong>.</p>
             <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it somewhere safe&mdash;it is the only way to reset a forgotten password.</p>
             <form id="signinForm" aria-labelledby="authTitle" novalidate>
               <label class="field">Email
@@ -527,16 +527,16 @@
         </a>
         <a class="choice converter" href="/converter">
           <span class="choice-icon" aria-hidden="true">&#128196;</span>
-          <h2>PPTX Import</h2>
+          <h2>PowerPoint (PPTX) Import</h2>
           <p>Upload a compatible .pptx and turn it into print-ready cards.</p>
-          <span class="choice-action">Open PPTX Import &rarr;</span>
+          <span class="choice-action">Open PowerPoint (PPTX) Import &rarr;</span>
         </a>
       </div>
 
       <div class="hub-help">
         <p>Need help?</p>
         <p>The <a href="/help">quick-start guide</a> explains editing, printing, accounts, and deck compatibility.</p>
-        <p><a href="/pptx-guide">Read the PPTX Import Guide</a></p>
+        <p><a href="/pptx-guide">Read the PowerPoint (PPTX) Import Guide</a></p>
       </div>
     </section>
   </main>
@@ -587,6 +587,12 @@ let recoveryModalOpen = false;
 let recoveryResolve = null;
 let recoveryReturnFocus = null;
 let authMode = 'signin';
+const POST_AUTH_DESTINATIONS = Object.freeze({ converter: '/converter' });
+const requestedPostAuthDestination = new URLSearchParams(window.location.search).get('signin');
+const postAuthDestination = Object.prototype.hasOwnProperty.call(
+  POST_AUTH_DESTINATIONS,
+  requestedPostAuthDestination
+) ? POST_AUTH_DESTINATIONS[requestedPostAuthDestination] : null;
 
 function setAuthBusy(busy) {
   authBusy = busy;
@@ -616,7 +622,7 @@ function setAuthMode(mode, focusHeading = false) {
   authMode = registering ? 'register' : 'signin';
   $('authTitle').textContent = registering ? 'Create your free account' : 'Sign in';
   $('authSubtitle').textContent = registering
-    ? 'Save your plays and use the PowerPoint converter with one free account.'
+    ? 'Save your plays and use PowerPoint (PPTX) Import with one free account.'
     : 'Access your saved plays and PowerPoint conversions.';
   $('registerRecoveryNotice').hidden = !registering;
   $('passwordHelp').hidden = !registering;
@@ -661,6 +667,20 @@ function showHub(account, focusHeading = false) {
   authView.hidden = true;
   hubView.hidden = false;
   if (focusHeading) $('hubHeading').focus();
+}
+
+function routeAfterAuthentication(account, focusHeading = false) {
+  if (!account || typeof account.userId !== 'string' || !account.userId ||
+      typeof account.email !== 'string' || !account.email) {
+    throw new Error('The server returned an invalid account');
+  }
+  if (postAuthDestination) {
+    // The destination comes only from the fixed allowlist above. Replace the
+    // sign-in URL so Back cannot bounce the user through the same redirect.
+    window.location.replace(postAuthDestination);
+    return;
+  }
+  showHub(account, focusHeading);
 }
 
 async function verifyAccount(expectedUserId, epoch) {
@@ -782,7 +802,7 @@ async function authSubmit(path) {
     }
     if (epoch !== authEpoch) return;
     const verified = await verifyAccount(data.userId, epoch);
-    if (verified && epoch === authEpoch) showHub(verified, true);
+    if (verified && epoch === authEpoch) routeAfterAuthentication(verified, true);
   } catch (error) {
     if (epoch === authEpoch) setError(authError, error.message || 'Could not sign in');
   } finally {
@@ -861,7 +881,7 @@ $('recoverForm').addEventListener('submit', async event => {
     }
     if (epoch !== authEpoch) return;
     const verified = await verifyAccount(data.userId, epoch);
-    if (verified && epoch === authEpoch) showHub(verified, true);
+    if (verified && epoch === authEpoch) routeAfterAuthentication(verified, true);
   } catch (error) {
     if (epoch === authEpoch) setError(recError, error.message || 'Recovery failed');
   } finally {
@@ -893,7 +913,7 @@ $('signOutBtn').addEventListener('click', async () => {
 });
 
 (async function init() {
-  if (new URLSearchParams(window.location.search).get('signin') === 'converter') {
+  if (postAuthDestination === '/converter') {
     $('converterSigninNotice').hidden = false;
   }
   const epoch = ++authEpoch;
@@ -906,7 +926,7 @@ $('signOutBtn').addEventListener('click', async () => {
           typeof data.email !== 'string' || !data.email) {
         throw new Error('The server returned an invalid account');
       }
-      showHub(data);
+      routeAfterAuthentication(data);
       return;
     }
     if (res.status !== 401) throw new Error('Could not check your account');

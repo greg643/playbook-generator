@@ -8,6 +8,7 @@ import {
 import {
   CATALOG_WRITE_ATTEMPTS,
   clonePlaybookCatalog,
+  DEFAULT_PLAYBOOK_ID,
   deleteAccountPlaybooks,
   findPlaybookEntry,
   isPlaybookId,
@@ -23,6 +24,7 @@ import { createJson, putJsonIfCurrent } from "../_lib/r2.js";
 
 const MAX_BODY_BYTES = 10000;
 const SUPPORTED_PLAYER_COUNTS = new Set([5, 6]);
+const PLAYBOOK_OBJECT_DELETE_ATTEMPTS = 3;
 
 async function readBody(request) {
   if (requestBodyTooLarge(request, MAX_BODY_BYTES)) {
@@ -63,6 +65,20 @@ async function finishResponse(env, user, response) {
 
 async function finishMutation(env, user, catalog, options = {}) {
   return finishResponse(env, user, jsonNoStore(publicCatalog(catalog), options));
+}
+
+async function deleteNamedPlaybookObject(env, userId, playbookId) {
+  const key = playbookObjectKey(userId, playbookId);
+  let lastError = null;
+  for (let attempt = 0; attempt < PLAYBOOK_OBJECT_DELETE_ATTEMPTS; attempt += 1) {
+    try {
+      await env.PLAYBOOK_BUCKET.delete(key);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Could not delete playbook document");
 }
 
 export async function onRequestGet(context) {
@@ -279,6 +295,94 @@ export async function onRequestPatch(context) {
     );
   } catch (error) {
     console.error("Playbooks PATCH error:", error);
+    const failure = jsonNoStore({ error: "Internal server error" }, { status: 500 });
+    return user ? finishResponse(env, user, failure) : failure;
+  }
+}
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  let user = null;
+  let playbookId = null;
+  try {
+    const auth = await requireUser(context);
+    if (!auth.user) return auth.response;
+    user = auth.user;
+    const parsed = await readBody(request);
+    if (parsed.response) return parsed.response;
+    playbookId = parsed.body && parsed.body.playbookId;
+    const baseRevision = parsed.body && parsed.body.baseRevision;
+    if (!isPlaybookId(playbookId) || typeof baseRevision !== "string") {
+      return jsonNoStore({ error: "Invalid playbook deletion" }, { status: 400 });
+    }
+    if (playbookId === DEFAULT_PLAYBOOK_ID) {
+      return jsonNoStore(
+        { error: "The original playbook cannot be deleted" },
+        { status: 409 }
+      );
+    }
+
+    for (let attempt = 0; attempt < CATALOG_WRITE_ATTEMPTS; attempt += 1) {
+      const loaded = await loadOrCreatePlaybookCatalog(env, user.userId);
+      const current = findPlaybookEntry(loaded.catalog, playbookId);
+
+      // A prior attempt may have committed the catalog removal but failed
+      // while deleting the document or returning the response. Retrying the
+      // same UUID finishes that cleanup without exposing a dangling entry.
+      if (!current) {
+        await deleteNamedPlaybookObject(env, user.userId, playbookId);
+        return finishMutation(env, user, loaded.catalog);
+      }
+      if (current.revision !== baseRevision) {
+        return finishResponse(
+          env,
+          user,
+          jsonNoStore({ error: "conflict", playbook: current }, { status: 409 })
+        );
+      }
+
+      const next = clonePlaybookCatalog(loaded.catalog);
+      next.entries = next.entries.filter((entry) => entry.id !== playbookId);
+      next.updatedAt = new Date().toISOString();
+      const saved = await putJsonIfCurrent(
+        env,
+        playbookCatalogKey(user.userId),
+        next,
+        loaded.object
+      );
+      if (saved === null) continue;
+
+      // Remove membership first. Any save which already passed membership
+      // either lands before this delete and is removed, or loses its own ETag
+      // conditional after this delete; later saves cannot address this UUID.
+      await deleteNamedPlaybookObject(env, user.userId, playbookId);
+      return finishMutation(env, user, next);
+    }
+
+    return finishResponse(
+      env,
+      user,
+      jsonNoStore(
+        { error: "Playbook list changed repeatedly; please try again" },
+        { status: 503, headers: { "Retry-After": "1" } }
+      )
+    );
+  } catch (error) {
+    // A conditional catalog write can commit remotely and still surface a
+    // transport error. If the entry is now absent, complete the document
+    // cleanup and report the already-committed deletion as successful.
+    if (user && playbookId && playbookId !== DEFAULT_PLAYBOOK_ID && isPlaybookId(playbookId)) {
+      try {
+        const loaded = await readPlaybookCatalog(env, user.userId);
+        if (loaded.catalog && !findPlaybookEntry(loaded.catalog, playbookId)) {
+          await deleteNamedPlaybookObject(env, user.userId, playbookId);
+          return finishMutation(env, user, loaded.catalog);
+        }
+      } catch (cleanupError) {
+        console.error("Could not reconcile failed playbook deletion:", cleanupError);
+      }
+    }
+    console.error("Playbooks DELETE error:", error);
     const failure = jsonNoStore({ error: "Internal server error" }, { status: 500 });
     return user ? finishResponse(env, user, failure) : failure;
   }

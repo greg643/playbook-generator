@@ -6,11 +6,11 @@ Greenwich Sports Systems web app for drawing flag football plays or converting a
 
 - `/` — account sign-in and the two-choice GSS Playbook Editor home
 - `/editor` — GSS Playbook Editor for 5v5 and 6v6 plays
-- `/pptx-guide` — public, non-proprietary deck compatibility guide
-- `/converter` — signed-in PowerPoint upload and conversion screen
+- `/pptx-guide` — public PowerPoint (PPTX) Import Guide with non-proprietary deck examples
+- `/converter` — signed-in PowerPoint (PPTX) Import screen
 - `/help` — editor, account, compatibility, and printing help
 
-The converter page verifies the current session before revealing its controls. The upload,
+The PowerPoint (PPTX) Import page verifies the current session before revealing its controls. The upload,
 status, and download APIs remain the actual security boundary: they require an authenticated
 account, and job results are owner-checked.
 
@@ -59,6 +59,10 @@ in this first version (for example, `Fall 2026 5v5`). **Rename** changes only th
 catalog label; every playbook keeps its own plays, numbering, bench, format
 preference, backups and generated PDFs. Existing single-playbook accounts are
 adopted automatically as `My Playbook` without moving or rewriting their data.
+Playbooks created after that original can be deleted by typing their exact name
+to confirm; the original can instead be renamed and reused. Export first if the
+plays may be needed again. Each JSON backup includes its source playbook name
+and can be shared with another coach or imported into another playbook or account.
 
 - **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
   salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
@@ -96,7 +100,7 @@ isolated directory under `_playbook_work/`; artifacts from an older deck are
 never reused. The pipeline rejects unsafe/oversized PPTX archives, excessive
 slide/play counts and images with unsafe dimensions.
 
-### PPTX conversion behavior
+### PowerPoint (PPTX) Import behavior
 
 Public PPTX-to-PDF conversion is deterministic; it does not use an LLM to
 interpret play marks or player positions. The pipeline identifies the largest
@@ -109,10 +113,10 @@ play slides before its first `DEFENSE` divider are treated as offense; a
 successful conversion warns when it uses this fallback or skips likely plays.
 A fully headerless deck remains offense-only. For explicitly sectioned decks,
 use nearly empty `OFFENSE` and `DEFENSE` divider slides and start with the
-appropriate divider. PPTX uploads
-support up to 64 offense plays (16 per coach-card page and 8 per wristband page)
+appropriate divider. PowerPoint (PPTX) Import
+supports up to 64 offense plays (16 per coach-card page and 8 per wristband page)
 and 24 defense plays (6 per coach-card page and 8 per wristband page). See the
-[visual PPTX guide](dashboard/pptx-guide.html) for example slides and known
+[PowerPoint (PPTX) Import Guide](dashboard/pptx-guide.html) for example slides and known
 failure cases.
 
 Convert a supported PPTX into an editor JSON backup with:
