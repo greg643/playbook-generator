@@ -26,35 +26,41 @@ jobs:
           workingDirectory: dashboard
 
       - name: Delete temporary owner-recovery deployments
+        working-directory: dashboard
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # Cloudflare account IDs are public identifiers. The repository had
-          # no CLOUDFLARE_ACCOUNT_ID secret, so use the project's known ID.
-          CLOUDFLARE_ACCOUNT_ID: 76317c04d814307dbb81c8fe71d287bb
           TEMPORARY_COMMITS: >-
-            da1055d9a4a3649547a682e11a1b504d095543e0
-            90fcdc2ba35270c99e6067b23ef8e95f9836cbbc
+            da1055d
+            90fcdc2
         run: |
           set -euo pipefail
-          deployments="$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/playbook-generator/deployments?env=production&per_page=100")"
-          test "$(jq -r '.success' <<< "${deployments}")" = "true"
+          deployments="$(npx --yes wrangler@4 pages deployment list \
+            --project-name=playbook-generator \
+            --environment=production \
+            --json)"
 
           for commit in ${TEMPORARY_COMMITS}; do
             deployment_ids="$(jq -r --arg commit "${commit}" \
-              '.result[] | select([.. | strings] | index($commit)) | .id' \
-              <<< "${deployments}")"
+              '.. | objects
+                | select(
+                    (.Source? == $commit) or
+                    (.source? == $commit) or
+                    ((.deployment_trigger?.metadata?.commit_hash? // "") | startswith($commit))
+                  )
+                | (.Id? // .id? // empty)' \
+              <<< "${deployments}" | sort -u)"
             if [ -z "${deployment_ids}" ]; then
               echo "Temporary deployment for ${commit} is already absent"
               continue
             fi
 
             while IFS= read -r deployment_id; do
-              result="$(curl --fail-with-body --silent --show-error \
-                --request DELETE \
-                --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-                "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/playbook-generator/deployments/${deployment_id}?force=true")"
-              test "$(jq -r '.success' <<< "${result}")" = "true"
+              if [[ ! "${deployment_id}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+                echo "Refusing malformed deployment ID" >&2
+                exit 1
+              fi
+              npx --yes wrangler@4 pages deployment delete "${deployment_id}" \
+                --project-name=playbook-generator \
+                --force
             done <<< "${deployment_ids}"
           done
