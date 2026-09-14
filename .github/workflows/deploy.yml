@@ -3,7 +3,7 @@ name: Deploy Dashboard
 on:
   push:
     branches: [main]
-    paths: ['dashboard/**', '.github/workflows/deploy.yml']
+    paths: ['dashboard/**']
   workflow_dispatch:
 
 jobs:
@@ -24,43 +24,3 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy . --project-name=playbook-generator --branch=main --commit-dirty=true
           workingDirectory: dashboard
-
-      - name: Delete temporary owner-recovery deployments
-        working-directory: dashboard
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          TEMPORARY_COMMITS: >-
-            da1055d
-            90fcdc2
-        run: |
-          set -euo pipefail
-          deployments="$(npx --yes wrangler@4 pages deployment list \
-            --project-name=playbook-generator \
-            --environment=production \
-            --json)"
-
-          for commit in ${TEMPORARY_COMMITS}; do
-            deployment_ids="$(jq -r --arg commit "${commit}" \
-              '.. | objects
-                | select(
-                    (.Source? == $commit) or
-                    (.source? == $commit) or
-                    ((.deployment_trigger?.metadata?.commit_hash? // "") | startswith($commit))
-                  )
-                | (.Id? // .id? // empty)' \
-              <<< "${deployments}" | sort -u)"
-            if [ -z "${deployment_ids}" ]; then
-              echo "Temporary deployment for ${commit} is already absent"
-              continue
-            fi
-
-            while IFS= read -r deployment_id; do
-              if [[ ! "${deployment_id}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-                echo "Refusing malformed deployment ID" >&2
-                exit 1
-              fi
-              npx --yes wrangler@4 pages deployment delete "${deployment_id}" \
-                --project-name=playbook-generator \
-                --force
-            done <<< "${deployment_ids}"
-          done
