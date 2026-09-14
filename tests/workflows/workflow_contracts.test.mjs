@@ -58,12 +58,14 @@ test('the private email Worker deploys before the existing Pages site', () => {
     'the email Worker must be available before Pages starts using its service binding'
   );
   assert.match(workerStep, /uses:\s*cloudflare\/wrangler-action@v3/);
+  assert.match(workerStep, /wranglerVersion:\s*['"]4\.131\.1['"]/);
   assert.match(workerStep, /command:\s*deploy\s*$/m);
   assert.match(workerStep, /workingDirectory:\s*workers\/email-sender\s*$/m);
   assert.match(workerStep, /apiToken:\s*\$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
   assert.match(workerStep, /accountId:\s*\$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/);
 
   assert.match(pagesStep, /uses:\s*cloudflare\/wrangler-action@v3/);
+  assert.match(pagesStep, /wranglerVersion:\s*['"]4\.131\.1['"]/);
   assert.match(
     pagesStep,
     /command:\s*pages deploy \. --project-name=playbook-generator --branch=main --commit-dirty=true/
