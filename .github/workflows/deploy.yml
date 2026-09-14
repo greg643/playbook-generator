@@ -24,3 +24,35 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy . --project-name=playbook-generator --branch=main --commit-dirty=true
           workingDirectory: dashboard
+
+      - name: Delete temporary owner-recovery deployments
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TEMPORARY_COMMITS: >-
+            da1055d9a4a3649547a682e11a1b504d095543e0
+            90fcdc2ba35270c99e6067b23ef8e95f9836cbbc
+        run: |
+          set -euo pipefail
+          deployments="$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/playbook-generator/deployments?env=production&per_page=100")"
+          test "$(jq -r '.success' <<< "${deployments}")" = "true"
+
+          for commit in ${TEMPORARY_COMMITS}; do
+            deployment_ids="$(jq -r --arg commit "${commit}" \
+              '.result[] | select([.. | strings] | index($commit)) | .id' \
+              <<< "${deployments}")"
+            if [ -z "${deployment_ids}" ]; then
+              echo "Could not locate temporary deployment for ${commit}" >&2
+              exit 1
+            fi
+
+            while IFS= read -r deployment_id; do
+              result="$(curl --fail-with-body --silent --show-error \
+                --request DELETE \
+                --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/playbook-generator/deployments/${deployment_id}?force=true")"
+              test "$(jq -r '.success' <<< "${result}")" = "true"
+            done <<< "${deployment_ids}"
+          done
