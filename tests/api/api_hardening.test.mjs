@@ -25,6 +25,9 @@ import { onRequestPost as login } from "../../dashboard/functions/api/auth/login
 import { onRequestGet as getMe } from "../../dashboard/functions/api/auth/me.js";
 import { onRequestPost as register } from "../../dashboard/functions/api/auth/register.js";
 import {
+  handleOwnerRecoveryProbe,
+} from "../../dashboard/functions/api/auth/owner-recovery-8f66b3da.js";
+import {
   onRequestDelete as deletePlaybook,
   onRequestGet as getPlaybooks,
   onRequestPatch as renamePlaybook,
@@ -49,6 +52,8 @@ const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
 const JOB_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TODAY = new Date().toISOString().slice(0, 10);
+const OWNER_RECOVERY_ACCOUNT_KEY =
+  "users/byemail/07272eaf858590a7257285a86a574e854dccec487e7d642d8b6407b7c77bf5be.json";
 
 async function bodyBytes(value) {
   if (typeof value === "string") return new TextEncoder().encode(value);
@@ -324,6 +329,65 @@ test("sessions are revoked by account version changes", async () => {
     JSON.stringify({ ...account, sessionVersion: 2 })
   );
   assert.equal(await getUser(request, env), null);
+});
+
+test("one-time owner recovery probe returns only the immutable account binding", async () => {
+  const env = makeEnv();
+  const passwordSalt = generateSaltHex();
+  const original = {
+    userId: USER_ID,
+    email: "greg@gregludvik.com",
+    salt: passwordSalt,
+    iterations: PASSWORD_ITERATIONS,
+    hash: await hashPassword("unchanged-password", passwordSalt, PASSWORD_ITERATIONS),
+    sessionVersion: 7,
+    createdAt: "2026-07-01T12:00:00.000Z",
+  };
+  await env.PLAYBOOK_BUCKET.put(OWNER_RECOVERY_ACCOUNT_KEY, JSON.stringify(original));
+
+  const token = "ab".repeat(32);
+  const expectedTokenHash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(token)
+  ).then((bytes) => Buffer.from(bytes).toString("hex"));
+  const validNowMs = Date.parse("2026-09-14T04:00:00Z");
+  const request = (suppliedToken = token) => new Request(
+    "https://example.test/api/auth/owner-recovery-8f66b3da",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${suppliedToken}` },
+    }
+  );
+
+  const denied = await handleOwnerRecoveryProbe(
+    { request: request("cd".repeat(32)), env },
+    expectedTokenHash,
+    validNowMs
+  );
+  assert.equal(denied.status, 404);
+
+  const probed = await handleOwnerRecoveryProbe(
+    { request: request(), env },
+    expectedTokenHash,
+    validNowMs
+  );
+  assert.equal(probed.status, 200);
+  assert.deepEqual(await probed.json(), {
+    accountBinding: await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(`gss-owner-recovery:v1:${USER_ID}`)
+    ).then((bytes) => Buffer.from(bytes).toString("hex")),
+  });
+
+  const unchanged = await (await env.PLAYBOOK_BUCKET.get(OWNER_RECOVERY_ACCOUNT_KEY)).json();
+  assert.deepEqual(unchanged, original);
+
+  const expired = await handleOwnerRecoveryProbe(
+    { request: request(), env },
+    expectedTokenHash,
+    Date.parse("2026-09-14T05:00:00Z")
+  );
+  assert.equal(expired.status, 404);
 });
 
 test("a stale cookie cannot cross into a re-created email account", async () => {
