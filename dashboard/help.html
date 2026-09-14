@@ -240,7 +240,7 @@
       <li><strong>Move players</strong> &mdash; with the <strong>Select</strong> tool, drag any chip. Routes stay attached to their chip when it moves.</li>
       <li><strong>Draw an arrow route</strong> &mdash; pick the <strong>Arrow</strong> tool, click near the chip the route starts from, then click each waypoint. Press <kbd>Enter</kbd> or double-click to finish; <kbd>Esc</kbd> cancels without saving the route.</li>
       <li><strong>Add a block</strong> &mdash; pick <strong>Block</strong> and click where the block happens. The editor draws a T-ended block from the nearest player; each click adds one block.</li>
-      <li><strong>Lines</strong> &mdash; the <strong>Line</strong> tool works the same way (click waypoints, <kbd>Enter</kbd> or double-click to finish) and defaults to a dashed zone-line style with no arrow.</li>
+      <li><strong>Lines</strong> &mdash; the <strong>Line</strong> tool works the same way (click waypoints, <kbd>Enter</kbd> or double-click to finish) and defaults to a dashed black line with an arrow. You can change its color, line type, ending, and corners before drawing.</li>
       <li><strong>Text</strong> &mdash; pick <strong>Text</strong> and click the field. <kbd>Enter</kbd> saves, <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line, and long text wraps on the card automatically.</li>
       <li><strong>Ball</strong> &mdash; click the field to place a football marker.</li>
       <li><strong>Erase</strong> &mdash; click any route, line, label, or ball to remove it.</li>
@@ -302,9 +302,9 @@
   <section class="card" id="account">
     <h2>Account &amp; safety</h2>
     <h3>Recovery code &mdash; save it!</h3>
-    <p>When you create an account you get a one-time <strong>recovery code</strong> (looks like <kbd>XXXX-XXXX-XXXX-XXXX-XXXX</kbd>). Save it somewhere safe &mdash; it is the <strong>only</strong> way back into your account if you forget your password, and it is shown only when issued.</p>
+    <p>When you create an account you get a one-time <strong>recovery code</strong> (looks like <kbd>XXXX-XXXX-XXXX-XXXX-XXXX</kbd>). Save it somewhere safe as an offline backup in case you lose access to your email. It is shown only when issued.</p>
     <h3>Password reset</h3>
-    <p>Forgot your password? Use your email plus your recovery code to set a new one. Each successful reset issues a <strong>fresh</strong> recovery code &mdash; save the new one, the old one no longer works. You can also rotate your recovery code anytime while signed in.</p>
+    <p>Forgot your password? Request an email from the sign-in screen. The link expires after <strong>15 minutes</strong>, is single-use, and is replaced if you request a newer one. If you cannot access your email, use your saved recovery code instead. Every successful reset issues a <strong>fresh</strong> recovery code &mdash; save the new one because the old one no longer works. You can also rotate your recovery code anytime while signed in.</p>
     <h3>Backups</h3>
     <p>You can <strong>export</strong> the currently selected playbook as a JSON file at any time, and <strong>import</strong> it back later. The backup includes its source playbook name, and you can share the file with another coach or import it into another playbook or account. Import affects only the playbook selected at that time. Export each playbook separately before major edits or deletion.</p>
     <h3>Deleting a playbook</h3>

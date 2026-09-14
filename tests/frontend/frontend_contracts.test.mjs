@@ -9,6 +9,8 @@ const index = read('index.html');
 const converter = read('converter.html');
 const help = read('help.html');
 const pptxGuide = read('pptx-guide.html');
+const resetPassword = read('reset-password.html');
+const headers = read('_headers');
 const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 
 function inlineScripts(html) {
@@ -20,6 +22,7 @@ test('inline frontend scripts compile', () => {
     ['editor.html', editor],
     ['index.html', index],
     ['converter.html', converter],
+    ['reset-password.html', resetPassword],
   ]) {
     const scripts = inlineScripts(html);
     assert.ok(scripts.length, `${name} should contain an inline script`);
@@ -58,7 +61,7 @@ test('output gating retains checkbox preferences and resyncs membership changes'
 test('drawing tools keep independent defaults', () => {
   assert.match(editor, /const toolStyles\s*=\s*\{/);
   assert.match(editor, /route:\s*\{\s*color:\s*'#FF0000',\s*dash:\s*false/);
-  assert.match(editor, /line:\s*\{\s*color:\s*'#1F6E8C',\s*dash:\s*true/);
+  assert.match(editor, /line:\s*\{\s*color:\s*'#000000',\s*dash:\s*true,\s*end:\s*'arrow'/);
   assert.match(editor, /if\s*\(toolStyles\[t\]\)\s*style\s*=\s*\{\s*\.\.\.toolStyles\[t\]\s*\}/);
 });
 
@@ -238,6 +241,34 @@ test('home preserves one-time recovery codes until explicit acknowledgement', ()
   assert.match(index, /const focusable = \[recoveryCode, copyRecoveryBtn, saveRecoveryBtn\]/);
   assert.match(index, /document\.querySelector\('main'\)\.inert = true/);
   assert.match(index, /verifyAccount\(data\.userId, epoch\)/);
+});
+
+test('email password reset is primary while the offline code stays available', () => {
+  assert.match(index, /id="forgotLink" href="\/\?forgot=1">Forgot password\?<\/a>/);
+  assert.match(index, /id="resetRequestForm"/);
+  assert.match(index, /Email me a reset link/);
+  assert.match(index, /fetch\('\/api\/auth\/password-reset\/request'/);
+  assert.match(index, /If an active account exists for that email/);
+  assert.match(index, /id="useRecoveryCodeLink"[^>]*>Have a recovery code\? Use it instead<\/a>/);
+  assert.match(index, /fetch\('\/api\/auth\/recover'/);
+  assert.match(editor, /id="emailResetLink" href="\/\?forgot=1" target="_blank" rel="noopener"/);
+  assert.match(editor, /Use an offline recovery code instead/);
+  assert.doesNotMatch(help, /recovery code[^.]*the <strong>only<\/strong> way/i);
+});
+
+test('emailed reset credentials stay in the fragment and are cleared before network work', () => {
+  assert.match(resetPassword, /new URLSearchParams\(window\.location\.hash\.slice\(1\)\)/);
+  assert.match(resetPassword, /history\.replaceState\(null, '', window\.location\.pathname\)/);
+  assert.match(resetPassword, /\^\[A-Za-z0-9_-\]\{43\}\$/);
+  assert.match(resetPassword, /id="newPassword"[^>]*autocomplete="new-password"/);
+  assert.match(resetPassword, /id="confirmPassword"[^>]*autocomplete="new-password"/);
+  assert.match(resetPassword, /fetch\('\/api\/auth\/password-reset\/complete'/);
+  assert.match(resetPassword, /body: JSON\.stringify\(\{ email: resetEmail, token: resetToken, newPassword \}\)/);
+  assert.match(resetPassword, /resetToken = ''/);
+  assert.match(resetPassword, /id="savedButton"[^>]*>I saved it/);
+  assert.match(resetPassword, /beforeunload[\s\S]*?resetComplete/);
+  assert.doesNotMatch(resetPassword, /(?:localStorage|sessionStorage|\.innerHTML\s*=)/);
+  assert.match(headers, /\/reset-password\s+[\s\S]*?Cache-Control: no-store[\s\S]*?X-Robots-Tag: noindex, nofollow/);
 });
 
 test('cold signed-out editor visits use home while in-editor reauthentication stays local', () => {

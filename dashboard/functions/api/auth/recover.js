@@ -5,11 +5,9 @@ import {
   emailKey,
   hashPassword,
   createSessionCookie,
-  createRecoveryFields,
   normalizeRecoveryCode,
   constantTimeEqualHex,
-  generateSaltHex,
-  PASSWORD_ITERATIONS,
+  replacePasswordAndRecovery,
   requestBodyTooLarge,
   utf8ByteLength,
 } from "../../_lib/auth.js";
@@ -74,22 +72,17 @@ export async function onRequestPost(context) {
       return jsonNoStore({ error: "Invalid email or recovery code" }, { status: 401 });
     }
 
-    // Set the new password and rotate the recovery code.
-    record.salt = generateSaltHex();
-    record.iterations = PASSWORD_ITERATIONS;
-    record.hash = await hashPassword(newPassword, record.salt, record.iterations);
-    const { recoveryCode, fields } = await createRecoveryFields();
-    Object.assign(record, fields);
-    record.sessionVersion =
-      (Number.isSafeInteger(record.sessionVersion) && record.sessionVersion >= 1
-        ? record.sessionVersion
-        : 1) + 1;
-    record.passwordChangedAt = new Date().toISOString();
+    // Set the new password, rotate the recovery code, revoke existing
+    // sessions, and invalidate any outstanding emailed reset link.
+    const { record: updatedRecord, recoveryCode } = await replacePasswordAndRecovery(
+      record,
+      newPassword
+    );
 
     // Consume the recovery code exactly once. A simultaneous recovery request
     // using the same code loses the ETag precondition and cannot overwrite the
     // first password change.
-    const updated = await putJsonIfCurrent(env, key, record, obj);
+    const updated = await putJsonIfCurrent(env, key, updatedRecord, obj);
     if (updated === null) {
       return jsonNoStore(
         { error: "Recovery code was already used; try the newly issued code" },
@@ -98,13 +91,13 @@ export async function onRequestPost(context) {
     }
 
     const cookie = await createSessionCookie(
-      record.userId,
-      record.email,
+      updatedRecord.userId,
+      updatedRecord.email,
       env,
-      record.sessionVersion
+      updatedRecord.sessionVersion
     );
     return jsonNoStore(
-      { email: record.email, userId: record.userId, recoveryCode },
+      { email: updatedRecord.email, userId: updatedRecord.userId, recoveryCode },
       { headers: { "Set-Cookie": cookie } }
     );
   } catch (err) {

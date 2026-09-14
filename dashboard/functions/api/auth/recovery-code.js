@@ -24,6 +24,9 @@ export async function onRequestPost(context) {
     const record = { ...user.account };
     const { recoveryCode, fields } = await createRecoveryFields();
     Object.assign(record, fields);
+    // Rotating the offline credential is also an explicit revocation of any
+    // password-reset link that may still be sitting in an inbox.
+    delete record.passwordReset;
     record.recoveryChangedAt = new Date().toISOString();
 
     const key = await emailKey(user.email);

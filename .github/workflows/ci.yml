@@ -22,6 +22,31 @@ jobs:
       - name: Run API and frontend tests
         run: node --test tests/api/*.test.mjs tests/frontend/*.test.mjs tests/workflows/*.test.mjs
 
+  email-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/email-sender
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workers/email-sender/package-lock.json
+      - name: Install email Worker dependencies
+        run: npm ci
+      - name: Verify generated Worker types
+        run: npm run types:check
+      - name: Type-check email Worker
+        run: npm run typecheck
+      - name: Test email Worker
+        run: npm test
+      - name: Validate email Worker deployment
+        run: npm run deploy:dry-run
+
   pipeline:
     runs-on: ubuntu-latest
     steps:

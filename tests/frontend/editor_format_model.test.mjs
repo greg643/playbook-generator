@@ -143,6 +143,28 @@ test('new plays default to 5v5 when no format has been selected', () => {
   assert.equal(defense.playersPerSide, 5);
 });
 
+test('new offense plays place the line of scrimmage about 20 px higher', () => {
+  const offense = plain(model.makePlay('offense', 5));
+
+  assert.equal(offense.lines.length, 1);
+  assert.deepEqual(offense.lines[0].points, [[0, 0.526], [1, 0.526]]);
+  assert.ok(Math.abs((0.55 - offense.lines[0].points[0][1]) * 822 - 20) < 0.5);
+});
+
+test('normalizing a saved offense play preserves its existing line position', () => {
+  const existing = plain(model.makePlay('offense', 5));
+  existing.lines[0].points = [[0, 0.55], [1, 0.55]];
+
+  const normalized = plain(model.normalizeDoc({
+    schema: 2,
+    defaultPlayersPerSide: 5,
+    offense: [existing],
+    defense: [],
+  }));
+
+  assert.deepEqual(normalized.offense[0].lines[0].points, [[0, 0.55], [1, 0.55]]);
+});
+
 test('an absent selection is inferred from existing plays and a tie stays 6v6', () => {
   const existingFive = plain(model.makePlay('offense', 5));
   const existingSix = plain(model.makePlay('defense', 6));

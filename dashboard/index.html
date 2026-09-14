@@ -253,6 +253,16 @@
     }
 
     .error-msg.active { display: block; }
+    .success-msg {
+      margin-bottom: 0.9rem;
+      padding: 0.7rem 0.75rem;
+      border: 1px solid #3fb950;
+      border-radius: 8px;
+      background: rgba(35, 134, 54, 0.1);
+      color: #7ee787;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
     .deletion-help { margin: -0.35rem 0 0.9rem; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
     .deletion-help a { color: var(--blue); }
 
@@ -468,7 +478,7 @@
             <h2 id="authTitle" tabindex="-1">Sign in</h2>
             <p class="card-sub" id="authSubtitle">Access your saved plays and PowerPoint conversions.</p>
             <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. We&rsquo;ll return you automatically to <strong>PowerPoint (PPTX) Import</strong>.</p>
-            <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it somewhere safe&mdash;it is the only way to reset a forgotten password.</p>
+            <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it as an offline backup in case you lose access to your email.</p>
             <form id="signinForm" aria-labelledby="authTitle" novalidate>
               <label class="field">Email
                 <input type="email" id="authEmail" autocomplete="email" maxlength="320" required>
@@ -486,13 +496,28 @@
                 <button class="btn btn-secondary" id="startRegisterBtn" type="button">Create a free account</button>
               </div>
             </form>
-            <p class="auth-links" id="signinLinks"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
+            <p class="auth-links" id="signinLinks"><a id="forgotLink" href="/?forgot=1">Forgot password?</a></p>
             <p class="auth-links" id="registerLinks" hidden>Already have an account? <a id="signinInsteadLink" href="#">Sign in</a></p>
           </div>
 
+          <div id="resetRequestWrap" hidden>
+            <h2 id="resetRequestTitle" tabindex="-1">Reset your password</h2>
+            <p class="card-sub">We&rsquo;ll email a single-use link that expires after 15 minutes.</p>
+            <form id="resetRequestForm" aria-labelledby="resetRequestTitle" novalidate>
+              <label class="field">Email
+                <input type="email" id="resetEmail" autocomplete="email" maxlength="320" required>
+              </label>
+              <div class="error-msg" id="resetRequestError" role="alert" aria-live="assertive"></div>
+              <div class="success-msg" id="resetRequestSuccess" role="status" aria-live="polite" tabindex="-1" hidden></div>
+              <button class="btn btn-primary" id="resetRequestBtn" type="submit">Email me a reset link</button>
+            </form>
+            <p class="auth-links"><a id="useRecoveryCodeLink" href="#">Have a recovery code? Use it instead</a></p>
+            <p class="auth-links"><a id="resetBackToSignin" href="#">&larr; Back to sign in</a></p>
+          </div>
+
           <div id="recoverFormWrap" hidden>
-            <h2>Reset password</h2>
-            <p class="card-sub">Enter the recovery code you saved when the account was created.</p>
+            <h2 id="recoveryResetTitle" tabindex="-1">Use your recovery code</h2>
+            <p class="card-sub">No access to your email? Enter the offline recovery code you saved.</p>
             <form id="recoverForm" novalidate>
               <label class="field">Email
                 <input type="email" id="recEmail" autocomplete="email" maxlength="320">
@@ -570,7 +595,12 @@ const registerBtn = $('registerBtn');
 const startRegisterBtn = $('startRegisterBtn');
 const recoverBtn = $('recoverBtn');
 const signinFormWrap = $('signinFormWrap');
+const resetRequestWrap = $('resetRequestWrap');
 const recoverFormWrap = $('recoverFormWrap');
+const resetRequestBtn = $('resetRequestBtn');
+const resetEmail = $('resetEmail');
+const resetRequestError = $('resetRequestError');
+const resetRequestSuccess = $('resetRequestSuccess');
 const recEmail = $('recEmail');
 const recCode = $('recCode');
 const recPassword = $('recPassword');
@@ -589,6 +619,7 @@ let recoveryReturnFocus = null;
 let authMode = 'signin';
 const POST_AUTH_DESTINATIONS = Object.freeze({ converter: '/converter' });
 const requestedPostAuthDestination = new URLSearchParams(window.location.search).get('signin');
+const forgotRequested = new URLSearchParams(window.location.search).get('forgot') === '1';
 const postAuthDestination = Object.prototype.hasOwnProperty.call(
   POST_AUTH_DESTINATIONS,
   requestedPostAuthDestination
@@ -600,12 +631,17 @@ function setAuthBusy(busy) {
   registerBtn.disabled = busy;
   startRegisterBtn.disabled = busy;
   recoverBtn.disabled = busy;
+  resetRequestBtn.disabled = busy;
   $('forgotLink').setAttribute('aria-disabled', String(busy));
   $('signinInsteadLink').setAttribute('aria-disabled', String(busy));
   $('backToSignin').setAttribute('aria-disabled', String(busy));
+  $('useRecoveryCodeLink').setAttribute('aria-disabled', String(busy));
+  $('resetBackToSignin').setAttribute('aria-disabled', String(busy));
   $('forgotLink').style.pointerEvents = busy ? 'none' : '';
   $('signinInsteadLink').style.pointerEvents = busy ? 'none' : '';
   $('backToSignin').style.pointerEvents = busy ? 'none' : '';
+  $('useRecoveryCodeLink').style.pointerEvents = busy ? 'none' : '';
+  $('resetBackToSignin').style.pointerEvents = busy ? 'none' : '';
 }
 
 function setError(element, message) {
@@ -615,6 +651,38 @@ function setError(element, message) {
 
 function setDeletionHelp(visible) {
   $('deletionHelp').hidden = !visible;
+}
+
+function showSigninPanel(focus = false) {
+  resetRequestWrap.hidden = true;
+  recoverFormWrap.hidden = true;
+  signinFormWrap.hidden = false;
+  setError(resetRequestError, '');
+  resetRequestSuccess.hidden = true;
+  resetRequestSuccess.textContent = '';
+  setError(recError, '');
+  if (focus) authEmail.focus();
+}
+
+function showResetRequestPanel(focusHeading = false) {
+  signinFormWrap.hidden = true;
+  recoverFormWrap.hidden = true;
+  resetRequestWrap.hidden = false;
+  resetEmail.value = resetEmail.value || authEmail.value;
+  setError(resetRequestError, '');
+  resetRequestSuccess.hidden = true;
+  resetRequestSuccess.textContent = '';
+  if (focusHeading) $('resetRequestTitle').focus();
+  else resetEmail.focus();
+}
+
+function showRecoveryCodePanel() {
+  recEmail.value = recEmail.value || resetEmail.value || authEmail.value;
+  signinFormWrap.hidden = true;
+  resetRequestWrap.hidden = true;
+  recoverFormWrap.hidden = false;
+  setError(recError, '');
+  $('recoveryResetTitle').focus();
 }
 
 function setAuthMode(mode, focusHeading = false) {
@@ -698,7 +766,7 @@ function showRecoveryCode(code, context) {
   if (typeof code !== 'string' || !code) return Promise.reject(new Error('The server did not return a recovery code'));
   recoveryReturnFocus = document.activeElement;
   recoveryCode.textContent = code;
-  recoveryDescription.textContent = (context || 'This code is the only way to reset your password.') +
+  recoveryDescription.textContent = (context || 'This is your offline password-recovery backup.') +
     ' Write it down or store it in a password manager. It will not be shown again.';
   copyRecoveryBtn.textContent = 'Copy code';
   recoveryModal.hidden = false;
@@ -798,7 +866,7 @@ async function authSubmit(path) {
     authPassword.value = '';
     if (data.recoveryCode) {
       await showRecoveryCode(data.recoveryCode,
-        'Your account was created. This code is the only way to reset your password if you forget it.');
+        'Your account was created. Save this offline backup in case you lose access to your email.');
     }
     if (epoch !== authEpoch) return;
     const verified = await verifyAccount(data.userId, epoch);
@@ -833,21 +901,61 @@ $('signinInsteadLink').addEventListener('click', event => {
 $('forgotLink').addEventListener('click', event => {
   event.preventDefault();
   if (authBusy) return;
-  recEmail.value = authEmail.value;
-  signinFormWrap.hidden = true;
-  recoverFormWrap.hidden = false;
-  setError(recError, '');
-  recEmail.focus();
+  resetEmail.value = authEmail.value;
+  showResetRequestPanel(true);
+});
+
+$('useRecoveryCodeLink').addEventListener('click', event => {
+  event.preventDefault();
+  if (authBusy) return;
+  showRecoveryCodePanel();
+});
+
+$('resetBackToSignin').addEventListener('click', event => {
+  event.preventDefault();
+  if (authBusy) return;
+  authEmail.value = authEmail.value || resetEmail.value;
+  showSigninPanel(true);
 });
 
 $('backToSignin').addEventListener('click', event => {
   event.preventDefault();
   if (authBusy) return;
-  recoverFormWrap.hidden = true;
-  signinFormWrap.hidden = false;
   setAuthMode('signin');
-  setError(recError, '');
-  authEmail.focus();
+  authEmail.value = authEmail.value || recEmail.value;
+  showSigninPanel(true);
+});
+
+$('resetRequestForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (authBusy) return;
+  const email = resetEmail.value.trim().toLowerCase();
+  setError(resetRequestError, '');
+  resetRequestSuccess.hidden = true;
+  resetRequestSuccess.textContent = '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setError(resetRequestError, 'Enter a valid email address');
+    return;
+  }
+
+  setAuthBusy(true);
+  try {
+    const response = await fetch('/api/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not request a reset email');
+    resetRequestSuccess.textContent = data.message ||
+      'If an active account exists for that email, a password-reset link has been sent.';
+    resetRequestSuccess.hidden = false;
+    resetRequestSuccess.focus();
+  } catch (error) {
+    setError(resetRequestError, error.message || 'Could not request a reset email');
+  } finally {
+    setAuthBusy(false);
+  }
 });
 
 $('recoverForm').addEventListener('submit', async event => {
@@ -900,6 +1008,7 @@ $('signOutBtn').addEventListener('click', async () => {
     if (epoch !== authEpoch) return;
     if (!res.ok) throw new Error('Could not sign out');
     recoverFormWrap.hidden = true;
+    resetRequestWrap.hidden = true;
     signinFormWrap.hidden = false;
     setAuthMode('signin');
     authPassword.value = '';
@@ -931,8 +1040,10 @@ $('signOutBtn').addEventListener('click', async () => {
     }
     if (res.status !== 401) throw new Error('Could not check your account');
     showAuth();
+    if (forgotRequested) showResetRequestPanel(true);
   } catch (error) {
     showAuth(error.message || 'Could not check your account. You can still try signing in.');
+    if (forgotRequested) showResetRequestPanel(true);
   }
 })();
 </script>

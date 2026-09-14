@@ -29,6 +29,37 @@ export function utf8ByteLength(text) {
   return new TextEncoder().encode(text).length;
 }
 
+// Read a request body without ever accumulating more than maxBytes. A null
+// result means the declared or streamed body exceeded the limit. Counting the
+// raw chunks also covers requests that omit Content-Length (for example,
+// chunked transfer encoding).
+export async function readBoundedUtf8Text(request, maxBytes) {
+  if (requestBodyTooLarge(request, maxBytes)) return null;
+  if (!request.body) return "";
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let byteLength = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+      byteLength += chunk.byteLength;
+      if (byteLength > maxBytes) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      text += decoder.decode(chunk, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
@@ -55,6 +86,22 @@ function b64urlEncode(bytes) {
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// Password-reset links use 256 bits of entropy. The compact base64url form is
+// always 43 characters for a 32-byte token (unpadded).
+export function generatePasswordResetToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return b64urlEncode(bytes);
+}
+
+export function isValidPasswordResetToken(token) {
+  return typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token);
+}
+
+export function hashPasswordResetToken(token) {
+  return sha256Hex(`gss-playbook-password-reset:v1:${token}`);
 }
 
 function b64urlDecode(str) {
@@ -169,10 +216,35 @@ export async function createRecoveryFields() {
   };
 }
 
+// Keep both password-recovery paths on one mutation primitive. In addition to
+// replacing the password, every successful recovery rotates the offline code,
+// revokes existing sessions, and invalidates any outstanding emailed link.
+export async function replacePasswordAndRecovery(record, newPassword, now = new Date()) {
+  const updated = { ...record };
+  updated.salt = generateSaltHex();
+  updated.iterations = PASSWORD_ITERATIONS;
+  updated.hash = await hashPassword(newPassword, updated.salt, updated.iterations);
+  const { recoveryCode, fields } = await createRecoveryFields();
+  Object.assign(updated, fields);
+  updated.sessionVersion = accountSessionVersion(record) + 1;
+  updated.passwordChangedAt = now.toISOString();
+  delete updated.passwordReset;
+  return { record: updated, recoveryCode };
+}
+
 // Constant-time compare of two hex digest strings.
 export function constantTimeEqualHex(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length === 0 || b.length === 0) {
     return false;
+  }
+  if (
+    a.length === b.length &&
+    a.length % 2 === 0 &&
+    /^[0-9a-f]+$/i.test(a) &&
+    /^[0-9a-f]+$/i.test(b) &&
+    typeof crypto.subtle.timingSafeEqual === "function"
+  ) {
+    return crypto.subtle.timingSafeEqual(hexToBytes(a), hexToBytes(b));
   }
   let diff = a.length === b.length ? 0 : 1;
   for (let i = 0; i < a.length; i++) {
@@ -193,7 +265,7 @@ async function hmacSign(secret, payload) {
   return new Uint8Array(sig);
 }
 
-function accountSessionVersion(record) {
+export function accountSessionVersion(record) {
   return Number.isSafeInteger(record && record.sessionVersion) && record.sessionVersion >= 1
     ? record.sessionVersion
     : 1;

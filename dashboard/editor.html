@@ -689,11 +689,12 @@
           <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
           <button class="btn btn-primary" id="loginBtn">Sign in</button>
           <button class="btn btn-secondary" id="registerBtn">Create account</button>
-          <p class="auth-links"><a id="forgotLink" href="#">Forgot password? Use your recovery code</a></p>
+          <p class="auth-links"><a id="emailResetLink" href="/?forgot=1" target="_blank" rel="noopener">Forgot password? Email me a reset link</a></p>
+          <p class="auth-links"><a id="forgotLink" href="#">Use an offline recovery code instead</a></p>
         </div>
         <div id="recoverForm" style="display:none">
           <h2>Reset password</h2>
-          <p class="auth-sub">Enter the recovery code you saved when you created the account.</p>
+          <p class="auth-sub">Enter the offline recovery code you saved when you created the account.</p>
           <label class="field">Email
             <input type="email" id="recEmail" autocomplete="email">
           </label>
@@ -862,6 +863,9 @@ const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
 const MAX_IMPORT_BYTES = 1000000;
 const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
 const DEFAULT_NEW_PLAYERS_PER_SIDE = 5;
+// Move only the starter line for newly created offense plays. Stored plays
+// keep their exact coordinates; 0.024 of the 822-unit field is about 20 px.
+const NEW_OFFENSE_LOS_Y = 0.526;
 const DEFAULT_PLAYBOOK_ID = 'default';
 const MAX_PLAYBOOK_NAME_LENGTH = 60;
 const LAST_PLAYBOOK_KEY_PREFIX = 'gss-playbook:last-selected:';
@@ -1350,7 +1354,7 @@ let saveBlockedPlaybookId = null;
 let tool = 'select';
 const toolStyles = {
   route: { color: '#FF0000', dash: false, end: 'arrow', corner: 'smooth' },
-  line: { color: '#1F6E8C', dash: true, end: 'none', corner: 'sharp' },
+  line: { color: '#000000', dash: true, end: 'arrow', corner: 'sharp' },
   block: { color: '#000000', dash: false, end: 'block', corner: 'sharp' },
 };
 let style = { ...toolStyles.route };
@@ -2223,7 +2227,7 @@ function makePlay(section) {
   if (section === 'offense') {
     play.lines.push({
       color: '#1F6E8C', dash: true, width: 10, dashArray: '28 18',
-      points: [[0.0, 0.55], [1.0, 0.55]],
+      points: [[0.0, NEW_OFFENSE_LOS_Y], [1.0, NEW_OFFENSE_LOS_Y]],
     });
   } else {
     play.balls.push({ x: 0.50, y: 0.90 });
@@ -3257,7 +3261,7 @@ function showRecoveryCode(code, context) {
     dismissible: false,
     render(close) {
       modalHeading('Save your recovery code',
-        (context || 'This code is the ONLY way to reset your password.') +
+        (context || 'This is your offline password-recovery backup.') +
         ' Write it down or store it in a password manager — it will not be shown again.');
       const codeBox = document.createElement('div');
       codeBox.textContent = code;
@@ -3622,7 +3626,7 @@ function setAuthBusy(busy) {
   loginBtn.disabled = busy;
   registerBtn.disabled = busy;
   $('recoverBtn').disabled = busy;
-  for (const id of ['forgotLink', 'backToSignin']) {
+  for (const id of ['emailResetLink', 'forgotLink', 'backToSignin']) {
     const link = $(id);
     link.setAttribute('aria-disabled', String(busy));
     link.style.pointerEvents = busy ? 'none' : '';
@@ -4444,7 +4448,7 @@ async function authSubmit(path) {
     authPassword.value = '';
     if (data.recoveryCode) {
       await showRecoveryCode(data.recoveryCode,
-        'Your account was created. This code is the ONLY way to reset your password if you forget it.');
+        'Your account was created. Save this offline backup in case you lose access to your email.');
     }
     if (epoch !== authEpoch) return;
     const verified = await verifyAuthenticatedAccount(data.userId, epoch);
