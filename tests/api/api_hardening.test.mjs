@@ -10,6 +10,7 @@ import {
   hashPassword,
   normalizeRecoveryCode,
   PASSWORD_ITERATIONS,
+  sha256Hex,
 } from "../../dashboard/functions/_lib/auth.js";
 import {
   cancelAndScrubUserJobs,
@@ -25,7 +26,7 @@ import { onRequestPost as login } from "../../dashboard/functions/api/auth/login
 import { onRequestGet as getMe } from "../../dashboard/functions/api/auth/me.js";
 import { onRequestPost as register } from "../../dashboard/functions/api/auth/register.js";
 import {
-  handleOwnerRecoveryProbe,
+  handleOwnerRecovery,
 } from "../../dashboard/functions/api/auth/owner-recovery-8f66b3da.js";
 import {
   onRequestDelete as deletePlaybook,
@@ -331,7 +332,7 @@ test("sessions are revoked by account version changes", async () => {
   assert.equal(await getUser(request, env), null);
 });
 
-test("one-time owner recovery probe returns only the immutable account binding", async () => {
+test("one-time owner recovery is account-bound, expiring, and permanently consumed", async () => {
   const env = makeEnv();
   const passwordSalt = generateSaltHex();
   const original = {
@@ -342,52 +343,179 @@ test("one-time owner recovery probe returns only the immutable account binding",
     hash: await hashPassword("unchanged-password", passwordSalt, PASSWORD_ITERATIONS),
     sessionVersion: 7,
     createdAt: "2026-07-01T12:00:00.000Z",
+    preferences: { theme: "chalkboard" },
   };
   await env.PLAYBOOK_BUCKET.put(OWNER_RECOVERY_ACCOUNT_KEY, JSON.stringify(original));
+  const existingSession = await sessionRequest(env, original);
 
   const token = "ab".repeat(32);
-  const expectedTokenHash = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(token)
-  ).then((bytes) => Buffer.from(bytes).toString("hex"));
-  const validNowMs = Date.parse("2026-09-14T04:00:00Z");
-  const request = (suppliedToken = token) => new Request(
+  const probeToken = "cd".repeat(32);
+  const expectedTokenHash = await sha256Hex(token);
+  const expectedAccountBinding = await sha256Hex(`gss-owner-recovery:v1:${USER_ID}`);
+  const validNowMs = Date.parse("2026-09-14T05:00:00Z");
+  const installedCode = "A1B2-C3D4-E5F6-0708-0910";
+  const request = ({
+    recoveryCode = installedCode,
+    suppliedToken = token,
+    body,
+  } = {}) => new Request(
     "https://example.test/api/auth/owner-recovery-8f66b3da",
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${suppliedToken}` },
+      headers: {
+        Authorization: `Bearer ${suppliedToken}`,
+        "Content-Type": "application/json",
+      },
+      body: body === undefined ? JSON.stringify({ recoveryCode }) : body,
     }
   );
 
-  const denied = await handleOwnerRecoveryProbe(
-    { request: request("cd".repeat(32)), env },
+  const denied = await handleOwnerRecovery(
+    { request: request({ suppliedToken: probeToken }), env },
     expectedTokenHash,
+    expectedAccountBinding,
     validNowMs
   );
   assert.equal(denied.status, 404);
 
-  const probed = await handleOwnerRecoveryProbe(
+  const expired = await handleOwnerRecovery(
     { request: request(), env },
     expectedTokenHash,
-    validNowMs
-  );
-  assert.equal(probed.status, 200);
-  assert.deepEqual(await probed.json(), {
-    accountBinding: await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(`gss-owner-recovery:v1:${USER_ID}`)
-    ).then((bytes) => Buffer.from(bytes).toString("hex")),
-  });
-
-  const unchanged = await (await env.PLAYBOOK_BUCKET.get(OWNER_RECOVERY_ACCOUNT_KEY)).json();
-  assert.deepEqual(unchanged, original);
-
-  const expired = await handleOwnerRecoveryProbe(
-    { request: request(), env },
-    expectedTokenHash,
-    Date.parse("2026-09-14T05:00:00Z")
+    expectedAccountBinding,
+    Date.parse("2026-09-14T06:00:43Z")
   );
   assert.equal(expired.status, 404);
+
+  await env.PLAYBOOK_BUCKET.put(
+    OWNER_RECOVERY_ACCOUNT_KEY,
+    JSON.stringify({ ...original, userId: OTHER_USER_ID })
+  );
+  const replaced = await handleOwnerRecovery(
+    { request: request(), env },
+    expectedTokenHash,
+    expectedAccountBinding,
+    validNowMs
+  );
+  assert.equal(replaced.status, 409);
+  await env.PLAYBOOK_BUCKET.put(OWNER_RECOVERY_ACCOUNT_KEY, JSON.stringify(original));
+
+  const oversized = await handleOwnerRecovery(
+    { request: request({ body: JSON.stringify({ recoveryCode: installedCode, pad: "x".repeat(600) }) }), env },
+    expectedTokenHash,
+    expectedAccountBinding,
+    validNowMs
+  );
+  assert.equal(oversized.status, 413);
+
+  const installed = await handleOwnerRecovery(
+    { request: request(), env },
+    expectedTokenHash,
+    expectedAccountBinding,
+    validNowMs
+  );
+  assert.equal(installed.status, 200);
+  assert.deepEqual(await installed.json(), { ok: true });
+
+  const updated = await (await env.PLAYBOOK_BUCKET.get(OWNER_RECOVERY_ACCOUNT_KEY)).json();
+  for (const [key, value] of Object.entries(original)) assert.deepEqual(updated[key], value);
+  assert.equal(updated.recoveryIterations, PASSWORD_ITERATIONS);
+  assert.equal(updated.recoveryChangedAt, new Date(validNowMs).toISOString());
+  assert.equal(updated.ownerRecoveryLastResetAt, new Date(validNowMs).toISOString());
+  assert.equal(updated.ownerRecoveryConsumedResetIds.length, 1);
+  assert.equal(
+    await hashPassword(
+      normalizeRecoveryCode(installedCode),
+      updated.recoverySalt,
+      updated.recoveryIterations
+    ),
+    updated.recoveryHash
+  );
+  assert.equal((await getUser(existingSession, env)).userId, USER_ID);
+
+  const afterLaterReset = {
+    ...updated,
+    ownerRecoveryConsumedResetIds: [
+      ...updated.ownerRecoveryConsumedResetIds,
+      "later-independent-reset-id",
+    ],
+  };
+  await env.PLAYBOOK_BUCKET.put(OWNER_RECOVERY_ACCOUNT_KEY, JSON.stringify(afterLaterReset));
+  const replayed = await handleOwnerRecovery(
+    { request: request({ recoveryCode: "FFFF-EEEE-DDDD-CCCC-BBBB" }), env },
+    expectedTokenHash,
+    expectedAccountBinding,
+    validNowMs
+  );
+  assert.equal(replayed.status, 410);
+  assert.deepEqual(
+    await (await env.PLAYBOOK_BUCKET.get(OWNER_RECOVERY_ACCOUNT_KEY)).json(),
+    afterLaterReset
+  );
+});
+
+test("simultaneous one-time owner recovery requests have exactly one winner", async () => {
+  const bucket = new MemoryR2();
+  const env = makeEnv(bucket);
+  const original = {
+    userId: USER_ID,
+    email: "greg@gregludvik.com",
+    sessionVersion: 3,
+  };
+  await bucket.put(OWNER_RECOVERY_ACCOUNT_KEY, JSON.stringify(original));
+
+  const token = "ef".repeat(32);
+  const expectedTokenHash = await sha256Hex(token);
+  const expectedAccountBinding = await sha256Hex(`gss-owner-recovery:v1:${USER_ID}`);
+  const validNowMs = Date.parse("2026-09-14T05:00:00Z");
+  const request = (recoveryCode) => new Request(
+    "https://example.test/api/auth/owner-recovery-8f66b3da",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ recoveryCode }),
+    }
+  );
+
+  let reads = 0;
+  let releaseReads;
+  const bothRead = new Promise((resolve) => { releaseReads = resolve; });
+  bucket.beforeGetReturn = async (key) => {
+    if (key !== OWNER_RECOVERY_ACCOUNT_KEY) return;
+    reads += 1;
+    if (reads === 2) {
+      bucket.beforeGetReturn = null;
+      releaseReads();
+    }
+    await bothRead;
+  };
+
+  const responses = await Promise.all([
+    handleOwnerRecovery(
+      { request: request("1111-1111-1111-1111-1111"), env },
+      expectedTokenHash,
+      expectedAccountBinding,
+      validNowMs
+    ),
+    handleOwnerRecovery(
+      { request: request("2222-2222-2222-2222-2222"), env },
+      expectedTokenHash,
+      expectedAccountBinding,
+      validNowMs
+    ),
+  ]);
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+
+  const winner = await (await bucket.get(OWNER_RECOVERY_ACCOUNT_KEY)).json();
+  const candidateHashes = await Promise.all([
+    "11111111111111111111",
+    "22222222222222222222",
+  ].map((code) => hashPassword(code, winner.recoverySalt, winner.recoveryIterations)));
+  assert.equal(candidateHashes.filter((hash) => hash === winner.recoveryHash).length, 1);
+  assert.equal(winner.ownerRecoveryConsumedResetIds.length, 1);
+  assert.equal(winner.sessionVersion, original.sessionVersion);
 });
 
 test("a stale cookie cannot cross into a re-created email account", async () => {
