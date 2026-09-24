@@ -98,6 +98,7 @@
 
     p { font-size: 1rem; line-height: 1.6; color: #e1e4e8; }
     p + p { margin-top: 0.6rem; }
+    body > p:not(.subtitle) { max-width: 720px; margin-bottom: 1rem; }
     .muted { color: #8b949e; font-size: 0.85rem; }
 
     ul,
@@ -179,73 +180,46 @@
     footer a:hover { text-decoration: underline; }
   </style>
 </head>
-<body>
-
+<body id="overview">
   <h1>GSS Playbook Editor Help</h1>
-  <p class="subtitle">From your first play to a printed game-day sheet.</p>
-
+  <p class="subtitle">Choose your plays. Create a coach card. Print.</p>
   <div class="nav-links">
-    <a class="pill" href="/">&#8962; Home</a>
-    <a class="pill" href="/editor">&#9999;&#65039; GSS Playbook Editor</a>
-    <a class="pill" href="/pptx-guide">&#128209; PowerPoint (PPTX) Import Guide</a>
+    <a class="pill" href="/">Home</a>
+    <a class="pill" href="/editor">Playbook Editor</a>
+    <a class="pill" href="/converter">PowerPoint (PPTX) Import</a>
   </div>
-
-  <nav class="toc" aria-label="Help topics">
-    <a href="#overview">Start here</a>
-    <a href="#editor">Draw plays</a>
-    <a href="#pptx">Use PowerPoint</a>
-    <a href="#printing">Print cards &amp; wristbands</a>
-    <a href="#numbering">Manage playbooks</a>
-    <a href="#account">Sign in &amp; share</a>
-  </nav>
-
-  <section class="card" id="overview">
-    <h2>Start here: make your first coach card</h2>
-    <ol>
-      <li><a href="/">Sign in</a> with Apple or email and password. New here? Choose <strong>Create a free account</strong>, or continue with Apple.</li>
-      <li>Choose <a href="#editor">Playbook Editor</a> to draw plays, or <a href="#pptx">PowerPoint (PPTX) Import</a> to use a PowerPoint file you already have.</li>
-      <li>Choose your cards and how many plays to put on each page. Select <strong>Create coach card</strong>, then download the finished PDFs.</li>
-    </ol>
-    <p>A <strong>coach card</strong> is a full-page sheet of plays. A <strong>wristband insert</strong> is a small card you cut out and slide into a player&rsquo;s wrist coach. Both 5v5 and 6v6 work.</p>
-    <div class="out-grid">
-      <div class="out">
-        <span class="out-icon">&#127944;</span>
-        <span><span class="out-name">Offense Coach Card</span><br>
-        <span class="out-desc">Choose 1, 2, 4, 6, 9, or 16 plays per page (default: 16). Extra plays continue across pages.</span></span>
-      </div>
-      <div class="out">
-        <span class="out-icon">&#128737;&#65039;</span>
-        <span><span class="out-name">Defense Coach Card</span><br>
-        <span class="out-desc">Choose 1, 2, 4, 6, 9, or 16 formations per page (default: 6), independently of offense.</span></span>
-      </div>
-      <div class="out">
-        <span class="out-icon">&#9200;</span>
-        <span><span class="out-name">Offense Wristband</span><br>
-        <span class="out-desc">Small cut-out cards with up to eight plays, repeated for your players.</span></span>
-      </div>
-      <div class="out">
-        <span class="out-icon">&#9200;</span>
-        <span><span class="out-name">Defense Wristband</span><br>
-        <span class="out-desc">Same-size defense reference cards for player wristbands.</span></span>
-      </div>
-    </div>
-  </section>
+  <p><a href="/">Sign in</a> with Apple or email. New here? Choose <strong>Create a free account</strong>, or continue with Apple.</p>
 
   <section class="card" id="editor">
-    <h2>Draw plays in Playbook Editor</h2>
+    <h2>1. Draw plays</h2>
     <ol>
-      <li><a href="/editor">Open the editor</a>. Choose a saved playbook, or select <strong>+ New</strong> to name one for your team and season.</li>
-      <li>Check <strong>New plays:</strong> is set to 5v5 or 6v6, then select <strong>+ Add play</strong> under OFFENSE or DEFENSE. Give the play a name.</li>
-      <li>Choose <strong>Select</strong> and drag the player symbols into position. In 5v5 offense, <strong>C</strong> is the center and <strong>QB</strong> is the quarterback.</li>
-      <li>Choose <strong>Arrow</strong>. Click near a player, then click where the route should turn. Press <kbd>Enter</kbd> or double-click to finish. Press <kbd>Esc</kbd> to cancel.</li>
-      <li>Your changes save automatically. Wait for <strong>Saved</strong> before leaving, or use <strong>Save</strong>.</li>
+      <li><a href="/editor">Open the editor</a>. Choose a playbook or <strong>+ New</strong>. Set <strong>New plays:</strong> to 5v5 or 6v6, then <strong>+ Add play</strong>.</li>
+      <li>Use <strong>Select</strong> to drag players. Choose <strong>Arrow</strong>, click along the route, then press <kbd>Enter</kbd> to finish.</li>
+      <li>Wait for <strong>Saved</strong>. Check the plays you want to print, then choose <strong>Create coach card</strong>.</li>
     </ol>
-    <p>The editor remembers your chosen format; changing it does not change plays you already made. Use separate playbooks for different teams or formats.</p>
-    <p class="callout">Ready to print? Check the boxes beside the plays you want, then choose <strong>Create coach card</strong> at the top to reach the <a href="#printing">printing controls</a>.</p>
   </section>
 
-  <section class="card" id="editing">
-    <h2>More drawing tools</h2>
+  <section class="card" id="pptx">
+    <h2>Or use your PowerPoint plays</h2>
+    <p>No OFFENSE/DEFENSE title slides? All plays are treated as offense. For both sections, put an <strong>OFFENSE</strong> title slide before offense plays and <strong>DEFENSE</strong> before defense.</p>
+    <p>Use one play per slide, with a separate field rectangle behind it. <a href="/pptx-guide">See section setup and examples</a>, then <a href="/converter">upload your .pptx</a>.</p>
+    <p>This makes printable PDFs, not editable plays.</p>
+  </section>
+
+  <section class="card" id="printing">
+    <h2>2. Create and print your cards</h2>
+    <ol>
+      <li>Choose coach cards, wristband inserts, or both.</li>
+      <li>Pick <strong>1, 2, 4, 6, 9, or 16 plays per page</strong>, separately for offense and defense. Fewer plays per page means larger drawings.</li>
+      <li>Select <strong>Create coach card</strong>. Download and check the PDFs, then print on US Letter paper.</li>
+    </ol>
+    <p>Unused spaces stay blank; extra plays continue on another page.</p>
+    <p><strong>Wristbands:</strong> print at <strong>100%</strong> (Actual size), laminate before cutting, then cut along the dashed guides.</p>
+  </section>
+
+  <section class="card" aria-labelledby="more-heading">
+    <h2 id="more-heading">More help, if you need it</h2>
+    <div id="editing">
     <details>
     <summary>Add blocks, lines, text, or a football</summary>
     <ul>
@@ -268,33 +242,19 @@
       <li><strong>Undo / redo</strong> &mdash; <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>) redoes. History is kept per play.</li>
     </ul>
     </details>
-    <p class="muted">The short hint below the field explains whichever tool you have selected.</p>
-  </section>
-
-  <section class="card" id="numbering">
-    <h2>Manage your playbooks</h2>
+  </div>
+    <div id="numbering"><details><summary>Manage playbooks and play numbers</summary>
     <ul>
       <li><strong>Separate teams and seasons</strong> &mdash; use <strong>+ New</strong> and a name such as &ldquo;Fall 2026 5v5.&rdquo; Switch books with the <strong>Playbook</strong> menu; use <strong>Rename</strong> to change a name.</li>
       <li><strong>Choose what prints</strong> &mdash; check a play to include it. Uncheck it to keep it saved but leave it off the cards. These unchecked plays are called &ldquo;benched&rdquo; in the editor.</li>
       <li><strong>Keep numbers consistent</strong> &mdash; offense uses numbers; defense uses letters. They stay the same when you leave a play out. <strong>Renumber</strong> puts them back in order; reprint old cards if their numbers change.</li>
     </ul>
-    <details><summary>Playbook limits and deleting a book</summary>
+    <h3>Playbook limits and deleting a book</h3>
       <p>You can keep <strong>20 named playbooks</strong>, each with up to <strong>64 offense</strong> and <strong>24 defense</strong> plays, including benched plays. Both printing methods support these play counts.</p>
       <p>To delete an extra playbook, select it, choose <strong>Delete</strong>, and type its exact name. This is permanent. Export a backup before deleting. The original playbook cannot be deleted; rename and reuse it instead.</p>
-    </details>
-  </section>
 
-  <section class="card" id="printing">
-    <h2>Print coach cards and wristbands</h2>
-    <ol>
-      <li><strong>Choose your cards.</strong> Offense and defense coach cards are checked to start. Check <strong>Also make offense wristband inserts</strong> or the defense option if you need them. You can uncheck coach cards to make wristbands only.</li>
-      <li><strong>Choose plays per page.</strong> Pick 1, 2, 4, 6, 9, or 16 for each coach card. Offense and defense can use different layouts. Fewer plays per page means larger drawings.</li>
-      <li><strong>Check, then create.</strong> In the editor, use <strong>Preview coach card</strong>. Choose <strong>Create coach card</strong> when ready. Keep the page open; download buttons appear when the PDFs are ready.</li>
-      <li><strong>Download and print.</strong> Open each PDF and check the names, routes, and play count before printing. Use US Letter paper (8.5 &times; 11 inches); coach cards print landscape.</li>
-    </ol>
-    <p>Six plays use 2 columns &times; 3 rows; nine use 3 &times; 3. Empty spaces stay blank: 15 plays fit on one 4 &times; 4 page. Extra plays continue on another page.</p>
-    <h3>Make wristband inserts</h3>
-    <p>Each sheet has six identical inserts for your players, with up to eight plays in each insert. More plays continue on the next sheet. The coach-card layout does not change wristband sizes. Cut around each whole insert, not each individual play.</p>
+  </details></div>
+    <details><summary>Wristband sizes, holders, and cutting</summary>    <p>Each sheet has six identical inserts for your players, with up to eight plays in each insert. More plays continue on the next sheet. The coach-card layout does not change wristband sizes. Cut around each whole insert, not each individual play.</p>
     <p class="callout warn"><strong>Print at 100% scale and laminate before cutting.</strong> Turn off &ldquo;fit to page&rdquo; so the wristband inserts keep their exact size.</p>
     <p class="callout"><strong>Compatible holder:</strong> The cut-out group is designed to fit the
       <a href="https://www.amazon.com/dp/B07QHCVV7M?th=1" target="_blank" rel="noopener noreferrer"
@@ -302,7 +262,7 @@
       The <a href="https://www.wristcoaches.com/products/adult-black-wrist-coach" target="_blank" rel="noopener noreferrer"
          aria-label="WristCoaches manufacturer specifications for the adult black wrist coach (opens in a new tab)">manufacturer&rsquo;s specifications</a>
       list a <strong>2 5/8 &times; 4 5/8 in</strong> clear window, so the <strong>4.40 &times; 2.09 in</strong> insert fits when its long edge follows the window&rsquo;s long edge.</p>
-    <h3>Print, laminate, then cut</h3>
+
     <ol>
       <li><strong>Print at 100% scale.</strong> Check the print dialog for &ldquo;actual size&rdquo; and turn off scaling or &ldquo;fit to page.&rdquo;</li>
       <li><strong>Laminate the full sheet before cutting.</strong> Let it cool and flatten first if you use a heat laminator.</li>
@@ -313,46 +273,31 @@
       <li><strong>Load the holder.</strong> Slide each finished insert into a panel with the 4.40-inch edge following the window&rsquo;s long edge.</li>
     </ol>
     <p class="muted">The holder and trimmer are optional examples. Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</p>
-  </section>
-
-  <section class="card" id="account">
-    <h2>Sign in, back up, and share</h2>
-    <h3>Continue with Apple</h3>
-    <p><strong>Continue with Apple</strong> lets you sign in without another password. If you use the GSS app, use the same Apple Account. Playbooks do not yet appear in the app.</p>
-    <p><strong>Adding Apple to an existing account?</strong> Choose <strong>Connect my playbooks to Apple</strong>. If asked, first choose <strong>Sign in to my existing account</strong>. Do not start a new account if you want to keep using your existing books. Once connected, use either Apple or your existing email and password.</p>
-    <h3>Email and password accounts</h3>
-    <p>Apple is optional. Choose <strong>Create a free account</strong> on the home page to use email and password. Save the recovery code you are shown in a safe place; it is your backup way to reset a forgotten password.</p>
-    <h3>Share plays with another coach</h3>
+  </details>
+    <details><summary>Share with another coach or save a backup</summary>
     <ol>
       <li>Open the playbook and choose <strong>Export backup</strong>. Send the downloaded <strong>.json</strong> file to the other coach. The backup includes its source playbook name.</li>
       <li>The other coach signs into their own account, creates a new playbook, and chooses <strong>Import backup</strong>. They can also import into another playbook or account.</li>
       <li>Import offers to replace that selected book or add the plays to its bench. Check the imported plays you want to print.</li>
     </ol>
     <p>This shares a copy, not a live shared playbook. Later edits stay in each coach&rsquo;s own copy. To share only printable cards, send the downloaded PDFs instead. Never share your password or recovery code.</p>
-    <details><summary>Forgot your password?</summary>
+</details>
+    <div id="account"><details><summary>Sign in with Apple or email</summary>
+    <h3>Continue with Apple</h3>
+    <p><strong>Continue with Apple</strong> lets you sign in without another password. If you use the GSS app, use the same Apple Account. Playbooks do not yet appear in the app.</p>
+    <p><strong>Adding Apple to an existing account?</strong> Choose <strong>Connect my playbooks to Apple</strong>. If asked, first choose <strong>Sign in to my existing account</strong>. Do not start a new account if you want to keep using your existing books. Once connected, use either Apple or your existing email and password.</p>
+    <h3>Email and password accounts</h3>
+    <p>Apple is optional. Choose <strong>Create a free account</strong> on the home page to use email and password. Save the recovery code you are shown in a safe place; it is your backup way to reset a forgotten password.</p>
+</details></div>
+    <details><summary>Password recovery and account deletion</summary>    <h3>Forgot your password?</h3>
       <p>Choose <strong>Forgot password?</strong> on the sign-in page. An email reset link lasts 15 minutes; use the newest one. If it does not arrive, check junk mail, then choose <strong>Have a recovery code? Use it instead</strong>. Email delivery is not yet reliable for every mailbox, so keep your recovery code safe.</p>
       <p>After a reset, save the new recovery code; the old one stops working. If Apple is already connected to your account, you can sign in with Apple instead. Apple-only accounts use Apple for account recovery.</p>
-    </details>
-    <details><summary>Delete your account</summary>
+
+    <h3>Delete your account</h3>
       <p>Open <strong>Account</strong> in the editor and follow the deletion steps. This permanently removes all your Playbook Editor playbooks, but not your GSS app account. Export each book first if you might need it again.</p>
-    </details>
+
+  </details>
   </section>
-
-  <section class="card" id="pptx">
-    <h2>Use a PowerPoint playbook</h2>
-    <ol>
-      <li>Save your presentation as a <strong>.pptx</strong> file. Use one play per slide.</li>
-      <li>Put a large rectangle behind each play using <strong>Insert &rarr; Shapes &rarr; Rectangle</strong>. Keep the play name, players, and routes inside it. Leave that rectangle separate from any grouped shapes.</li>
-      <li>For offense only, no title slides are needed. For a mixed book, put a slide titled <strong>OFFENSE</strong> before offense plays and <strong>DEFENSE</strong> before defense plays.</li>
-      <li>Open <a href="/converter">PowerPoint (PPTX) Import</a>, upload the file, choose your cards and layouts, and select <strong>Create coach card</strong>.</li>
-    </ol>
-    <p class="callout"><strong>This makes printable PDFs, not editable plays.</strong> Keep your original PowerPoint file to make changes. Your diagrams are printed as drawn; the website does not use AI to interpret or change your routes.</p>
-    <p>See the <a href="/pptx-guide">PowerPoint (PPTX) Import Guide</a> for illustrated examples and fixes if a slide is missing or looks wrong. Always check the finished PDFs before printing for the team.</p>
-  </section>
-
-  <footer>
-    Greenwich Sports Systems &middot; <a href="/">GSS Playbook Editor home</a> &middot; <a href="/pptx-guide">PowerPoint (PPTX) Import Guide</a> &middot; <a href="/editor">GSS Playbook Editor</a> &middot; <a href="#overview">Back to top</a>
-  </footer>
-
+  <footer>Greenwich Sports Systems &middot; <a href="/">Home</a> &middot; <a href="#overview">Back to top</a></footer>
 </body>
 </html>

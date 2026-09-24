@@ -375,11 +375,10 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   }
   assert.match(converter, /For offense only, no title slides are needed/i);
   assert.match(converter, /DEFENSE title slide but no OFFENSE title slide/);
-  assert.match(help, /does not use AI to interpret or change your routes/i);
   assert.match(help, /64 offense/);
   assert.match(help, /24 defense/);
   assert.match(help, /16 plays per page/);
-  assert.match(help, /independently of offense/);
+  assert.match(help, /separately for offense and defense/);
   assert.match(help, /up to eight plays in each insert/);
 
   assert.match(pptxGuide, /Up to 64 offense \/ 24 defense plays/);
@@ -393,4 +392,31 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   assert.match(pptxGuide, /href="\/">&larr; GSS Playbook Editor home/);
   assert.doesNotMatch(pptxGuide, /<script\b/i);
   assert.doesNotMatch(pptxGuide, /(?:src|href)="https?:/i);
+});
+
+function primaryHelpText(html) {
+  return html
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, '')
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '')
+    .replace(/<details\b[^>]*>\s*(<summary>[\s\S]*?<\/summary>)[\s\S]*?<\/details>/gi, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[^;]+;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+test('help stays short before coaches open optional details', () => {
+  for (const [name, html, limit] of [['Help', help, 400], ['PowerPoint guide', pptxGuide, 300]]) {
+    const count = primaryHelpText(html).split(' ').length;
+    assert.ok(count <= limit, `${name}: ${count} words exceeds ${limit}`);
+  }
+});
+
+test('PowerPoint section rules are explained first, outside troubleshooting', () => {
+  const text = primaryHelpText(pptxGuide);
+  assert.match(text, /No section titles: all plays are treated as offense/);
+  assert.match(text, /Offense and defense: put OFFENSE before your offense plays and DEFENSE before your defense plays/);
+  assert.match(text, /Defense only: start with DEFENSE, then your plays/);
+  assert.match(text, /DEFENSE but no OFFENSE title: plays before DEFENSE count as offense; plays after it count as defense/);
+  assert.ok(text.indexOf('No section titles:') < text.indexOf('Example: offense followed by defense'));
+  assert.match(text, /separate title slides.*without a field rectangle/);
 });
