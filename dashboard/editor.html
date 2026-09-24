@@ -429,6 +429,7 @@
     #saveIndicator.saved { color: #2ea043; }
     #saveIndicator.unsaved { color: #d29922; }
     .gen-checks { display: flex; flex-direction: column; gap: 0.35rem; }
+    .gen-checks select { width:100%; padding:.5rem; color:#eee; background:#263342; border:1px solid #607080; border-radius:5px; font:inherit; }
     .gen-checks label {
       display: flex;
       align-items: center;
@@ -825,6 +826,21 @@
         <label><input type="checkbox" id="chkOffenseTitle"> Offense wristband title</label>
         <label><input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title</label>
       </div>
+      <div class="gen-checks" role="group" aria-label="Coach card layouts">
+        <label for="offensePerPage">Offense plays per page</label>
+        <select id="offensePerPage" aria-describedby="coachLayoutHelp">
+          <option value="1">1 — full page</option><option value="2">2 — side by side</option>
+          <option value="4">4 — 2 × 2</option><option value="6">6 — 2 × 3</option>
+          <option value="9">9 — 3 × 3</option><option value="16" selected>16 — 4 × 4</option>
+        </select>
+        <label for="defensePerPage">Defense plays per page</label>
+        <select id="defensePerPage" aria-describedby="coachLayoutHelp">
+          <option value="1">1 — full page</option><option value="2">2 — side by side</option>
+          <option value="4">4 — 2 × 2</option><option value="6" selected>6 — 2 × 3</option>
+          <option value="9">9 — 3 × 3</option><option value="16">16 — 4 × 4</option>
+        </select>
+      </div>
+      <p id="coachLayoutHelp" style="font-size:.8rem;color:#aeb8c4;line-height:1.5">Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
       <button class="btn btn-secondary" id="previewCoachBtn" type="button" style="margin-bottom:.5rem" disabled>Preview coach card</button>
       <button class="btn btn-primary" id="generateBtn">Create coach card</button>
       <p style="font-size:.8rem;color:#aeb8c4;line-height:1.5">Download the PDF when it is ready, then print at 100% scale. Wristband inserts are optional.</p>
@@ -854,7 +870,7 @@
   </div>
 
   <dialog id="coachPreview" aria-labelledby="coachPreviewTitle" style="width:min(960px,94vw);max-height:90vh;margin:auto;border:1px solid #484f58;border-radius:12px;background:#161b22;color:#e6edf3;padding:1.4rem">
-    <h2 id="coachPreviewTitle">Coach card preview</h2>
+    <h2 id="coachPreviewTitle" tabindex="-1" autofocus>Coach card preview</h2>
     <p id="coachPreviewDescription" style="margin:.5rem 0"></p>
     <p>Check your play names, numbers, and routes. The downloaded PDF sets the final print spacing.</p>
     <div id="coachPreviewPages"></div>
@@ -874,10 +890,10 @@ const VB_W = 1076, VB_H = 1000, HEADER_H = 170;
 const FIELD_X = 8, FIELD_W = 1060, FIELD_H = 822;
 // Storage caps — how many plays each named playbook can keep (active + archive).
 // Included plays are separately capped at generate time:
-// 16 offense / 6 defense, the most the printed cards can hold.
+// 64 offense / 24 defense, paginated using the selected coach card layout.
 const MAX_OFFENSE = 64, MAX_DEFENSE = 24;
 const MAX_IMPORT_BYTES = 1000000;
-const MAX_INCLUDED_OFFENSE = 16, MAX_INCLUDED_DEFENSE = 6;
+const MAX_INCLUDED_OFFENSE = 64, MAX_INCLUDED_DEFENSE = 24;
 const DEFAULT_NEW_PLAYERS_PER_SIDE = 5;
 // Move only the starter line for newly created offense plays. Stored plays
 // keep their exact coordinates; 0.024 of the 822-unit field is about 20 px.
@@ -2641,29 +2657,30 @@ $('previewCoachBtn').addEventListener('click', () => {
   for (const section of ['offense', 'defense']) {
     const plays = doc[section].filter(isIncluded).slice().sort((a, b) => a.num - b.num);
     if (!plays.length) continue;
-    const title = document.createElement('h3');
-    title.textContent = section === 'offense' ? 'Offense coach card' : 'Defense coach card';
-    pages.appendChild(title);
-    const cap = section === 'offense' ? MAX_INCLUDED_OFFENSE : MAX_INCLUDED_DEFENSE;
-    if (plays.length > cap) {
-      const warning = document.createElement('p');
-      warning.textContent = 'Select at most ' + cap + ' ' + section + ' plays before creating cards.';
-      pages.appendChild(warning);
+    const perPage = Number($(section + 'PerPage').value);
+    const [cols, rows] = {1:[1,1],2:[2,1],4:[2,2],6:[2,3],9:[3,3],16:[4,4]}[perPage];
+    for (let start = 0; start < plays.length; start += perPage) {
+      const title = document.createElement('h3');
+      title.textContent = (section === 'offense' ? 'Offense' : 'Defense') + ' coach card — page ' +
+        (start / perPage + 1) + ' of ' + Math.ceil(plays.length / perPage);
+      pages.appendChild(title);
+      const grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;gap:6px;padding:18px;background:white;aspect-ratio:11/8.5;' +
+        'grid-template-columns:repeat(' + cols + ',minmax(0,1fr));grid-template-rows:repeat(' + rows + ',minmax(0,1fr))';
+      for (const play of plays.slice(start, start + perPage)) {
+        const tile = render(play, section, displayNum(section, play));
+        tile.style.cssText = 'width:100%;height:100%;min-height:0;display:block';
+        tile.setAttribute('role', 'img');
+        tile.setAttribute('aria-label', displayNum(section, play) + ': ' + (play.name || 'Untitled play'));
+        grid.appendChild(tile);
+      }
+      pages.appendChild(grid);
     }
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;gap:6px;padding:18px;background:white;grid-template-columns:repeat(' +
-      (section === 'offense' ? 4 : 2) + ',minmax(0,1fr))';
-    for (const play of plays) {
-      const tile = render(play, section, displayNum(section, play));
-      tile.style.cssText = 'width:100%;height:auto;display:block';
-      tile.setAttribute('role', 'img');
-      tile.setAttribute('aria-label', displayNum(section, play) + ': ' + (play.name || 'Untitled play'));
-      grid.appendChild(tile);
-    }
-    pages.appendChild(grid);
   }
   $('createFromPreview').disabled = generateBtn.disabled;
   $('coachPreview').showModal();
+  $('coachPreviewTitle').focus({ preventScroll: true });
+  $('coachPreview').scrollTop = 0;
 });
 $('closeCoachPreview').addEventListener('click', () => $('coachPreview').close());
 $('createFromPreview').addEventListener('click', () => {
@@ -3477,6 +3494,8 @@ generateBtn.addEventListener('click', async () => {
     defense_wristband: !chkDefenseWrist.disabled && chkDefenseWrist.checked,
     show_offense_title: !chkOffenseTitle.disabled && chkOffenseTitle.checked,
     show_defense_title: !chkDefenseTitle.disabled && chkDefenseTitle.checked,
+    offense_plays_per_page: Number($('offensePerPage').value),
+    defense_plays_per_page: Number($('defensePerPage').value),
   };
   hideGenError();
   downloads.classList.remove('active');

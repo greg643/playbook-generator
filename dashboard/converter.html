@@ -355,8 +355,8 @@
       <strong>Offense</strong> and <strong>Defense</strong> separator slides. If there is a Defense separator but no
       Offense separator, plays before the first Defense separator become offense and the converter flags that assumption.
       Completed conversions also flag likely play slides skipped because a field shape or opening divider is missing.
-      Offense playbooks continue onto extra PDF pages after play 16, up to 64 plays; defense continues
-      after play 6, up to 24 plays. Wristband PDFs continue every 8 plays. See the
+      Choose the coach card layout below: up to 64 offense plays and 24 defense plays continue onto extra pages as needed.
+      Wristband PDFs continue every 8 plays. See the
       <a href="/pptx-guide">PowerPoint (PPTX) Import Guide</a>.</p>
 
       <div class="section-select" role="group" aria-label="PDF outputs">
@@ -379,6 +379,24 @@
           <input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title <span class="title-note">(on pages with &le;6 plays)</span>
         </label>
       </div>
+
+      <div class="section-select" role="group" aria-label="Coach card layouts">
+        <label>Offense plays per page
+          <select id="offensePerPage" aria-describedby="coachLayoutHelp">
+            <option value="1">1 — full page</option><option value="2">2 — side by side</option>
+            <option value="4">4 — 2 × 2</option><option value="6">6 — 2 × 3</option>
+            <option value="9">9 — 3 × 3</option><option value="16" selected>16 — 4 × 4</option>
+          </select>
+        </label>
+        <label>Defense plays per page
+          <select id="defensePerPage" aria-describedby="coachLayoutHelp">
+            <option value="1">1 — full page</option><option value="2">2 — side by side</option>
+            <option value="4">4 — 2 × 2</option><option value="6" selected>6 — 2 × 3</option>
+            <option value="9">9 — 3 × 3</option><option value="16">16 — 4 × 4</option>
+          </select>
+        </label>
+      </div>
+      <p class="compatibility-note" id="coachLayoutHelp">Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
 
       <p class="compatibility-note"><strong>Wristband fit &amp; finishing:</strong> Each PDF cut-out group is about
         <strong>4.40 &times; 2.09 in</strong> and is designed to fit the
@@ -624,6 +642,8 @@
       form.append('defense_wristband', chkDefenseWrist.checked);
       form.append('show_offense_title', chkOffenseTitle.checked);
       form.append('show_defense_title', chkDefenseTitle.checked);
+      form.append('offense_plays_per_page', document.getElementById('offensePerPage').value);
+      form.append('defense_plays_per_page', document.getElementById('defensePerPage').value);
 
       const res = await generationFetch('/api/upload', { method: 'POST', body: form }, epoch, 120000);
       if (!isGenerationCurrent(epoch)) return;

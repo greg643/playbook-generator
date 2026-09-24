@@ -1729,6 +1729,43 @@ test("PPTX upload rejects signed-out requests before parsing or writing the file
   assert.equal(env.PLAYBOOK_BUCKET.objects.size, 0);
 });
 
+test("both generation paths validate and persist independent coach layouts", async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, {status:204}));
+  for (const mode of ['images', 'pptx']) {
+    for (const perPage of [1, 2, 4, 6, 9, 16, 0, 3, 17, null, '4', true]) {
+      const env = makeEnv();
+      const account = await seedAccount(env);
+      const session = await sessionRequest(env, account);
+      const form = new FormData();
+      const valid = [1,2,4,6,9,16].includes(perPage);
+      if (mode === 'images') {
+        form.set('options', JSON.stringify({offense_coach_card:true, defense_coach_card:true,
+          offense_plays_per_page:perPage, defense_plays_per_page:9}));
+        const png = new Uint8Array([137,80,78,71,13,10,26,10]);
+        // Highest supported numbers must work; the old 16/6 caps are gone.
+        form.append('plays', new File([png], '64.png', {type:'image/png'}));
+        form.append('plays', new File([png], 'D24.png', {type:'image/png'}));
+      } else {
+        // Multipart text necessarily represents numeric choices as strings.
+        if (perPage === '4') continue;
+        form.set('offense_plays_per_page', String(perPage));
+        form.set('defense_plays_per_page', '9');
+        form.append('file', new File([new Uint8Array([80,75,3,4])], 'test.pptx'));
+      }
+      const handler = mode === 'images' ? generate : upload;
+      const response = await handler({env, request:new Request('https://example.test/api/'+mode,
+        {method:'POST', headers:{cookie:session.headers.get('cookie')}, body:form})});
+      assert.equal(response.status, valid ? 200 : 400, mode + ': ' + String(perPage));
+      if (valid) {
+        const {jobId} = await response.json();
+        const status = await (await env.PLAYBOOK_BUCKET.get(`jobs/${jobId}/status.json`)).json();
+        assert.equal(status.options.offense_plays_per_page, perPage);
+        assert.equal(status.options.defense_plays_per_page, 9);
+      }
+    }
+  }
+});
+
 test("image generation rejects duplicate and zero-byte multipart files before dispatch", async () => {
   const env = makeEnv();
   const account = await seedAccount(env);

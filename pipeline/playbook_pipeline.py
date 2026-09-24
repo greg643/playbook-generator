@@ -634,6 +634,53 @@ class PlaybookGenerator:
                 defense_images.append(img)
         return offense_images, defense_images
 
+    @staticmethod
+    def coach_grid(plays_per_page):
+        grids = {1: (1, 1), 2: (2, 1), 4: (2, 2), 6: (2, 3), 9: (3, 3), 16: (4, 4)}
+        if type(plays_per_page) is not int or plays_per_page not in grids:
+            raise ValueError("Coach cards require 1, 2, 4, 6, 9, or 16 plays per page")
+        return grids[plays_per_page]
+
+    def create_coach_card_grid(self, images, section, plays_per_page):
+        """Fixed-size grid: partial pages keep empty slots, never stretch plays."""
+        cols, rows = self.coach_grid(plays_per_page)
+        if not images:
+            return
+        if section not in ("offense", "defense"):
+            raise ValueError("Invalid coach card section")
+        import io
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.utils import ImageReader
+
+        pdf_path = self.output_dir / f"{section}_coach_card.pdf"
+        page_width, page_height = landscape(letter)
+        c = canvas.Canvas(str(pdf_path), pagesize=(page_width, page_height))
+        margin, label_space, padding = 36, 36, 3
+        cell_width = (page_width - 2 * margin - label_space) / cols
+        cell_height = (page_height - 2 * margin) / rows
+        for start in range(0, len(images), plays_per_page):
+            if start:
+                c.showPage()
+            c.saveState()
+            c.setFont("Helvetica-Bold", 24)
+            c.translate(margin + label_space / 2, page_height / 2)
+            c.rotate(90)
+            c.drawCentredString(0, 0, section.upper())
+            c.restoreState()
+            for index, img in enumerate(images[start:start + plays_per_page]):
+                row, col = divmod(index, cols)
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                buf.seek(0)
+                c.drawImage(ImageReader(buf),
+                            margin + label_space + col * cell_width + padding,
+                            page_height - margin - (row + 1) * cell_height + padding,
+                            width=cell_width - 2 * padding, height=cell_height - 2 * padding,
+                            preserveAspectRatio=True, mask="auto")
+        c.save()
+        print(f"  Created: {pdf_path} ({plays_per_page} plays per page)")
+
     def create_coach_card_offense(self, images):
         if not images:
             return
@@ -949,7 +996,11 @@ class PlaybookGenerator:
     def generate_all(self, gen_offense=True, gen_defense=True,
                       offense_coach_card=True, offense_wristband=True,
                       defense_coach_card=True, defense_wristband=True,
-                      show_offense_title=False, show_defense_title=True):
+                      show_offense_title=False, show_defense_title=True,
+                      offense_plays_per_page=None, defense_plays_per_page=None):
+        for layout in (offense_plays_per_page, defense_plays_per_page):
+            if layout is not None:
+                self.coach_grid(layout)
         expected = set()
         if offense_coach_card:
             expected.add(OUTPUT_FILENAMES["offense_coach_card"])
@@ -994,13 +1045,19 @@ class PlaybookGenerator:
         if gen_offense and offense_images:
             print("\nGenerating offense materials...")
             if offense_coach_card:
-                self.create_coach_card_offense(offense_images)
+                if offense_plays_per_page is None:
+                    self.create_coach_card_offense(offense_images)
+                else:
+                    self.create_coach_card_grid(offense_images, "offense", offense_plays_per_page)
             if offense_wristband:
                 self.create_wristband_sheet_offense(offense_images, show_title=show_offense_title)
         if gen_defense and defense_images:
             print("\nGenerating defense materials...")
             if defense_coach_card:
-                self.create_coach_card_defense(defense_images)
+                if defense_plays_per_page is None:
+                    self.create_coach_card_defense(defense_images)
+                else:
+                    self.create_coach_card_grid(defense_images, "defense", defense_plays_per_page)
             if defense_wristband:
                 self.create_wristband_sheet_defense(defense_images, show_title=show_defense_title)
 
@@ -1034,6 +1091,16 @@ def main():
         sys.exit(1)
 
     pptx_path = sys.argv[1]
+    coach_layouts = {}
+    for section in ("offense", "defense"):
+        flag = f"--{section}-plays-per-page"
+        if flag in sys.argv:
+            idx = sys.argv.index(flag)
+            if idx + 1 >= len(sys.argv):
+                raise ValueError(f"Missing value for {flag}")
+            layout = int(sys.argv[idx + 1])
+            PlaybookGenerator.coach_grid(layout)
+            coach_layouts[f"{section}_plays_per_page"] = layout
     output_dir = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else "playbook_output"
 
     # Parse --sections flag (shorthand: offense, defense, or both)
@@ -1169,7 +1236,7 @@ def main():
                            offense_coach_card=offense_coach_card, offense_wristband=offense_wristband,
                            defense_coach_card=defense_coach_card, defense_wristband=defense_wristband,
                            show_offense_title="offense" in titles,
-                           show_defense_title="defense" in titles)
+                           show_defense_title="defense" in titles, **coach_layouts)
 
     # Cleanup
     print(f"\nPlay images saved in: {plays_dir}/")

@@ -6,6 +6,7 @@ import {
   reserveJobSlot,
 } from "../_lib/jobs.js";
 import { putJson } from "../_lib/r2.js";
+import { COACH_LAYOUTS, COACH_LAYOUT_FIELDS } from "../_lib/coach-layouts.js";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 52 * 1024 * 1024;
@@ -78,6 +79,7 @@ export async function onRequestPost(context) {
       "defense_wristband",
       "show_offense_title",
       "show_defense_title",
+      ...COACH_LAYOUT_FIELDS,
     ]);
     const seenTextFields = new Set();
     let textBytes = 0;
@@ -87,7 +89,7 @@ export async function onRequestPost(context) {
         !allowedTextFields.has(name) ||
         seenTextFields.has(name) ||
         typeof value !== "string" ||
-        !["true", "false"].includes(value)
+        !(COACH_LAYOUT_FIELDS.includes(name) ? COACH_LAYOUTS.map(String) : ["true", "false"]).includes(value)
       ) {
         return jsonNoStore({ error: "Unexpected form field" }, { status: 400 });
       }
@@ -123,6 +125,9 @@ export async function onRequestPost(context) {
       show_offense_title: formData.get("show_offense_title") === "true",
       show_defense_title: formData.get("show_defense_title") !== "false",
     };
+    for (const field of COACH_LAYOUT_FIELDS) {
+      if (formData.has(field)) options[field] = Number(formData.get(field));
+    }
 
     if (!PPTX_NAME_RE.test(file.name)) {
       return jsonNoStore({ error: "Only .pptx files are accepted" }, { status: 400 });

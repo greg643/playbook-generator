@@ -6,10 +6,11 @@ import {
   reserveJobSlot,
 } from "../_lib/jobs.js";
 import { putJson } from "../_lib/r2.js";
+import { coachLayouts } from "../_lib/coach-layouts.js";
 
-const OFFENSE_NAME_RE = /^(0[1-9]|1[0-6])\.png$/;
-const DEFENSE_NAME_RE = /^D[1-6]\.png$/;
-const MAX_FILES = 22;
+const OFFENSE_NAME_RE = /^(0[1-9]|[1-5][0-9]|6[0-4])\.png$/;
+const DEFENSE_NAME_RE = /^D([1-9]|1[0-9]|2[0-4])\.png$/;
+const MAX_FILES = 88;
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 62 * 1024 * 1024;
@@ -103,6 +104,8 @@ export async function onRequestPost(context) {
     // Title flags ride along after the output check so they can't satisfy it.
     selected.show_offense_title = options.show_offense_title === true;
     selected.show_defense_title = options.show_defense_title !== false;
+    try { Object.assign(selected, coachLayouts(options)); }
+    catch { return jsonNoStore({ error: "Choose 1, 2, 4, 6, 9, or 16 plays per coach card page" }, { status: 400 }); }
 
     const files = formData.getAll("plays");
     const allFiles = [];

@@ -209,12 +209,12 @@
       <div class="out">
         <span class="out-icon">&#127944;</span>
         <span><span class="out-name">Offense Coach Card</span><br>
-        <span class="out-desc">Full-page 4&times;4 grid, 16 plays per page. PowerPoint (PPTX) Import can continue across pages.</span></span>
+        <span class="out-desc">Choose 1, 2, 4, 6, 9, or 16 plays per page (default: 16). Extra plays continue across pages.</span></span>
       </div>
       <div class="out">
         <span class="out-icon">&#128737;&#65039;</span>
         <span><span class="out-name">Defense Coach Card</span><br>
-        <span class="out-desc">Full-page grid of your defensive formations (up to 6 per page).</span></span>
+        <span class="out-desc">Choose 1, 2, 4, 6, 9, or 16 formations per page (default: 6), independently of offense.</span></span>
       </div>
       <div class="out">
         <span class="out-icon">&#9200;</span>
@@ -268,7 +268,7 @@
       <li><strong>In-playbook toggle</strong> &mdash; the checkbox on each sidebar row controls whether a play prints. Unchecked plays stay on the bench: kept in your account, shown faded, but left out of the PDFs.</li>
       <li><strong>Sticky numbers</strong> &mdash; a play keeps its number (offense <strong>1&ndash;16</strong>) or letter (defense <strong>A&ndash;F</strong>) once assigned, even as you bench or reorder other plays &mdash; so wristbands you printed earlier stay valid.</li>
       <li><strong>Renumber</strong> &mdash; when you want a clean sequence again, the <strong>Renumber</strong> button reassigns numbers in sidebar order.</li>
-      <li><strong>Editor print caps</strong> &mdash; a browser-editor generation includes at most <strong>16 offense</strong> and <strong>6 defense</strong> plays at once. PowerPoint (PPTX) Import separately supports 64 offense and 24 defense plays across multiple pages.</li>
+      <li><strong>Print capacity</strong> &mdash; both the editor and PowerPoint (PPTX) Import support <strong>64 offense</strong> and <strong>24 defense</strong> plays across multiple pages.</li>
       <li><strong>Storage caps</strong> &mdash; each named playbook can keep up to <strong>64 offense</strong> and <strong>24 defense</strong> plays total (in playbook + benched). Your account can keep up to <strong>20 named playbooks</strong>.</li>
     </ul>
   </section>
@@ -277,7 +277,7 @@
     <h2>Generating &amp; printing</h2>
     <ul>
       <li>Coach-card PDFs are selected by default. Add optional wristband sheets if you want them, then choose <strong>Create coach card</strong> in the editor or PowerPoint (PPTX) Import. Jobs usually take <strong>about 1&ndash;2 minutes</strong>; the page polls automatically and shows download buttons when everything is ready.</li>
-      <li><strong>Coach cards</strong> are full-page grids &mdash; print one set per coach. Uploaded decks continue automatically every 16 offense plays or 6 defensive formations.</li>
+      <li><strong>Coach cards</strong> are landscape letter-size grids &mdash; print one set per coach. Choose 1, 2, 4, 6, 9, or 16 plays per page separately for offense and defense. Six uses 2 columns &times; 3 rows; nine uses 3 &times; 3. Unused spaces stay blank (15 plays fit on one 4 &times; 4 page); extra plays continue onto another page. Preview the editor layout before creating the PDF.</li>
       <li><strong>Wristband sheets</strong> print six identical <strong>4.40 &times; 2.09 in</strong> cut-out groups per page, with dashed <strong>cut guides</strong> around each group. Each output page holds the next eight offense or defense plays.</li>
     </ul>
     <p class="callout warn"><strong>Print at 100% scale and laminate before cutting.</strong> Turn off &ldquo;fit to page&rdquo; so the wristband inserts keep their exact size.</p>
@@ -326,7 +326,7 @@
       <li><strong>Field rectangle</strong> &mdash; make the field one large, ungrouped PowerPoint rectangle at the top level of the slide. Standard, rounded, and snipped-corner rectangle variants work. Its object name or PowerPoint language does not matter. If a slide has several recognized rectangles, the largest one is used.</li>
       <li><strong>Offense fallback</strong> &mdash; if the deck has no recognized <strong>OFFENSE</strong> divider anywhere, valid play slides before its first <strong>DEFENSE</strong> divider are treated as offense. A successful conversion warns when it uses this fallback. A fully headerless deck remains offense-only.</li>
       <li><strong>Explicit sections</strong> &mdash; use a nearly empty slide containing <strong>OFFENSE</strong> or <strong>DEFENSE</strong> before each section, and start the deck with the appropriate divider. A completed conversion warns if likely play slides were skipped before that first divider or inside a section without a field shape.</li>
-      <li><strong>Capacity and pagination</strong> &mdash; uploads support up to <strong>64 offense</strong> and <strong>24 defense</strong> plays. Offense coach cards paginate every 16 plays; defense coach cards every 6; both wristband sheets paginate every 8.</li>
+      <li><strong>Capacity and pagination</strong> &mdash; uploads support up to <strong>64 offense</strong> and <strong>24 defense</strong> plays. Coach cards paginate using your selected layout; both wristband sheets paginate every 8. Coach card layout choices do not change wristband sizes.</li>
       <li>Slides containing <strong>PRINT IMAGES</strong>, <strong>APPENDIX</strong>, or <strong>TEMPLATE</strong> are skipped automatically.</li>
     </ul>
     <p class="callout">See the <a href="/pptx-guide">PowerPoint (PPTX) Import Guide</a> for original example slides, a pre-upload checklist, and the most common failure cases.</p>

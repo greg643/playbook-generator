@@ -324,6 +324,20 @@ test('wristband compatibility guidance is accurate and links safely', () => {
   }
 });
 
+test('both creation surfaces offer independent paginated coach layouts', () => {
+  for (const html of [editor, converter]) {
+    for (const section of ['offense','defense']) {
+      const select = html.match(new RegExp('<select id="' + section + 'PerPage"[^>]*>([\\s\\S]*?)</select>'));
+      assert.ok(select);
+      assert.deepEqual([...select[1].matchAll(/value="(\d+)"/g)].map(m => Number(m[1])), [1,2,4,6,9,16]);
+      assert.match(html, new RegExp(section + '_plays_per_page'));
+    }
+    assert.match(html, /Unused spaces stay blank/);
+  }
+  assert.match(editor, /MAX_INCLUDED_OFFENSE = 64, MAX_INCLUDED_DEFENSE = 24/);
+  assert.match(editor, /plays\.slice\(start, start \+ perPage\)/);
+});
+
 test('PPTX guidance matches the deterministic multi-page converter', () => {
   for (const html of [converter, help]) {
     assert.match(html, /href="\/pptx-guide"/);
@@ -334,7 +348,7 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   assert.match(help, /64 offense/);
   assert.match(help, /24 defense/);
   assert.match(help, /16 plays per page/);
-  assert.match(help, /defense coach cards every 6/i);
+  assert.match(help, /independently of offense/);
   assert.match(help, /paginate every 8/);
 
   assert.match(pptxGuide, /Up to 64 offense \/ 24 defense plays/);

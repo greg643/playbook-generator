@@ -30,8 +30,8 @@ class JobCancelled(RuntimeError):
     """Raised when account deletion has cancelled an in-flight job."""
 
 
-PLAY_IMAGE_NAME_RE = re.compile(r"(?:0[1-9]|1[0-6]|D[1-6])\.png")
-MAX_PLAY_IMAGES = 22
+PLAY_IMAGE_NAME_RE = re.compile(r"(?:0[1-9]|[1-5][0-9]|6[0-4]|D(?:[1-9]|1[0-9]|2[0-4]))\.png")
+MAX_PLAY_IMAGES = 88
 MAX_PLAY_IMAGE_BYTES = 4 * 1024 * 1024
 ASSUMED_OFFENSE_WARNING_CODE = "assumed_offense_before_defense"
 SKIPPED_BEFORE_DIVIDER_WARNING_CODE = "skipped_before_first_divider"
@@ -284,6 +284,8 @@ def main():
                     defense_wristband=defense_wristband,
                     show_offense_title=options.get("show_offense_title") is True,
                     show_defense_title=options.get("show_defense_title") is not False,
+                    offense_plays_per_page=options.get("offense_plays_per_page"),
+                    defense_plays_per_page=options.get("defense_plays_per_page"),
                 )
             else:
                 pptx_path = tmpdir / "input.pptx"
@@ -335,6 +337,10 @@ def main():
                 sys.argv = ["playbook_pipeline.py", str(pptx_path), str(output_dir),
                              "--sections", sections, "--outputs", ",".join(selected),
                              "--titles", ",".join(titles) if titles else "none"]
+                for section in ("offense", "defense"):
+                    field = f"{section}_plays_per_page"
+                    if field in options:
+                        sys.argv.extend([f"--{section}-plays-per-page", str(options[field])])
 
                 # Change to tmpdir so _playbook_work is created there
                 original_cwd = os.getcwd()

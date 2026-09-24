@@ -16,7 +16,7 @@ import { putJsonIfCurrent } from "../_lib/r2.js";
 
 const MAX_DOC_BYTES = 1000000;
 // Storage caps (an archive/"bench" beyond what one PDF holds); the generate
-// flow separately enforces at most 16 offense / 6 defense INCLUDED plays.
+// flow supports the same 64 offense / 24 defense plays across multiple pages.
 const MAX_OFFENSE = 64;
 const MAX_DEFENSE = 24;
 const MAX_NAME_LENGTH = 60;

@@ -42,6 +42,72 @@ def xobject_draw_count(page):
     return page.get_contents().get_data().split().count(b"Do")
 
 
+class CoachGridTests(unittest.TestCase):
+    def test_pptx_cli_forwards_both_layouts_to_generator(self):
+        import playbook_pipeline as pipeline
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root) / "work"
+            work.mkdir()
+            with patch.object(sys, "argv", ["pipeline", "sample.pptx", str(Path(root) / "output"),
+                                            "--mode", "screenshot", "--offense-plays-per-page", "9",
+                                            "--defense-plays-per-page", "2"]), \
+                 patch.object(pipeline.tempfile, "mkdtemp", return_value=str(work)), \
+                 patch.object(pipeline, "analyze_playbook", return_value=([], 10, 8)), \
+                 patch.object(pipeline, "validate_print_play_counts"), \
+                 patch.object(pipeline, "convert_pptx_to_images", return_value=(work, [])), \
+                 patch.object(pipeline, "crop_plays"), \
+                 patch.object(PlaybookGenerator, "generate_all") as generate:
+                pipeline.main()
+            self.assertEqual(generate.call_args.kwargs["offense_plays_per_page"], 9)
+            self.assertEqual(generate.call_args.kwargs["defense_plays_per_page"], 2)
+
+    def test_every_layout_paginates_both_sections_without_filling_blank_slots(self):
+        from pypdf import PdfReader
+        with tempfile.TemporaryDirectory() as root:
+            gen = PlaybookGenerator(root, Path(root) / "output")
+            images = [Image.new("RGB", (160, 120), (i * 10, 30, 90)) for i in range(17)]
+            for section in ("offense", "defense"):
+                for per_page in (1, 2, 4, 6, 9, 16):
+                    for count in (1, 5, 15, 16, 17):
+                        with self.subTest(section=section, per_page=per_page, count=count):
+                            gen.create_coach_card_grid(images[:count], section, per_page)
+                            pdf = PdfReader(gen.output_dir / f"{section}_coach_card.pdf")
+                            self.assertEqual(len(pdf.pages), (count + per_page - 1) // per_page)
+                            self.assertEqual([xobject_draw_count(p) for p in pdf.pages],
+                                             [min(per_page, count - start) for start in range(0, count, per_page)])
+                            for page in pdf.pages:
+                                self.assertEqual(tuple(page.mediabox), (0, 0, 792, 612))
+                                self.assertIn(section.upper(), page.extract_text())
+
+    def test_invalid_layouts_fail_before_deleting_existing_outputs(self):
+        with tempfile.TemporaryDirectory() as root:
+            gen = PlaybookGenerator(root, Path(root) / "output")
+            old = gen.output_dir / "offense_coach_card.pdf"
+            old.write_bytes(b"existing")
+            for bad in (True, 0, -1, 3, 8, 64, "4", 4.0, [], {}):
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    gen.generate_all(offense_plays_per_page=bad)
+                self.assertEqual(old.read_bytes(), b"existing")
+
+    def test_independent_layouts_do_not_change_wristband_geometry(self):
+        from pypdf import PdfReader
+        with tempfile.TemporaryDirectory() as root:
+            images = Path(root) / "images"
+            images.mkdir()
+            for i in range(1, 16):
+                Image.new("RGB", (160, 120), (i * 10, 40, 80)).save(images / f"{i:02d}.png")
+                Image.new("RGB", (160, 120), (i * 10, 80, 40)).save(images / f"D{i}.png")
+            gen = PlaybookGenerator(images, Path(root) / "output")
+            gen.generate_all()
+            original = {s: [p.get_contents().get_data() for p in PdfReader(gen.output_dir / f"{s}_wristband.pdf").pages]
+                        for s in ("offense", "defense")}
+            gen.generate_all(offense_plays_per_page=16, defense_plays_per_page=4)
+            self.assertEqual(len(PdfReader(gen.output_dir / "offense_coach_card.pdf").pages), 1)
+            self.assertEqual(len(PdfReader(gen.output_dir / "defense_coach_card.pdf").pages), 4)
+            for section in ("offense", "defense"):
+                self.assertEqual(original[section], [p.get_contents().get_data() for p in PdfReader(gen.output_dir / f"{section}_wristband.pdf").pages])
+
+
 class WristbandLayoutTests(unittest.TestCase):
     def test_count_adaptive_shapes(self):
         # (count) -> (cards on top row, vertically centered cards, bottom row)
