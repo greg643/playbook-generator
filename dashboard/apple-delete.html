@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Finish account deletion — GSS Playbook Editor</title>
+<style>body{max-width:600px;margin:8vh auto;padding:24px;background:#0d1117;color:#e6edf3;font:18px/1.6 system-ui}input,button{font:inherit;padding:12px;margin:12px 0}a{color:#79c0ff}</style></head><body>
+<h1>Finish deleting your Playbook Editor account</h1>
+<p>Account access is already disabled. Confirm to finish removing your saved playbooks. Your GSS app account is separate.</p>
+<form id="form"><label for="confirm">Type DELETE to confirm</label><br><input id="confirm" required pattern="DELETE" autocomplete="off"><br><button id="submit">Finish deletion</button></form>
+<p id="status" role="status"></p><a href="/api/auth/apple/start?returnTo=%2Feditor">Sign in with Apple again</a>
+<script>
+'use strict';
+document.getElementById('form').addEventListener('submit', async event => {
+ event.preventDefault(); const button = document.getElementById('submit'); button.disabled = true;
+ try {
+  const me = await fetch('/api/auth/apple/deletion', {cache:'no-store'}); const account = await me.json();
+  if (!me.ok) throw new Error(account.error || 'Sign in with Apple again.');
+  const response = await fetch('/api/auth/delete-account', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:account.userId,confirm:document.getElementById('confirm').value})});
+  const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Please retry cleanup.');
+  location.replace('/');
+ } catch(error) {document.getElementById('status').textContent = error.message;} finally {button.disabled = false;}
+});
+</script></body></html>

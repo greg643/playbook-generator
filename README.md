@@ -9,6 +9,7 @@ Greenwich Sports Systems web app for drawing flag football plays or converting a
 - `/pptx-guide` — public PowerPoint (PPTX) Import Guide with non-proprietary deck examples
 - `/converter` — signed-in PowerPoint (PPTX) Import screen
 - `/reset-password` — single-use emailed password-reset link target
+- `/apple-welcome` — explicit first-time Apple account setup or existing-account link
 - `/help` — editor, account, compatibility, and printing help
 
 The PowerPoint (PPTX) Import page verifies the current session before revealing its controls. The upload,
@@ -46,6 +47,11 @@ The browser-based **GSS Playbook Editor** lives at `/editor`. Sign in at `/`,
 choose **Playbook Editor**, drag the player chips into position, draw routes,
 lines and labels, and generate the same four PDFs without PowerPoint.
 
+For the shortest path, choose a playbook, check the plays to include, and use
+**Create coach card** in the top bar. **Preview coach card** shows the selected
+diagrams before generation. Coach PDFs are selected by default; wristband sheets
+are optional. Download the resulting PDFs and print at 100% scale.
+
 The editor supports both common formats:
 
 - **5v5 offense:** `C`, `1`, `2`, `3` and `QB`; **5v5 defense:** `1`–`5`
@@ -67,7 +73,17 @@ to confirm; the original can instead be renamed and reused. Export first if the
 plays may be needed again. Each JSON backup includes its source playbook name
 and can be shared with another coach or imported into another playbook or account.
 
-- **Auth**: email + password. Passwords are hashed with PBKDF2-SHA256 (per-user
+- **Apple auth** (feature-gated): uses the existing GSS Services ID and backend
+  verifier, so the native app and website resolve to the same GSS identity.
+  Playbook storage remains separate; app playbook viewing is not implemented.
+  Existing users explicitly prove both logins to link; email matching is never
+  used. Linking preserves the local user ID, saved playbooks and existing
+  password/recovery credentials, and revokes old sessions/reset links. New Apple accounts
+  need no email address or local password. See [Apple setup](docs/apple-sign-in.md)
+  for configuration, activation checks and rollback limits.
+- **Email auth**: email + password remains available to new and existing accounts,
+  including email accounts that subsequently add Apple sign-in.
+  Passwords are hashed with PBKDF2-SHA256 (per-user
   salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
   legacy hashes upgrade on login). Sessions are
   HMAC-signed, account/version checked, and revoked after password recovery or
@@ -85,6 +101,7 @@ and can be shared with another coach or imported into another playbook or accoun
   - `auth/secret` — legacy session signing secret fallback; use `SESSION_SECRET`
     in production
   - `users/byemail/<sha256(email)>.json` — credential record (userId, salt, hash)
+  - `users/byapple/<GSS account key>.json` — Apple-only account or index to an explicitly linked legacy account
   - `accounts/<userId>/playbook.json` — backward-compatible default playbook
   - `accounts/<userId>/playbooks/catalog.json` — names and immutable playbook IDs
   - `accounts/<userId>/playbooks/items/<playbookId>.json` — additional playbooks
@@ -148,10 +165,12 @@ every push and pull request.
 
 - `PLAYBOOK_BUCKET` — permanent account-data R2 bucket
 - `JOBS_BUCKET` — separate transient job R2 bucket
+- `AUTH_STATE_BUCKET` — dedicated one-day Apple replay-marker R2 bucket (when Apple is enabled)
 - `EMAIL_SERVICE` — production-only Service binding to the private
   `gss-playbook-email` Worker
-- `SESSION_SECRET` — exactly 64 hexadecimal characters; create with
-  `openssl rand -hex 32`
+- `SESSION_SECRET` — exactly 64 hexadecimal characters. For an existing deployment,
+  preserve the current value (including the R2 `auth/secret` fallback) so sessions
+  remain valid. Only for a new installation, create with `openssl rand -hex 32`.
 - `GITHUB_TOKEN` — token allowed to dispatch this repository's workflow
 - `GITHUB_REPO` — optional `owner/repository` override
 - `MAX_ACTIVE_JOBS_PER_USER` — optional, default `2`

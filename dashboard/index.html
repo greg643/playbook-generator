@@ -437,12 +437,12 @@
       <div class="auth-layout">
         <div class="auth-copy">
           <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
-          <h1>Build your playbook.<br>Print your game day.</h1>
-          <p class="intro">Draw 5v5 or 6v6 plays in the browser, or convert an existing PowerPoint deck into coach cards and wristband inserts.</p>
+          <h1>Your playbook.<br>Your coach card.</h1>
+          <p class="intro">Put your 5v5 or 6v6 plays on a printable game-day sheet. Create plays here or bring a PowerPoint playbook.</p>
           <ul class="feature-list">
-            <li><span class="check" aria-hidden="true">&#10003;</span>Design, organize, and save 5v5 or 6v6 plays in the browser</li>
-            <li><span class="check" aria-hidden="true">&#10003;</span>Convert compatible .pptx decks without sharing your scheme with an LLM</li>
-            <li><span class="check" aria-hidden="true">&#10003;</span>Generate print-ready coach cards and wristband inserts</li>
+            <li><span class="check" aria-hidden="true">1</span>Choose a playbook or create your first plays</li>
+            <li><span class="check" aria-hidden="true">2</span>Select the plays you want on your coach card</li>
+            <li><span class="check" aria-hidden="true">3</span>Create your coach card, download, and print</li>
           </ul>
           <div class="play-preview" aria-hidden="true">
             <svg viewBox="0 0 920 420" xmlns="http://www.w3.org/2000/svg">
@@ -476,9 +476,16 @@
         <div class="card" id="authCard">
           <div id="signinFormWrap">
             <h2 id="authTitle" tabindex="-1">Sign in</h2>
-            <p class="card-sub" id="authSubtitle">Access your saved plays and PowerPoint conversions.</p>
+            <p class="card-sub" id="authSubtitle">Save your plays and create a coach card.</p>
+            <div id="appleSignin" hidden>
+              <a class="btn btn-secondary" id="appleSigninLink" href="/api/auth/apple/start?returnTo=%2Feditor" style="display:flex;align-items:center;justify-content:center;min-height:48px;padding:0;background:#fff;border-color:#fff;text-decoration:none"><img src="/apple-continue.png" alt="Continue with Apple" width="330" height="48" style="display:block;max-width:100%;height:auto"></a>
+              <p class="card-sub" style="margin-top:1rem">Use the same Apple account as the GSS app. No separate password to remember.</p>
+              <p id="appleStatus" role="status"></p>
+            </div>
             <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. We&rsquo;ll return you automatically to <strong>PowerPoint (PPTX) Import</strong>.</p>
             <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it as an offline backup in case you lose access to your email.</p>
+            <details id="legacyLogin" open>
+            <summary id="legacySummary" hidden style="cursor:pointer;margin:1rem 0">Or use email and password</summary>
             <form id="signinForm" aria-labelledby="authTitle" novalidate>
               <label class="field">Email
                 <input type="email" id="authEmail" autocomplete="email" maxlength="320" required>
@@ -498,6 +505,7 @@
             </form>
             <p class="auth-links" id="signinLinks"><a id="forgotLink" href="/?forgot=1">Forgot password?</a></p>
             <p class="auth-links" id="registerLinks" hidden>Already have an account? <a id="signinInsteadLink" href="#">Sign in</a></p>
+            </details>
           </div>
 
           <div id="resetRequestWrap" hidden>
@@ -539,22 +547,23 @@
 
     <section class="hub" id="hubView" hidden>
       <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
-      <h1 id="hubHeading" tabindex="-1">How do you want to build your playbook?</h1>
+      <h1 id="hubHeading" tabindex="-1">Let&rsquo;s make your coach card.</h1>
       <p class="hub-sub">Both paths make the same print-ready coach cards and wristband inserts.</p>
+      <p id="appleLinkNotice" class="hub-sub" hidden><a href="/api/auth/apple/start?returnTo=%2Feditor">Add Apple sign-in to this account</a>. Your email login and saved playbooks stay in place.</p>
       <p class="error-msg" id="hubError" role="alert" aria-live="assertive"></p>
 
       <div class="choice-grid">
         <a class="choice editor-choice" href="/editor">
           <span class="choice-icon" aria-hidden="true">&#9999;&#65039;</span>
           <h2>Playbook Editor</h2>
-          <p>Draw, organize, save, and print plays right in the browser.</p>
-          <span class="choice-action">Open Playbook Editor &rarr;</span>
+          <p>Open a saved playbook or draw new plays. Choose which plays to print, then create your coach card.</p>
+          <span class="choice-action">Choose or create plays &rarr;</span>
         </a>
         <a class="choice converter" href="/converter">
           <span class="choice-icon" aria-hidden="true">&#128196;</span>
           <h2>PowerPoint (PPTX) Import</h2>
-          <p>Upload a compatible .pptx and turn it into print-ready cards.</p>
-          <span class="choice-action">Open PowerPoint (PPTX) Import &rarr;</span>
+          <p>Already have your plays in PowerPoint? Upload your deck to create a coach card.</p>
+          <span class="choice-action">Use a PowerPoint playbook &rarr;</span>
         </a>
       </div>
 
@@ -617,7 +626,8 @@ let recoveryModalOpen = false;
 let recoveryResolve = null;
 let recoveryReturnFocus = null;
 let authMode = 'signin';
-const POST_AUTH_DESTINATIONS = Object.freeze({ converter: '/converter' });
+let appleEnabled = false;
+const POST_AUTH_DESTINATIONS = Object.freeze({ converter: '/converter', editor: '/editor', apple: '/apple-welcome' });
 const requestedPostAuthDestination = new URLSearchParams(window.location.search).get('signin');
 const forgotRequested = new URLSearchParams(window.location.search).get('forgot') === '1';
 const postAuthDestination = Object.prototype.hasOwnProperty.call(
@@ -725,10 +735,11 @@ function showAuth(message = '') {
 
 function showHub(account, focusHeading = false) {
   if (!account || typeof account.userId !== 'string' || !account.userId ||
-      typeof account.email !== 'string' || !account.email) {
+      typeof account.email !== 'string') {
     throw new Error('The server returned an invalid account');
   }
-  $('userEmail').textContent = account.email;
+  $('userEmail').textContent = account.email || account.displayName || 'Coach';
+  $('appleLinkNotice').hidden = !appleEnabled || account.appleLinked;
   $('hubAccount').hidden = false;
   setError($('hubError'), '');
   loadingView.hidden = true;
@@ -739,7 +750,7 @@ function showHub(account, focusHeading = false) {
 
 function routeAfterAuthentication(account, focusHeading = false) {
   if (!account || typeof account.userId !== 'string' || !account.userId ||
-      typeof account.email !== 'string' || !account.email) {
+      typeof account.email !== 'string') {
     throw new Error('The server returned an invalid account');
   }
   if (postAuthDestination) {
@@ -756,7 +767,7 @@ async function verifyAccount(expectedUserId, epoch) {
   if (epoch !== authEpoch) return null;
   const data = await res.json().catch(() => null);
   if (!res.ok || !data || data.userId !== expectedUserId ||
-      typeof data.email !== 'string' || !data.email) {
+      typeof data.email !== 'string') {
     throw new Error('Could not verify the signed-in account');
   }
   return data;
@@ -1022,8 +1033,30 @@ $('signOutBtn').addEventListener('click', async () => {
 });
 
 (async function init() {
+  try {
+    const config = await fetch('/api/auth/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) }).then(r => r.json());
+    appleEnabled = config.apple === true;
+    $('appleSignin').hidden = !appleEnabled;
+    $('legacySummary').hidden = !appleEnabled;
+    $('legacyLogin').open = true;
+    $('signupPrompt').hidden = false;
+    if (appleEnabled) {
+      const destination = postAuthDestination === '/converter' ? '/converter' : '/editor';
+      $('appleSigninLink').href = '/api/auth/apple/start?returnTo=' + encodeURIComponent(destination);
+      const appleResult = new URLSearchParams(location.search).get('apple');
+      if (appleResult) $('appleStatus').textContent = appleResult === 'cancelled'
+        ? 'Apple sign-in was cancelled. You can try again.'
+        : 'Apple sign-in could not finish. Please try again, or use your existing account below.';
+    }
+  } catch { /* Existing accounts can still sign in during configuration outages. */ }
   if (postAuthDestination === '/converter') {
     $('converterSigninNotice').hidden = false;
+  }
+  // This route is the explicit proof of the legacy identity during linking.
+  // Do not bounce a stale signed-in session back to the welcome page forever.
+  if (requestedPostAuthDestination === 'apple') {
+    showAuth();
+    return;
   }
   const epoch = ++authEpoch;
   try {
@@ -1032,7 +1065,7 @@ $('signOutBtn').addEventListener('click', async () => {
     if (res.ok) {
       const data = await res.json().catch(() => null);
       if (!data || typeof data.userId !== 'string' || !data.userId ||
-          typeof data.email !== 'string' || !data.email) {
+          typeof data.email !== 'string') {
         throw new Error('The server returned an invalid account');
       }
       routeAfterAuthentication(data);

@@ -333,7 +333,7 @@
   <main class="converter-app" id="converterApp" hidden>
     <p class="title-note">Greenwich Sports Systems</p>
     <h1>GSS Playbook Editor &mdash; PowerPoint (PPTX) Import</h1>
-    <p class="subtitle">Turn a 5v5 or 6v6 PowerPoint playbook into coach cards &amp; wristband PDFs</p>
+    <p class="subtitle">1. Upload your playbook &nbsp; 2. Choose your cards &nbsp; 3. Download and print</p>
     <div class="pill-links">
       <a class="editor-link" href="/">&#8592; Home</a>
       <a class="editor-link" href="/pptx-guide">&#128209; PowerPoint (PPTX) Import Guide</a>
@@ -367,10 +367,10 @@
           <input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card
         </label>
         <label>
-          <input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband
+          <input type="checkbox" id="chkOffenseWrist"> Also make offense wristband inserts
         </label>
         <label>
-          <input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband
+          <input type="checkbox" id="chkDefenseWrist"> Also make defense wristband inserts
         </label>
         <label>
           <input type="checkbox" id="chkOffenseTitle"> Offense wristband title <span class="title-note">(on pages with &le;6 plays)</span>
@@ -391,7 +391,7 @@
         makes straight cuts easy.
         <span class="disclosure">Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</span></p>
 
-      <button class="btn btn-primary" id="generateBtn" disabled>Create PDFs</button>
+      <button class="btn btn-primary" id="generateBtn" disabled>Create coach card</button>
 
       <div class="progress-section" id="progressSection" role="status" aria-live="polite">
         <div class="progress-bar-container">
@@ -410,7 +410,7 @@
       <div class="error-msg" id="errorMsg" role="alert" aria-live="assertive"></div>
 
       <div class="reset-link" id="resetLink">
-        <button type="button" class="reset-action" id="resetBtn">Create PDFs from another playbook</button>
+        <button type="button" class="reset-action" id="resetBtn">Create cards from another playbook</button>
       </div>
 
       <p class="signed-in" id="signedInLine" role="status"></p>
@@ -827,11 +827,11 @@
       if (res.ok) {
         const data = await res.json().catch(() => null);
         if (!data || typeof data.userId !== 'string' || !data.userId ||
-            typeof data.email !== 'string' || !data.email) {
+            typeof data.email !== 'string') {
           throw new Error('Invalid account response');
         }
         signedIn = true;
-        signedInLine.textContent = `Signed in as ${data.email}`;
+        signedInLine.textContent = `Signed in as ${data.email || data.displayName || 'Coach'}`;
         signedInLine.classList.add('active');
         authCheck.hidden = true;
         converterApp.hidden = false;

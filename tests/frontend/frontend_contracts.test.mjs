@@ -23,6 +23,8 @@ test('inline frontend scripts compile', () => {
     ['index.html', index],
     ['converter.html', converter],
     ['reset-password.html', resetPassword],
+    ['apple-welcome.html', read('apple-welcome.html')],
+    ['apple-delete.html', read('apple-delete.html')],
   ]) {
     const scripts = inlineScripts(html);
     assert.ok(scripts.length, `${name} should contain an inline script`);
@@ -156,8 +158,8 @@ test('home is an authenticated two-choice hub, not an upload surface', () => {
   assert.match(index, /class="choice converter" href="\/converter"/);
   assert.ok(converterChoice, 'missing PowerPoint (PPTX) Import choice');
   assert.doesNotMatch(converterChoice[0], /pptx-guide/);
-  assert.match(index, /class="choice editor-choice"[\s\S]*?<h2>Playbook Editor<\/h2>[\s\S]*?Open Playbook Editor &rarr;/);
-  assert.match(index, /class="choice converter"[\s\S]*?<h2>PowerPoint \(PPTX\) Import<\/h2>[\s\S]*?Open PowerPoint \(PPTX\) Import &rarr;/);
+  assert.match(index, /class="choice editor-choice"[\s\S]*?<h2>Playbook Editor<\/h2>[\s\S]*?Choose or create plays &rarr;/);
+  assert.match(index, /class="choice converter"[\s\S]*?<h2>PowerPoint \(PPTX\) Import<\/h2>[\s\S]*?Use a PowerPoint playbook &rarr;/);
   assert.match(index, /\.choice-grid\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*max-width: 620px;/);
   assert.match(index, /\.hub-sub\s*\{[^}]*font-size: 1rem;[^}]*line-height: 1\.6;/);
   assert.match(index, /\.hub-help\s*\{[^}]*font-size: 1rem;[^}]*line-height: 1\.6;/);
@@ -184,20 +186,30 @@ test('home presents account creation as a clear, dedicated mode', () => {
 
 test('PowerPoint import naming and the allowlisted post-auth return stay consistent', () => {
   assert.match(index, /id="converterSigninNotice"[^>]*hidden>[^<]*Sign in or create an account first\.[\s\S]*?return you automatically to <strong>PowerPoint \(PPTX\) Import<\/strong>/);
-  assert.match(index, /const POST_AUTH_DESTINATIONS = Object\.freeze\(\{ converter: '\/converter' \}\)/);
+  assert.match(index, /const POST_AUTH_DESTINATIONS = Object\.freeze\(\{ converter: '\/converter', editor: '\/editor', apple: '\/apple-welcome' \}\)/);
   assert.match(index, /Object\.prototype\.hasOwnProperty\.call\([\s\S]*?POST_AUTH_DESTINATIONS,[\s\S]*?requestedPostAuthDestination[\s\S]*?\? POST_AUTH_DESTINATIONS\[requestedPostAuthDestination\] : null/);
   assert.match(index, /function routeAfterAuthentication\(account, focusHeading = false\)[\s\S]*?window\.location\.replace\(postAuthDestination\)[\s\S]*?showHub\(account, focusHeading\)/);
   assert.doesNotMatch(index, /window\.location\.assign\(postAuthDestination\)/);
   assert.match(index, /async function authSubmit\(path\)[\s\S]*?routeAfterAuthentication\(verified, true\)/);
   assert.match(index, /\$\('recoverForm'\)\.addEventListener[\s\S]*?routeAfterAuthentication\(verified, true\)/);
   assert.match(index, /async function init\(\)[\s\S]*?routeAfterAuthentication\(data\)/);
+  assert.match(index, /if \(requestedPostAuthDestination === 'apple'\)\s*\{\s*showAuth\(\);\s*return;/,
+    'explicit old-account proof must show the login form instead of looping on a stale session');
 
   assert.match(converter, /<title>GSS Playbook Editor PowerPoint \(PPTX\) Import/);
   assert.match(converter, /<h1>GSS Playbook Editor &mdash; PowerPoint \(PPTX\) Import<\/h1>/);
-  assert.match(converter, /id="generateBtn" disabled>Create PDFs<\/button>/);
+  assert.match(converter, /id="generateBtn" disabled>Create coach card<\/button>/);
   assert.match(converter, /href="\/pptx-guide">&#128209; PowerPoint \(PPTX\) Import Guide<\/a>/);
   assert.match(pptxGuide, /<h1>PowerPoint \(PPTX\) Import Guide<\/h1>/);
   assert.match(pptxGuide, /class="converter-cta" href="\/converter">Open PowerPoint \(PPTX\) Import &rarr;<\/a>/);
+});
+
+test('optional Apple sign-in leaves the email form and signup visible', () => {
+  assert.match(index, /\$\('legacyLogin'\)\.open = true;/);
+  assert.match(index, /\$\('signupPrompt'\)\.hidden = false;/);
+  assert.doesNotMatch(index, /\$\('signupPrompt'\)\.hidden = [^;]*appleEnabled/);
+  assert.match(index, /Or use email and password/);
+  assert.match(help, /either Apple or your existing email and password/);
 });
 
 test('playbook deletion and portable backup guidance matches the named-book model', () => {

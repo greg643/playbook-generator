@@ -8,6 +8,7 @@ import {
   constantTimeEqualHex,
   requestBodyTooLarge,
   utf8ByteLength,
+  hasRecentAuthentication,
 } from "../../_lib/auth.js";
 import { createJson, putJsonIfCurrent } from "../../_lib/r2.js";
 import { deleteAccountPlaybooks } from "../../_lib/playbooks.js";
@@ -94,6 +95,18 @@ async function completeDeletion(env, credentialKey, record) {
       if (finalized === null) throw new Error("Account finalization lost a concurrent update");
     }
   }
+  // Retain the Apple index until the canonical account is finalized. Otherwise
+  // an interrupted deletion could break Apple cleanup retries: Apple could
+  // no longer find the disabled record to authenticate a cleanup retry.
+  if (record.appleAccountKey && credentialKey.startsWith("users/byemail/")) {
+    const identityKey = `users/byapple/${record.appleAccountKey}.json`;
+    const identityObject = await env.PLAYBOOK_BUCKET.get(identityKey);
+    const identity = identityObject && await identityObject.json();
+    if (identity && identity.userId === record.userId) {
+      // Losing this CAS to a replacement account is safe; never remove it.
+      await putJsonIfCurrent(env, identityKey, { schema: 1, deletedAt: new Date().toISOString() }, identityObject);
+    }
+  }
   return deletion.jobIds;
 }
 
@@ -143,8 +156,7 @@ export async function onRequestPost(context) {
     const password = body.password;
     const requestedUserId = body.userId;
     if (
-      typeof password !== "string" ||
-      password.length > 1024 ||
+      (password !== undefined && (typeof password !== "string" || password.length > 1024)) ||
       typeof requestedUserId !== "string"
     ) {
       return jsonNoStore({ error: "Invalid password" }, { status: 401 });
@@ -176,11 +188,22 @@ export async function onRequestPost(context) {
       return jsonNoStore({ error: "Account changed while deletion was pending" }, { status: 409 });
     }
 
-    const key = await emailKey(user.email);
+    const key = user.credentialKey || await emailKey(user.email);
     const record = { ...user.account };
-    const hash = await hashPassword(password, record.salt, record.iterations);
-    if (!constantTimeEqualHex(hash, record.hash)) {
-      return jsonNoStore({ error: "Invalid password" }, { status: 401 });
+    if (user.authMethod === "apple") {
+      if (request.headers.get("origin") !== new URL(request.url).origin ||
+          request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
+        return jsonNoStore({ error: "Invalid request origin" }, { status: 403 });
+      }
+      if (!hasRecentAuthentication(user) || body.confirm !== "DELETE") {
+        return jsonNoStore({ error: "Continue with Apple again, then confirm account deletion." }, { status: 403 });
+      }
+    } else {
+      if (typeof password !== "string") return jsonNoStore({ error: "Invalid password" }, { status: 401 });
+      const hash = await hashPassword(password, record.salt, record.iterations);
+      if (!constantTimeEqualHex(hash, record.hash)) {
+        return jsonNoStore({ error: "Invalid password" }, { status: 401 });
+      }
     }
 
     await ensureDeletionRecord(env, record.userId);

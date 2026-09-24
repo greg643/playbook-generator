@@ -12,3 +12,11 @@
 /reset-password
   Cache-Control: no-store
   X-Robots-Tag: noindex, nofollow
+
+/apple-welcome
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+
+/apple-delete
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow

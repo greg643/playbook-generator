@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect your playbooks — GSS Playbook Editor</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0d1117;color:#e6edf3;font:18px/1.6 system-ui,sans-serif}
+main{max-width:620px;margin:8vh auto;padding:2rem;background:#161b22;border:1px solid #30363d;border-radius:16px}
+h1{font-size:2rem;line-height:1.2}a{color:#79c0ff}button,.button{display:block;width:100%;padding:14px 18px;margin:16px 0;border:1px solid #484f58;border-radius:8px;background:#238636;color:white;text-align:center;font:inherit;text-decoration:none;cursor:pointer}
+.secondary{background:transparent}.small{font-size:16px;color:#aeb8c4}button:disabled{opacity:.5;cursor:wait}[hidden]{display:none!important}
+@media(max-width:640px){main{margin:20px;padding:1.4rem}}
+</style></head><body><main>
+<a href="/">GSS Playbook Editor</a><h1>Bring your playbooks with you.</h1>
+<p id="intro">Checking your Apple sign-in…</p>
+<section id="existing" hidden>
+  <h2 style="font-size:1.2rem">Already have saved plays?</h2>
+  <p id="existingAccount">Sign into your existing account once to connect it to Apple.</p>
+  <a class="button" id="oldLogin" href="/?signin=apple">Sign in to my existing account</a>
+  <button id="link" hidden>Connect my playbooks to Apple</button>
+  <p class="small">Your playbooks stay in place. Once connected, you can sign in with Apple or your existing email and password. Your recovery code still works.</p>
+</section>
+<section id="newAccount" hidden>
+  <h2 style="font-size:1.2rem">First time here?</h2>
+  <button id="create" class="secondary">Start a new playbook account</button>
+  <p class="small">Uses your GSS Apple identity. No new password or reset email.</p>
+</section>
+<p id="status" role="status" aria-live="polite"></p>
+<a id="restart" href="/api/auth/apple/start?returnTo=%2Feditor" hidden>Continue with Apple again</a>
+</main><script>
+'use strict';
+const $ = id => document.getElementById(id);
+let account = null;
+async function finish(mode) {
+  $('link').disabled = $('create').disabled = true;
+  $('status').textContent = 'Connecting your account…';
+  try {
+    const response = await fetch('/api/auth/apple/finish', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode,userId:account && account.userId}) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not connect your account.');
+    location.replace(['/editor','/converter','/'].includes(data.returnTo) ? data.returnTo : '/editor');
+  } catch (error) {
+    $('status').textContent = error.message;
+    $('restart').hidden = false;
+  } finally { $('link').disabled = $('create').disabled = false; }
+}
+$('link').addEventListener('click', () => finish('link'));
+$('create').addEventListener('click', () => finish('new'));
+(async () => {
+  try {
+    const response = await fetch('/api/auth/apple/pending', {cache:'no-store'});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Please continue with Apple again.');
+    account = data.account;
+    $('intro').textContent = 'Apple sign-in is ready. Choose how to set up your Playbook Editor account.';
+    $('existing').hidden = false;
+    $('newAccount').hidden = Boolean(account);
+    $('oldLogin').hidden = Boolean(account && account.recent);
+    $('link').hidden = !account || !account.recent;
+    if (account) $('existingAccount').textContent = 'Connect the saved playbooks for ' + (account.email || account.displayName) + '.';
+  } catch (error) {
+    $('intro').textContent = error.message;
+    $('restart').hidden = false;
+  }
+})();
+</script></body></html>

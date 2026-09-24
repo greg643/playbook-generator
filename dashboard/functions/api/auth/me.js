@@ -8,7 +8,9 @@ export async function onRequestGet(context) {
     if (!user) {
       return jsonNoStore({ error: "Not signed in" }, { status: 401 });
     }
-    return jsonNoStore({ email: user.email, userId: user.userId });
+    return jsonNoStore({ email: user.email, userId: user.userId,
+      ...(user.account.appleAccountKey ? { displayName: user.displayName, authMethod: user.authMethod,
+        appleLinked: true, passwordAvailable: typeof user.account.hash === "string" } : {}) });
   } catch (err) {
     console.error("Me error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });

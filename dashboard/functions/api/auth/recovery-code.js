@@ -13,6 +13,9 @@ export async function onRequestPost(context) {
   try {
     const { user, response } = await requireUser(context);
     if (!user) return response;
+    if (user.account.appleAccountKey && typeof user.account.hash !== "string") {
+      return jsonNoStore({ error: "This Apple-only account has no password to recover. Use Sign in with Apple." }, { status: 409 });
+    }
 
     if (!hasRecentAuthentication(user)) {
       return jsonNoStore(

@@ -271,13 +271,18 @@ export function accountSessionVersion(record) {
     : 1;
 }
 
-export async function createSessionCookie(userId, email, env, sessionVersion = 1) {
+export function validCredentialKey(key) {
+  return typeof key === "string" && /^users\/(byemail\/[a-f0-9]{64}|byapple\/[a-f0-9]{16})\.json$/.test(key);
+}
+
+export async function createSessionCookie(userId, email, env, sessionVersion = 1, identity = {}) {
   const secret = await getSecret(env);
   const issuedAt = Math.floor(Date.now() / 1000);
   const exp = issuedAt + SESSION_TTL_SECONDS;
   const payload = b64urlEncode(
     new TextEncoder().encode(
-      JSON.stringify({ uid: userId, em: normalizeEmail(email), sv: sessionVersion, iat: issuedAt, exp })
+      JSON.stringify({ uid: userId, em: normalizeEmail(email), sv: sessionVersion, iat: issuedAt, exp,
+        ...(identity.credentialKey ? { ck: identity.credentialKey, apple: identity.appleAccountKey } : {}) })
     )
   );
   const sig = b64urlEncode(await hmacSign(secret, payload));
@@ -317,12 +322,14 @@ export async function getUser(request, env, { allowDisabled = false } = {}) {
     if (typeof data.uid !== "string" || typeof data.exp !== "number") return null;
     if (data.exp <= Math.floor(Date.now() / 1000)) return null;
     const email = normalizeEmail(data.em);
-    if (!isValidEmail(email)) return null;
+    if (!data.ck && !isValidEmail(email)) return null;
+    if (data.ck && (!validCredentialKey(data.ck) || !/^[a-f0-9]{16}$/.test(data.apple || ""))) return null;
+    const credentialKey = data.ck || await emailKey(email);
 
     // A valid HMAC is not enough: bind the cookie to the current immutable
     // account ID and revocation version. Missing versions on legacy accounts
     // and cookies are treated as version 1 so existing users stay signed in.
-    const accountObject = await env.PLAYBOOK_BUCKET.get(await emailKey(email));
+    const accountObject = await env.PLAYBOOK_BUCKET.get(credentialKey);
     if (!accountObject) return null;
     const account = await accountObject.json();
     const cookieVersion = Number.isSafeInteger(data.sv) && data.sv >= 1 ? data.sv : 1;
@@ -330,6 +337,8 @@ export async function getUser(request, env, { allowDisabled = false } = {}) {
       !account ||
       account.userId !== data.uid ||
       normalizeEmail(account.email) !== email ||
+      account.deletedAt ||
+      (data.ck && account.appleAccountKey !== data.apple) ||
       accountSessionVersion(account) !== cookieVersion ||
       (account.disabledAt && !allowDisabled)
     ) {
@@ -339,6 +348,9 @@ export async function getUser(request, env, { allowDisabled = false } = {}) {
     return {
       userId: account.userId,
       email,
+      credentialKey,
+      authMethod: data.ck ? "apple" : "password",
+      displayName: account.displayName || email || "Coach",
       sessionVersion: cookieVersion,
       authenticatedAt: Number.isSafeInteger(data.iat) ? data.iat : 0,
       account,
@@ -357,7 +369,9 @@ export async function isAccountActive(env, user) {
   if (!user || typeof user.email !== "string" || typeof user.userId !== "string") {
     return false;
   }
-  const object = await env.PLAYBOOK_BUCKET.get(await emailKey(user.email));
+  const key = user.credentialKey || await emailKey(user.email);
+  if (!validCredentialKey(key)) return false;
+  const object = await env.PLAYBOOK_BUCKET.get(key);
   if (!object) return false;
   try {
     const account = await object.json();
@@ -365,7 +379,7 @@ export async function isAccountActive(env, user) {
       account &&
       account.userId === user.userId &&
       normalizeEmail(account.email) === user.email &&
-      !account.disabledAt
+      !account.disabledAt && !account.deletedAt
     );
   } catch (error) {
     console.error("Could not verify account liveness:", error);

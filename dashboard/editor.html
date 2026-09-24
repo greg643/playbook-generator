@@ -655,6 +655,7 @@
     <h1>GSS Playbook Editor</h1>
     <a class="back" href="/">&larr; Home</a>
     <div class="spacer"></div>
+    <button class="linkbtn" id="coachCardShortcut" type="button" hidden>Create coach card</button>
     <a class="back" href="/help" target="_blank" rel="noopener">Help</a>
     <span class="email" id="userEmail"></span>
     <button class="linkbtn" id="accountBtn" style="display:none">Account</button>
@@ -715,6 +716,7 @@
   <div class="editor" id="editorView">
     <aside class="sidebar" aria-label="Playbook and play list">
       <section class="playbook-manager" aria-labelledby="playbookManagerLabel">
+        <p style="font-size:.85rem;color:#aeb8c4;margin:0 0 .7rem">1. Choose a playbook<br>2. Check the plays to include<br>3. Preview and create your coach card</p>
         <label id="playbookManagerLabel" for="playbookSelect">Playbook</label>
         <select id="playbookSelect" disabled></select>
         <div class="playbook-manager-actions">
@@ -813,16 +815,19 @@
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       </div>
 
-      <div class="tb-label">Generate</div>
+      <div class="tb-label" id="coachCardHeading">Create your coach card</div>
+      <p id="coachCardSummary" style="font-size:.85rem;color:#aeb8c4;line-height:1.5" aria-live="polite">Add a play to get started.</p>
       <div class="gen-checks" role="group" aria-label="PDF outputs">
         <label><input type="checkbox" id="chkOffenseCoach" checked> Offense Coach Card</label>
-        <label><input type="checkbox" id="chkOffenseWrist" checked> Offense Wristband</label>
+        <label><input type="checkbox" id="chkOffenseWrist"> Also make offense wristband inserts</label>
         <label><input type="checkbox" id="chkDefenseCoach" checked> Defense Coach Card</label>
-        <label><input type="checkbox" id="chkDefenseWrist" checked> Defense Wristband</label>
+        <label><input type="checkbox" id="chkDefenseWrist"> Also make defense wristband inserts</label>
         <label><input type="checkbox" id="chkOffenseTitle"> Offense wristband title</label>
         <label><input type="checkbox" id="chkDefenseTitle" checked> Defense wristband title</label>
       </div>
-      <button class="btn btn-primary" id="generateBtn">Generate PDFs</button>
+      <button class="btn btn-secondary" id="previewCoachBtn" type="button" style="margin-bottom:.5rem" disabled>Preview coach card</button>
+      <button class="btn btn-primary" id="generateBtn">Create coach card</button>
+      <p style="font-size:.8rem;color:#aeb8c4;line-height:1.5">Download the PDF when it is ready, then print at 100% scale. Wristband inserts are optional.</p>
 
       <div class="progress-section" id="progressSection" role="status" aria-live="polite">
         <div class="progress-bar-container">
@@ -832,7 +837,7 @@
       </div>
 
       <div class="downloads" id="downloads" aria-live="polite">
-        <h3>Your PDFs are ready</h3>
+        <h3>Your cards are ready — download and print</h3>
         <div class="dl-grid" id="dlGrid"></div>
       </div>
 
@@ -847,6 +852,17 @@
   <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
     <div class="modal" id="modalBox" role="dialog" aria-modal="true" tabindex="-1"></div>
   </div>
+
+  <dialog id="coachPreview" aria-labelledby="coachPreviewTitle" style="width:min(960px,94vw);max-height:90vh;margin:auto;border:1px solid #484f58;border-radius:12px;background:#161b22;color:#e6edf3;padding:1.4rem">
+    <h2 id="coachPreviewTitle">Coach card preview</h2>
+    <p id="coachPreviewDescription" style="margin:.5rem 0"></p>
+    <p>Check your play names, numbers, and routes. The downloaded PDF sets the final print spacing.</p>
+    <div id="coachPreviewPages"></div>
+    <div style="display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap">
+      <button class="btn btn-secondary" id="closeCoachPreview" type="button">Back to editing</button>
+      <button class="btn btn-primary" id="createFromPreview" type="button">Create coach card</button>
+    </div>
+  </dialog>
 
 <script>
 'use strict';
@@ -2607,7 +2623,53 @@ function syncGenerateChecks() {
     box.parentElement.style.opacity = ok ? '' : '0.5';
   }
   generateBtn.disabled = generating || !doc || !outputChecks.some(box => !box.disabled && box.checked);
+  if ($('previewCoachBtn')) $('previewCoachBtn').disabled = generating || (!hasOff && !hasDef);
+  if ($('coachCardSummary')) $('coachCardSummary').textContent = hasOff || hasDef
+    ? offCount + ' offense + ' + defCount + ' defense plays selected. Uncheck a play in the sidebar to leave it off the cards.'
+    : 'Add your first play using + Add play in the sidebar.';
 }
+
+$('coachCardShortcut').addEventListener('click', () => {
+  $('coachCardHeading').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('previewCoachBtn').focus({ preventScroll: true });
+});
+$('previewCoachBtn').addEventListener('click', () => {
+  if (!doc || generating) return;
+  const pages = $('coachPreviewPages');
+  pages.replaceChildren();
+  $('coachPreviewDescription').textContent = (playbookById(activePlaybookId) || {}).name || 'My Playbook';
+  for (const section of ['offense', 'defense']) {
+    const plays = doc[section].filter(isIncluded).slice().sort((a, b) => a.num - b.num);
+    if (!plays.length) continue;
+    const title = document.createElement('h3');
+    title.textContent = section === 'offense' ? 'Offense coach card' : 'Defense coach card';
+    pages.appendChild(title);
+    const cap = section === 'offense' ? MAX_INCLUDED_OFFENSE : MAX_INCLUDED_DEFENSE;
+    if (plays.length > cap) {
+      const warning = document.createElement('p');
+      warning.textContent = 'Select at most ' + cap + ' ' + section + ' plays before creating cards.';
+      pages.appendChild(warning);
+    }
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;gap:6px;padding:18px;background:white;grid-template-columns:repeat(' +
+      (section === 'offense' ? 4 : 2) + ',minmax(0,1fr))';
+    for (const play of plays) {
+      const tile = render(play, section, displayNum(section, play));
+      tile.style.cssText = 'width:100%;height:auto;display:block';
+      tile.setAttribute('role', 'img');
+      tile.setAttribute('aria-label', displayNum(section, play) + ': ' + (play.name || 'Untitled play'));
+      grid.appendChild(tile);
+    }
+    pages.appendChild(grid);
+  }
+  $('createFromPreview').disabled = generateBtn.disabled;
+  $('coachPreview').showModal();
+});
+$('closeCoachPreview').addEventListener('click', () => $('coachPreview').close());
+$('createFromPreview').addEventListener('click', () => {
+  $('coachPreview').close();
+  generateBtn.click();
+});
 
 outputChecks.forEach(box => box.addEventListener('change', () => {
   hideGenError();
@@ -3345,7 +3407,7 @@ function invalidateGeneration({ clearUI = false, resetPreferences = false } = {}
   if (generationRequest) generationRequest.abort();
   generationRequest = null;
   generating = false;
-  if (resetPreferences) outputChecks.forEach(box => { box.checked = true; });
+  if (resetPreferences) outputChecks.forEach(box => { box.checked = box === chkOffenseCoach || box === chkDefenseCoach; });
   if (clearUI) {
     progressSection.classList.remove('active');
     downloads.classList.remove('active');
@@ -3618,6 +3680,8 @@ resetGenLink.addEventListener('click', () => {
 
 let authEpoch = 0;
 let activeUserId = null;
+let activeAccount = null;
+let appleEnabled = false;
 let authBusy = false;
 let accountRequestBusy = false;
 
@@ -3663,6 +3727,7 @@ async function verifyAuthenticatedAccount(expectedUserId, epoch) {
   if (!res.ok || !data || data.userId !== expectedUserId || typeof data.email !== 'string') {
     throw new Error('Could not verify the signed-in account');
   }
+  activeAccount = data;
   return data;
 }
 
@@ -3679,7 +3744,9 @@ async function requestDeletionUntilSettled(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email
         ? { email, password, userId: expectedUserId }
-        : { password, userId: expectedUserId }),
+        : activeAccount && activeAccount.authMethod === 'apple'
+          ? { confirm: password, userId: expectedUserId }
+          : { password, userId: expectedUserId }),
     });
     const data = await res.json().catch(() => ({}));
     if (epoch !== authEpoch) return false;
@@ -3717,6 +3784,7 @@ function showAuthView(msg) {
   signOutBtn.style.display = 'none';
   $('accountBtn').style.display = 'none';
   userEmail.textContent = '';
+  $('coachCardShortcut').hidden = true;
   if (msg) showAuthError(msg);
   else hideAuthError();
 }
@@ -3901,6 +3969,7 @@ async function enterEditor(email, userId, expectedEpoch = null) {
   }
   activeUserId = userId;
   userEmail.textContent = email || '';
+  $('coachCardShortcut').hidden = false;
   signOutBtn.style.display = '';
   $('accountBtn').style.display = '';
   authView.classList.remove('active');
@@ -4529,13 +4598,20 @@ $('accountBtn').addEventListener('click', async () => {
     title: 'Account',
     message: userEmail.textContent,
     choices: [
-      { key: 'code', label: 'Get new recovery code' },
+      ...(activeAccount && activeAccount.appleLinked
+        ? [{ key: 'apple', label: 'Sign in with Apple again' }]
+        : (appleEnabled ? [{ key: 'link', label: 'Add Apple sign-in' }] : [])),
+      ...(!activeAccount?.appleLinked || activeAccount.passwordAvailable
+        ? [{ key: 'code', label: 'Get new recovery code' }] : []),
       { key: 'delete', label: 'Delete account', danger: true },
       { key: 'cancel', label: 'Close' },
     ],
   });
   if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
-  if (choice === 'code') {
+  if (choice === 'link' || choice === 'apple') {
+    if (doc && saveState !== 'saved' && !await saveDoc()) return;
+    window.location.assign('/api/auth/apple/start?returnTo=%2Feditor');
+  } else if (choice === 'code') {
     const sure = await showModal({
       title: 'New recovery code',
       message: 'This replaces your current recovery code — the old one stops working. Continue?',
@@ -4560,9 +4636,11 @@ $('accountBtn').addEventListener('click', async () => {
   } else if (choice === 'delete') {
     const pw = await showModal({
       title: 'Delete account',
-      message: 'This permanently deletes your account AND all of its playbooks. Type your password to confirm.',
+      message: activeAccount && activeAccount.authMethod === 'apple'
+        ? 'This permanently deletes your Playbook Editor account and all its playbooks. Your GSS app account stays separate. Type DELETE to confirm. You must have signed in with Apple in the last 10 minutes.'
+        : 'This permanently deletes your account AND all of its playbooks. Type your password to confirm.',
       withInput: true,
-      inputType: 'password',
+      inputType: activeAccount && activeAccount.authMethod === 'apple' ? 'text' : 'password',
       confirmLabel: 'Delete forever',
       danger: true,
     });
@@ -4640,13 +4718,17 @@ syncStyleUI();
 
 (async function init() {
   const epoch = startAuthTransition();
+  void fetch('/api/auth/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) })
+    .then(r => r.ok ? r.json() : null).then(config => { appleEnabled = config?.apple === true; })
+    .catch(() => { /* Apple stays hidden until configuration is confirmed. */ });
   try {
     const res = await fetch('/api/auth/me');
     if (epoch !== authEpoch) return;
     if (res.ok) {
       const data = await res.json();
       if (epoch !== authEpoch) return;
-      await enterEditor(data.email, data.userId, epoch);
+      activeAccount = data;
+      await enterEditor(data.email || data.displayName || 'Coach', data.userId, epoch);
       return;
     }
     const finishingDeletion = new URLSearchParams(window.location.search).get('finish-deletion') === '1';
