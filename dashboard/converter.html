@@ -326,7 +326,7 @@
   <div class="auth-check" id="authCheck" role="status" aria-live="polite">
     <div>
       <p id="authCheckMessage">Checking your account&hellip;</p>
-      <p id="authCheckHelp" hidden>We could not verify your session. <a href="/converter">Try again</a> or <a href="/">return home</a>.</p>
+      <p id="authCheckHelp" hidden>We could not check whether you are signed in. <a href="/converter">Try again</a> or <a href="/">return home</a>.</p>
     </div>
   </div>
 
@@ -348,16 +348,11 @@
       </div>
       <input type="file" id="fileInput" accept=".pptx" aria-label="Choose PowerPoint playbook">
 
-      <p class="format-hint"><strong>5v5 and 6v6 both work.</strong> No player-count setting is needed:
-      the converter preserves the visible slide drawing instead of interpreting or relabeling its players.
-      Use one play per slide with one large rectangle shape marking the field. If the deck has
-      no section separators, every recognized play is treated as <strong>offense</strong>. For a mixed deck, add
-      <strong>Offense</strong> and <strong>Defense</strong> separator slides. If there is a Defense separator but no
-      Offense separator, plays before the first Defense separator become offense and the converter flags that assumption.
-      Completed conversions also flag likely play slides skipped because a field shape or opening divider is missing.
-      Choose the coach card layout below: up to 64 offense plays and 24 defense plays continue onto extra pages as needed.
-      Wristband PDFs continue every 8 plays. See the
-      <a href="/pptx-guide">PowerPoint (PPTX) Import Guide</a>.</p>
+      <p class="format-hint"><strong>Use one play per slide, with a large rectangle behind the field.</strong>
+      Both 5v5 and 6v6 work. For offense only, no title slides are needed; for a mixed book, put
+      <strong>OFFENSE</strong> and <strong>DEFENSE</strong> title slides before their plays.
+      <a href="/pptx-guide">See example slides and the upload checklist</a>.</p>
+      <p class="format-hint"><strong>This makes printable PDFs, not editable plays.</strong> Keep your PowerPoint file to make changes later. Upload a .pptx file up to 50 MB.</p>
 
       <div class="section-select" role="group" aria-label="PDF outputs">
         <label>
@@ -396,18 +391,20 @@
           </select>
         </label>
       </div>
-      <p class="compatibility-note" id="coachLayoutHelp">Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
+      <p class="compatibility-note" id="coachLayoutHelp">Fewer plays per page means larger drawings. Choose offense and defense separately. Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
 
-      <p class="compatibility-note"><strong>Wristband fit &amp; finishing:</strong> Each PDF cut-out group is about
+      <details class="compatibility-note"><summary>Printing wristbands? Fit and cutting tips</summary>
+      <p><strong>Print at 100% scale and laminate before cutting.</strong> Cut around each whole insert on the dashed guides, not around individual plays. Each insert is about
         <strong>4.40 &times; 2.09 in</strong> and is designed to fit the
         <a href="https://www.amazon.com/dp/B07QHCVV7M?th=1" target="_blank" rel="noopener noreferrer"
            aria-label="WristCoaches adult three-panel wrist coach on Amazon (opens in a new tab)">WristCoaches adult three-panel holder</a>&rsquo;s
-        <strong>2 5/8 &times; 4 5/8 in</strong> window when the long edges align. Print at <strong>100%</strong> scale and
-        <strong>laminate before cutting</strong>; an optional
+        <strong>2 5/8 &times; 4 5/8 in</strong> window when the long edges align. An optional
         <a href="https://www.amazon.com/Fiskars-SureCut-Portable-Paper-Trimmer/dp/B000OMYB18/" target="_blank" rel="noopener noreferrer"
            aria-label="Fiskars SureCut portable paper trimmer on Amazon (opens in a new tab)">compact paper trimmer</a>
         makes straight cuts easy.
         <span class="disclosure">Accessory links are for reference only; we are not affiliated with or endorsed by the sellers or manufacturers and receive no commission.</span></p>
+        <p><a href="/help#printing">Full printing instructions</a></p>
+      </details>
 
       <button class="btn btn-primary" id="generateBtn" disabled>Create coach card</button>
 
@@ -779,24 +776,24 @@
         if (!Number.isSafeInteger(count) || count < 1 || count > 64) continue;
         const label = count === 1 ? 'play slide' : 'play slides';
         messages.push(
-          `Check your offense output: this deck has a DEFENSE divider but no OFFENSE divider, ` +
-          `so we treated ${count} ${label} before the first DEFENSE divider as offense.`
+          `Check your offense cards: this file has a DEFENSE title slide but no OFFENSE title slide, ` +
+          `so we treated ${count} ${label} before the first DEFENSE title slide as offense.`
         );
       } else if (warning.code === 'skipped_before_first_divider') {
         const count = warning.slideCount;
         if (!Number.isSafeInteger(count) || count < 1 || count > 100) continue;
         const label = count === 1 ? 'field slide was' : 'field slides were';
         messages.push(
-          `${count} ${label} skipped before the first section divider. Start an explicitly ` +
-          `sectioned deck with OFFENSE or DEFENSE if those slides should be included.`
+          `${count} ${label} skipped before the first section title slide. Put an OFFENSE or DEFENSE ` +
+          `title slide before those plays if you want to include them, then upload again.`
         );
       } else if (warning.code === 'skipped_no_field_rectangle') {
         const count = warning.slideCount;
         if (!Number.isSafeInteger(count) || count < 1 || count > 100) continue;
         const label = count === 1 ? 'slide was' : 'slides were';
         messages.push(
-          `${count} ${label} skipped inside a detected section because no field rectangle ` +
-          `was found. Covers and notes may be intentional; otherwise add a separate, top-level field shape.`
+          `${count} ${label} skipped because no field rectangle was found. If these are play slides, ` +
+          `add a rectangle behind each play, keep it separate from grouped shapes, and upload again. Covers and notes can be left out.`
         );
       } else {
         continue;

@@ -63,7 +63,7 @@ test('backup source names are optional display metadata', () => {
   const backupFlow = sourceBetween("$('exportBtn').addEventListener", "window.addEventListener('beforeunload'");
   assert.match(backupFlow, /schema:\s*2,[\s\S]*?playbookName:\s*current\.name/);
   assert.match(backupFlow, /const incoming = normalizeDoc\(data \|\| \{\}\)/);
-  assert.match(backupFlow, /The destination name will not change\./);
+  assert.match(backupFlow, /The playbook name will not change\./);
   assert.doesNotMatch(backupFlow, /method:\s*'PATCH'/);
   assert.match(editor, />&#8681; Export backup<\/button>/);
   assert.match(editor, />&#8679; Import backup<\/button>/);

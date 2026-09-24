@@ -177,7 +177,7 @@ test('home presents account creation as a clear, dedicated mode', () => {
   assert.match(index, /id="startRegisterBtn"[^>]*>Create a free account<\/button>/);
   assert.match(index, /function setAuthMode\(mode, focusHeading = false\)/);
   assert.match(index, /Create your free account/);
-  assert.match(index, /one-time recovery code/i);
+  assert.match(index, /recovery code after signup/i);
   assert.match(index, /authPassword\.autocomplete = registering \? 'new-password' : 'current-password'/);
   assert.match(index, /authPassword\.minLength = 8/);
   assert.match(index, /if \(authMode === 'register'\)[\s\S]*?authSubmit\('\/api\/auth\/register'\)/);
@@ -303,9 +303,40 @@ test('converter stays hidden until auth succeeds and returns signed-out users ho
 });
 
 test('help names the Arrow and Block controls shown by the editor', () => {
-  assert.match(help, /<strong>Arrow<\/strong> tool/);
-  assert.match(help, /<strong>Add a block<\/strong>/);
+  assert.match(help, /Choose <strong>Arrow<\/strong>/);
+  assert.match(help, /<strong>Block<\/strong>/);
   assert.match(help, /Arrow \/ Ball \/ Block \/ None/);
+});
+
+test('coach help explains the two workflows, printing, and safe sharing in plain language', () => {
+  for (const html of [help, pptxGuide, converter]) {
+    assert.match(html, /printable PDFs, not editable plays/);
+    assert.match(html, /laminate before cutting/i);
+  }
+  assert.match(help, /This shares a copy, not a live shared playbook/);
+  assert.match(help, /Cut around each whole insert, not each individual play/);
+  assert.match(help, /Fewer plays per page means larger drawings/);
+  assert.match(help, /reprint old cards if their numbers change/);
+  assert.match(help, /Email delivery is not yet reliable/);
+  for (const html of [help, pptxGuide]) {
+    assert.doesNotMatch(html, /deterministic|AI-mediated|top-level|rectangle-family|waypoint|polls automatically/i);
+    assert.match(html, /<details>[\s\S]*?<summary>/);
+    assert.doesNotMatch(html, /offense <strong>1&ndash;16|defense <strong>A&ndash;F/);
+  }
+});
+
+test('help navigation points to real pages and section anchors', () => {
+  const pages = new Map([
+    ['/', index], ['/help', help], ['/pptx-guide', pptxGuide], ['/editor', editor], ['/converter', converter],
+  ]);
+  for (const [path, html] of [['/help', help], ['/pptx-guide', pptxGuide]]) {
+    for (const [, href] of html.matchAll(/href="([^"]+)"/g)) {
+      const link = new URL(href, 'https://example.test' + path);
+      if (link.origin !== 'https://example.test') continue;
+      assert.ok(pages.has(link.pathname), href);
+      if (link.hash) assert.ok(pages.get(link.pathname).includes('id="' + link.hash.slice(1) + '"'), href);
+    }
+  }
 });
 
 test('wristband compatibility guidance is accurate and links safely', () => {
@@ -342,22 +373,22 @@ test('PPTX guidance matches the deterministic multi-page converter', () => {
   for (const html of [converter, help]) {
     assert.match(html, /href="\/pptx-guide"/);
   }
-  assert.match(converter, /no section separators[\s\S]*treated[\s\S]*offense/i);
-  assert.match(converter, /Defense separator but no[\s\S]*Offense separator[\s\S]*become offense/i);
-  assert.match(help, /no LLM/i);
+  assert.match(converter, /For offense only, no title slides are needed/i);
+  assert.match(converter, /DEFENSE title slide but no OFFENSE title slide/);
+  assert.match(help, /does not use AI to interpret or change your routes/i);
   assert.match(help, /64 offense/);
   assert.match(help, /24 defense/);
   assert.match(help, /16 plays per page/);
   assert.match(help, /independently of offense/);
-  assert.match(help, /paginate every 8/);
+  assert.match(help, /up to eight plays in each insert/);
 
   assert.match(pptxGuide, /Up to 64 offense \/ 24 defense plays/);
-  assert.match(pptxGuide, /No OFFENSE divider\?/);
-  assert.match(pptxGuide, /Valid play slides before the first DEFENSE divider are treated as <strong>offense<\/strong>/);
-  assert.match(pptxGuide, /successful conversion warns you when it uses this fallback/);
-  assert.match(pptxGuide, /start with OFFENSE if offense comes first/i);
+  assert.match(pptxGuide, /No OFFENSE title slide\?/);
+  assert.match(pptxGuide, /plays before the first DEFENSE title slide are treated as offense/);
+  assert.match(pptxGuide, /message after conversion tells you when this happens/);
+  assert.match(pptxGuide, /OFFENSE title slide, put it before the first offense play/i);
   assert.match(pptxGuide, /rounded and snipped-corner rectangle variants/i);
-  assert.match(pptxGuide, /No LLM/);
+  assert.match(pptxGuide, /does not use AI to interpret your routes/);
   assert.match(pptxGuide, /class="converter-cta" href="\/converter">Open PowerPoint \(PPTX\) Import/);
   assert.match(pptxGuide, /href="\/">&larr; GSS Playbook Editor home/);
   assert.doesNotMatch(pptxGuide, /<script\b/i);

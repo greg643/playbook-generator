@@ -504,6 +504,9 @@
 
     .technical-note p { color: #c9d1d9; }
     .technical-note p + p { margin-top: 0.45rem; color: var(--muted); font-size: 0.82rem; }
+    summary { cursor: pointer; color: var(--blue, #79c0ff); font-weight: 600; line-height: 1.5; }
+    details[open] > summary { margin-bottom: 1rem; }
+    a:focus-visible, summary:focus-visible { outline: 2px solid #79c0ff; outline-offset: 4px; }
 
     footer {
       margin-top: 2rem;
@@ -563,17 +566,21 @@
     </div>
     <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
     <h1>PowerPoint (PPTX) Import Guide</h1>
-    <p class="subtitle">5v5 and 6v6 decks both work, with no proprietary template. Keep each slide simple, give the converter one clear field to crop, and your own diagrams stay yours.</p>
-    <nav class="nav-links" aria-label="Primary navigation">
+    <p class="subtitle">Turn your PowerPoint plays into coach cards and wristband inserts. These examples show how to set up your slides.</p>
+    <nav class="nav-links" aria-label="Guide shortcuts">
       <a class="pill" href="/help">Help</a>
+      <a class="pill" href="#sequence-heading">Example slides</a>
+      <a class="pill" href="#behavior-heading">Print cards</a>
+      <a class="pill" href="#failures-heading">Fix a problem</a>
     </nav>
   </header>
 
   <main>
     <section class="card lede" aria-labelledby="ready-heading">
       <div>
-        <h2 id="ready-heading">A familiar PowerPoint workflow</h2>
-        <p>Draw 5v5 or 6v6 plays with ordinary PowerPoint text, lines, arrows, circles, and other shapes. The converter renders what is visible inside the field rectangle; it does not need to understand your player labels, terminology or scheme.</p>
+        <h2 id="ready-heading">Use the plays you already have</h2>
+        <p>Prepare your slides, sign in, then upload your file. Choose the cards and page layouts you want, select <strong>Create coach card</strong>, and download the PDFs.</p>
+        <p><strong>This makes printable PDFs, not editable plays.</strong> To change a play later, edit your original PowerPoint file and upload it again.</p>
       </div>
       <ul class="status-list" aria-label="Supported deck basics">
         <li><span class="check" aria-hidden="true">&#10003;</span><span><strong>.pptx files</strong> only</span></li>
@@ -585,32 +592,32 @@
 
     <section class="card" aria-labelledby="rules-heading">
       <h2 id="rules-heading">The four rules</h2>
-      <p class="section-intro">A deck that follows these basics gives the cropper the clearest possible signal.</p>
+      <p class="section-intro">Start with these four checks. Both 5v5 and 6v6 work.</p>
       <ol class="rules">
         <li><strong>Save as .pptx</strong><span>Export older PowerPoint, Keynote, or Google Slides decks to the modern PowerPoint format first.</span></li>
         <li><strong>One play per slide</strong><span>Do not place two fields or multiple play options on the same slide.</span></li>
-        <li><strong>Use one large rectangle</strong><span>Make an ungrouped PowerPoint rectangle-family shape the largest recognized rectangle on every play slide. Standard, rounded, and snipped-corner variants work.</span></li>
-        <li><strong>Choose one section pattern</strong><span>Use no dividers for offense-only, or start an explicitly sectioned deck with the appropriate OFFENSE or DEFENSE divider.</span></li>
+        <li><strong>Put a rectangle behind the play</strong><span>Use Insert &rarr; Shapes &rarr; Rectangle. Keep it separate from grouped shapes, and keep the name, players, and routes inside it.</span></li>
+        <li><strong>Label offense and defense</strong><span>For a mixed book, put a title slide saying OFFENSE before offense plays and DEFENSE before defense plays. An offense-only book needs no title slides.</span></li>
       </ol>
     </section>
 
     <section class="card" aria-labelledby="sequence-heading">
-      <h2 id="sequence-heading">An ideal deck, slide by slide</h2>
-      <p class="section-intro">These illustrations are synthetic examples&mdash;not a real team&rsquo;s playbook. Your colors, formations, labels, and route language can be completely different.</p>
+      <h2 id="sequence-heading">Example: offense followed by defense</h2>
+      <p class="section-intro">These are made-up examples, not a team&rsquo;s playbook. Use your own colors, names, and formations. Add as many play slides as you need between the title slides.</p>
 
       <div class="deck-strip">
         <figure>
           <div class="slide-shell">
             <svg viewBox="0 0 320 180" role="img" aria-labelledby="off-title off-desc">
-              <title id="off-title">Offense separator slide for a mixed deck</title>
-              <desc id="off-desc">A dark blue title slide containing only the word offense and a small subtitle, required before offense plays when the deck also uses section separators.</desc>
+              <title id="off-title">Offense title slide for a mixed playbook</title>
+              <desc id="off-desc">A dark blue title slide containing the word offense and a small subtitle, placed before the offense plays.</desc>
               <rect width="320" height="180" fill="#10253f"/>
               <path d="M0 150 L320 80 L320 180 L0 180 Z" fill="#173d65"/>
               <text x="160" y="84" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="26" font-weight="700">OFFENSE</text>
               <text x="160" y="108" text-anchor="middle" fill="#9ccaff" font-family="Arial, sans-serif" font-size="10" letter-spacing="2">PLAY SECTION</text>
             </svg>
           </div>
-          <figcaption><strong>1. OFFENSE separator</strong>A nearly empty title slide. <span class="required-tag">Required in this mixed deck</span></figcaption>
+          <figcaption><strong>1. OFFENSE title slide</strong>A nearly empty slide with the word OFFENSE. <span class="required-tag">Recommended for a mixed book</span></figcaption>
         </figure>
 
         <figure>
@@ -641,7 +648,7 @@
         <figure>
           <div class="slide-shell">
             <svg viewBox="0 0 320 180" role="img" aria-labelledby="def-title def-desc">
-              <title id="def-title">Required defense separator slide</title>
+              <title id="def-title">Required defense title slide</title>
               <desc id="def-desc">A charcoal title slide containing only the word defense and a small subtitle.</desc>
               <rect width="320" height="180" fill="#202b39"/>
               <path d="M0 38 L320 112 V180 H0 Z" fill="#29384a"/>
@@ -649,7 +656,7 @@
               <text x="160" y="108" text-anchor="middle" fill="#b6c8da" font-family="Arial, sans-serif" font-size="10" letter-spacing="2">PLAY SECTION</text>
             </svg>
           </div>
-          <figcaption><strong>3. DEFENSE separator</strong>Everything after this starts the defense section. <span class="required-tag">Needed for defense</span></figcaption>
+          <figcaption><strong>3. DEFENSE title slide</strong>Put this before the first defensive play. <span class="required-tag">Needed for defense</span></figcaption>
         </figure>
 
         <figure>
@@ -669,16 +676,16 @@
               </g>
             </svg>
           </div>
-          <figcaption><strong>4. One defense play</strong>The same slide rules apply after the DEFENSE separator.</figcaption>
+          <figcaption><strong>4. One defense play</strong>Use the same field rectangle and clear labels.</figcaption>
         </figure>
       </div>
 
-      <p class="callout"><strong>No OFFENSE divider?</strong> Valid play slides before the first DEFENSE divider are treated as <strong>offense</strong>, and a successful conversion warns you when it uses this fallback. A fully headerless deck remains offense-only. For an explicitly sectioned deck, start with the appropriate OFFENSE or DEFENSE divider. Titles such as <strong>5v5 OFFENSE</strong> and <strong>6v6 DEFENSE</strong> work too.</p>
+      <p class="callout"><strong>Defense only?</strong> Start with a DEFENSE title slide, then add your defensive plays. With no section title slides, all recognized plays are treated as offense.</p>
     </section>
 
     <section class="card" aria-labelledby="anatomy-heading">
-      <h2 id="anatomy-heading">Anatomy of a reliable play slide</h2>
-      <p class="section-intro">The rectangle defines the crop. Everything important should sit inside it, including the play name.</p>
+      <h2 id="anatomy-heading">What to put on each play slide</h2>
+      <p class="section-intro">The website cuts out the area inside the field rectangle. Anything outside it may be left off the card.</p>
 
       <div class="anatomy-grid">
         <div class="slide-shell">
@@ -711,52 +718,26 @@
 
         <ol class="anatomy-notes">
           <li><strong>Play name and number</strong><span>Put a short, readable label near the top, inside the rectangle.</span></li>
-          <li><strong>One explicit field rectangle</strong><span>Use Insert &rarr; Shapes &rarr; Rectangle and leave it ungrouped. Its object name and PowerPoint language do not matter.</span></li>
-          <li><strong>Ordinary visible shapes</strong><span>Lines, arrows, freeforms, player circles, and text all render as part of the slide image, whether the play is 5v5 or 6v6.</span></li>
-          <li><strong>Safe inner margin</strong><span>Keep labels and route tips away from the rectangle edge so cropping and printing do not crowd them.</span></li>
+          <li><strong>A separate field rectangle</strong><span>Draw it with Insert &rarr; Shapes &rarr; Rectangle. Send it behind the players and routes, but do not group it with them.</span></li>
+          <li><strong>Clear players and routes</strong><span>Use ordinary text, circles, lines, and arrows. Your player labels and route drawings stay as you made them.</span></li>
+          <li><strong>Room around the edges</strong><span>Keep labels and arrow tips a little way inside the rectangle so they are not cut off.</span></li>
         </ol>
       </div>
     </section>
 
     <section class="card" aria-labelledby="behavior-heading">
-      <h2 id="behavior-heading">Sections and longer offense playbooks</h2>
-      <p class="section-intro">Separator slides control the current section; they are not included as plays.</p>
-
-      <div class="behavior-grid">
-        <article class="behavior">
-          <span class="label">Offense-only deck</span>
-          <h3>Title cards are optional</h3>
-          <p>With no section separators, every slide that has a recognized field rectangle becomes an offense play.</p>
-        </article>
-        <article class="behavior">
-          <span class="label">Deck with defense</span>
-          <h3>Mark every section</h3>
-          <p>For the clearest result, start with OFFENSE if offense comes first, then place DEFENSE before the first defensive play. Without any OFFENSE divider, valid plays before the first DEFENSE divider become offense and the successful conversion shows a warning.</p>
-        </article>
-        <article class="behavior">
-          <span class="label">Longer playbooks</span>
-          <h3>Additional pages are automatic</h3>
-          <p>Uploads accept up to 64 offense and 24 defense plays. Choose 1, 2, 4, 6, 9, or 16 plays per coach card page, independently for offense and defense. Partial pages leave unused spaces blank; additional plays continue onto the next page. Wristband sheets continue every 8 and keep the same physical size.</p>
-        </article>
-        <article class="behavior">
-          <span class="label">Play slides</span>
-          <h3>Section words are safe inside a play</h3>
-          <p>A slide with a field rectangle remains a play even when its title happens to include &ldquo;offense&rdquo; or &ldquo;defense.&rdquo;</p>
-        </article>
-      </div>
-
-      <div class="pages" aria-label="Offense coach-card pagination">
-        <div class="page-block"><strong>Coach page 1</strong><span>plays 1&ndash;16</span></div>
-        <div class="page-block"><strong>Coach page 2</strong><span>plays 17&ndash;32</span></div>
-        <div class="page-block"><strong>Coach page 3</strong><span>plays 33&ndash;48</span></div>
-        <div class="page-block"><strong>Coach page 4</strong><span>plays 49&ndash;64</span></div>
-      </div>
-      <p class="callout">Offense wristband sheets use the same play order with <strong>eight plays per output page</strong>.</p>
+      <h2 id="behavior-heading">Choose your cards and print</h2>
+      <p>Choose <strong>1, 2, 4, 6, 9, or 16 plays per page</strong> for coach cards, separately for offense and defense. Six uses 2 columns &times; 3 rows; nine uses 3 &times; 3. Fewer plays per page gives you larger drawings.</p>
+      <p>Extra plays go onto another page. Empty spaces stay blank, so 15 plays fit on one 4 &times; 4 page. The limit is 64 offense and 24 defense plays per upload.</p>
+      <p>Wristband sheets are optional. Each sheet repeats the same insert six times, with up to eight plays per insert. More plays continue on the next sheet. Coach-card layouts do not change insert sizes.</p>
+      <p class="callout"><strong>Check the downloaded PDFs before printing.</strong> Use US Letter paper at 100% or &ldquo;Actual size,&rdquo; not &ldquo;Fit to page.&rdquo; For wristbands, laminate before cutting along the dashed guides. See the <a href="/help#printing">printing and wristband instructions</a>.</p>
     </section>
 
     <section class="card" aria-labelledby="failures-heading">
-      <h2 id="failures-heading">What works&mdash;and what can fail</h2>
-      <p class="section-intro">Renaming a rectangle is safe, and rounded and snipped-corner rectangle variants are supported. Most conversion issues come from how the field object is built, not from the routes themselves.</p>
+      <h2 id="failures-heading">If a slide is missing or looks wrong</h2>
+      <p class="section-intro">Check any warning shown after conversion, then open the PDFs. If a play is missing or cut off, check its field rectangle first.</p>
+      <details>
+      <summary>Show common problems and how to fix them</summary>
 
       <div class="failure-grid">
         <article class="failure">
@@ -771,7 +752,7 @@
               <path d="M128 8 L151 31 M151 8 L128 31" stroke="#cf222e" stroke-width="6"/>
             </svg>
           </div>
-          <div><h3>Grouped field</h3><p>The field can disappear inside a group. <strong class="fix">Fix:</strong> ungroup it and leave the field rectangle as a top-level shape.</p></div>
+          <div><h3>The field is grouped with other shapes</h3><p><strong class="fix">Fix:</strong> select the group in PowerPoint and choose Ungroup. Leave the field rectangle separate from the players and routes.</p></div>
         </article>
 
         <article class="failure success">
@@ -789,7 +770,7 @@
               <path d="M124 69 L128 73 L136 64" fill="none" stroke="#fff" stroke-width="3"/>
             </svg>
           </div>
-          <div><h3>Rectangle family: supported</h3><p>The converter recognizes standard, rounded, and snipped-corner rectangle geometry, even when the object is renamed or PowerPoint uses another language. Keep it ungrouped and top-level.</p></div>
+          <div><h3>Rounded corners are fine</h3><p>Standard, rounded and snipped-corner rectangle variants work. You do not need to rename the shape or change PowerPoint&rsquo;s language. Keep the field separate from grouped shapes.</p></div>
         </article>
 
         <article class="failure">
@@ -805,7 +786,7 @@
               <text x="140" y="22" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="15" font-weight="700">!</text>
             </svg>
           </div>
-          <div><h3>Missing field shape</h3><p>A background color or background image is not a rectangle object. <strong class="fix">Fix:</strong> insert a real rectangle behind the play.</p></div>
+          <div><h3>There is no field rectangle</h3><p>A slide background or picture alone is not enough. <strong class="fix">Fix:</strong> use Insert &rarr; Shapes &rarr; Rectangle to add a rectangle behind the play.</p></div>
         </article>
 
         <article class="failure">
@@ -820,7 +801,7 @@
               <text x="80" y="15" text-anchor="middle" fill="#cf222e" font-family="Arial, sans-serif" font-size="6" font-weight="700">LARGEST RECTANGLE</text>
             </svg>
           </div>
-          <div><h3>Larger decorative rectangle</h3><p>The cropper uses the largest recognized rectangle. <strong class="fix">Fix:</strong> remove large rectangle borders or make the field clearly largest.</p></div>
+          <div><h3>Too much of the slide is printed</h3><p>The largest rectangle is used as the field. <strong class="fix">Fix:</strong> remove any larger decorative rectangle around your play.</p></div>
         </article>
 
         <article class="failure">
@@ -837,7 +818,7 @@
               <path d="M15 72 H139" stroke="#cf222e" stroke-width="4"/>
             </svg>
           </div>
-          <div><h3>Unsupported file format</h3><p>The uploader accepts modern PowerPoint files only. Export first; do not upload a link, PDF, Keynote file, or legacy PowerPoint file.</p><div class="file-types" aria-label="Unsupported extensions"><span class="file-badge">.ppt</span><span class="file-badge">.key</span><span class="file-badge">.pdf</span></div></div>
+          <div><h3>The file will not upload</h3><p>Save or export as <strong>.pptx</strong>, then upload that file. A shared link, PDF, .key, or older .ppt file will not work. The upload limit is 50 MB.</p><div class="file-types" aria-label="Unsupported extensions"><span class="file-badge">.ppt</span><span class="file-badge">.key</span><span class="file-badge">.pdf</span></div></div>
         </article>
 
         <article class="failure">
@@ -854,19 +835,23 @@
               <text x="130" y="72" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="16" font-weight="700">!</text>
             </svg>
           </div>
-          <div><h3>Special Office effects</h3><p>SmartArt, embedded media, unusual fonts, and some ink effects can render differently outside PowerPoint. <strong class="fix">Fix:</strong> use ordinary shapes and common fonts when possible.</p></div>
+          <div><h3>Text or drawings look different</h3><p>Some special fonts, pen effects, and Office diagrams may look different in the PDF. <strong class="fix">Fix:</strong> try common fonts and simple shapes, then upload again.</p></div>
         </article>
       </div>
 
-      <p class="callout warn"><strong>Quick check:</strong> In PowerPoint, open the Selection Pane and confirm the field is a separate, top-level rectangle-family object rather than part of a group, table, or background image. If several recognized rectangles exist, make the field clearly the largest. A completed conversion warns when likely play slides are skipped.</p>
+      </details>
+      <details><summary>Missing title slides or other skipped slides</summary>
+        <p><strong>No OFFENSE title slide?</strong> If the file has no OFFENSE title slide anywhere, plays before the first DEFENSE title slide are treated as offense. A message after conversion tells you when this happens.</p>
+        <p>If you do use an OFFENSE title slide, put it before the first offense play; earlier plays can be skipped. Start a defense-only file with DEFENSE. Title slides are not printed as plays.</p>
+        <p>Slides containing <strong>PRINT IMAGES</strong>, <strong>APPENDIX</strong>, or <strong>TEMPLATE</strong> are skipped. Avoid those words on play slides you want to print.</p>
+      </details>
     </section>
 
     <section class="card technical-note" aria-labelledby="converter-heading">
-      <span class="badge">No LLM</span>
+      <span class="badge">As drawn</span>
       <div>
-        <h2 id="converter-heading">What the converter actually does</h2>
-        <p>The conversion is deterministic, not AI-mediated. It reads the slide&rsquo;s object structure to locate the large field rectangle-family shape, renders the visible slide, and crops that rendering to the shape&rsquo;s bounds.</p>
-        <p>It does not count, move or relabel player markers, so 5v5 and 6v6 use the same converter with no format setting. An ordinary route arrow does not need a special meaning: it only needs to render visibly inside a field the converter can find. That is why the field rectangle&rsquo;s object structure matters more than the football notation.</p>
+        <h2 id="converter-heading">Your plays stay as drawn</h2>
+        <p>The website makes a picture of each play inside its field rectangle. It does not use AI to interpret your routes, count players, or change their labels. You do not need to choose 5v5 or 6v6 when uploading.</p>
       </div>
     </section>
 
@@ -875,13 +860,10 @@
       <ul class="checklist">
         <li>The file extension is <strong>.pptx</strong>.</li>
         <li>Each play has its own slide.</li>
-        <li>The drawing shows the five or six players you want printed; the converter preserves them as drawn.</li>
-        <li>Each play slide has one large, ungrouped rectangle-family shape.</li>
-        <li>The field is a real standard, rounded, or snipped-corner rectangle shape, not a background image or table.</li>
-        <li>The play name and number sit inside the field near the top.</li>
-        <li>A mixed deck starts with the appropriate <strong>OFFENSE</strong> or <strong>DEFENSE</strong> separator.</li>
-        <li>No decorative rectangle is larger than the field.</li>
-        <li>Important routes and labels stay clear of the crop edge.</li>
+        <li>The field rectangle is separate from grouped shapes and is the largest rectangle on the slide.</li>
+        <li>The name, number, players, and routes are inside the field.</li>
+        <li>Title slides mark offense and defense if both are included.</li>
+        <li>Arrow tips and labels have room around the edges.</li>
       </ul>
       <p class="callout">Ready to try it? Start with a small copy of your deck if you want to verify the format before converting the whole playbook.</p>
       <p class="bottom-action"><a class="converter-cta" href="/converter">Open PowerPoint (PPTX) Import &rarr;</a></p>

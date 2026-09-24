@@ -668,12 +668,12 @@
       <div class="splash-pitch">
         <h2 class="splash-title">Draw your plays.<br>Print your game day.</h2>
         <p class="splash-sub">GSS Playbook Editor by Greenwich Sports Systems is built for 5v5 and 6v6 flag football &mdash; design plays in the
-          browser and generate coach cards and cut-out wristband inserts in one click.</p>
+          browser, then print coach cards and cut-out wristband inserts.</p>
         <ul class="splash-points">
-          <li>&#9989; Fixed player chips &mdash; drag the formation, draw the routes</li>
+          <li>&#9989; Drag the player symbols into position, then draw routes</li>
           <li>&#127912; Smooth or sharp-cut routes, arrows, footballs, labels</li>
-          <li>&#128203; Bench &amp; archive plays; sticky numbers the kids memorize stay put</li>
-          <li>&#128424;&#65039; 4 print-ready PDFs sized for QB wrist-coach inserts</li>
+          <li>&#128203; Keep plays saved and choose which ones to print</li>
+          <li>&#128424;&#65039; Full-page coach cards and smaller wristband inserts</li>
         </ul>
         <div class="splash-sample" id="splashSample" aria-hidden="true"></div>
         <p class="splash-help"><a href="/help">Read the quick-start guide &rarr;</a></p>
@@ -840,10 +840,10 @@
           <option value="9">9 — 3 × 3</option><option value="16">16 — 4 × 4</option>
         </select>
       </div>
-      <p id="coachLayoutHelp" style="font-size:.8rem;color:#aeb8c4;line-height:1.5">Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
+      <p id="coachLayoutHelp" style="font-size:.85rem;color:#aeb8c4;line-height:1.5">Fewer plays per page means larger drawings. Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
       <button class="btn btn-secondary" id="previewCoachBtn" type="button" style="margin-bottom:.5rem" disabled>Preview coach card</button>
       <button class="btn btn-primary" id="generateBtn">Create coach card</button>
-      <p style="font-size:.8rem;color:#aeb8c4;line-height:1.5">Download the PDF when it is ready, then print at 100% scale. Wristband inserts are optional.</p>
+      <p style="font-size:.85rem;color:#aeb8c4;line-height:1.5">Download the PDF when it is ready. Print on US Letter paper at 100% or Actual size. For wristbands, laminate before cutting. <a href="/help#printing">Printing help</a></p>
 
       <div class="progress-section" id="progressSection" role="status" aria-live="polite">
         <div class="progress-bar-container">
@@ -1978,10 +1978,10 @@ const TOOL_DEFS = [
   ['block', 'Block'], ['text', 'Text'], ['ball', 'Ball'], ['erase', 'Erase'],
 ];
 const HINTS = {
-  select: 'Drag chips, text and balls. Click a route or line to select it — drag its handles to reshape, double-click a segment to add a bend, double-click a handle to remove it, restyle with the controls, or press Delete.',
-  route: 'Click near a player to start the arrow, then click waypoints. Double-click or press Enter to finish.',
+  select: 'Drag players, text, or footballs to move them. Click a route to show its round handles, then drag a handle to change its shape. See Help for more editing tips.',
+  route: 'Click near a player to start, then click each turn in the route. Double-click or press Enter to finish; Esc cancels.',
   block: 'Click where the block happens — a T is drawn from the nearest player. One click per block.',
-  line: 'Click waypoints for a zone line. Double-click or press Enter to finish.',
+  line: 'Click a start point, then click each turn in the line. Double-click or press Enter to finish; Esc cancels.',
   text: 'Click the field to place a text label. Double-click a label with Select to edit it.',
   ball: 'Click the field to place a football.',
   erase: 'Click a route, line, label or ball to remove it.',
@@ -2931,7 +2931,7 @@ $('importFile').addEventListener('change', async () => {
   try {
     data = JSON.parse(await file.text());
   } catch {
-    await showModal({ title: 'Import failed', message: 'That file is not a valid playbook backup (could not parse JSON).', confirmLabel: 'OK' });
+    await showModal({ title: 'Import failed', message: 'Choose a .json file made with Export backup. For a PowerPoint file, use PowerPoint (PPTX) Import on the home page.', confirmLabel: 'OK' });
     return;
   }
   if (!isCurrentDocumentContext(importContext)) {
@@ -2954,8 +2954,8 @@ $('importFile').addEventListener('change', async () => {
       ? 'Import backup from “' + sourceName + '”'
       : 'Import ' + nOff + ' offense + ' + nDef + ' defense plays',
     message: 'This backup contains ' + nOff + ' offense and ' + nDef + ' defense plays. ' +
-      'Replace “' + destination.name + '”, or add the plays to its bench (they arrive toggled out, with fresh numbers)? ' +
-      'The destination name will not change.',
+      'Replace the plays in “' + destination.name + '”, or add them to its bench? Benched plays are saved but not printed until you check their boxes. ' +
+      'Added plays get new numbers. The playbook name will not change.',
     choices: [
       { key: 'replace', label: 'Replace playbook', danger: true },
       { key: 'bench', label: 'Add to bench', primary: true },

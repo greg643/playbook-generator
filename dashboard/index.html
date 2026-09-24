@@ -479,11 +479,11 @@
             <p class="card-sub" id="authSubtitle">Save your plays and create a coach card.</p>
             <div id="appleSignin" hidden>
               <a class="btn btn-secondary" id="appleSigninLink" href="/api/auth/apple/start?returnTo=%2Feditor" style="display:flex;align-items:center;justify-content:center;min-height:48px;padding:0;background:#fff;border-color:#fff;text-decoration:none"><img src="/apple-continue.png" alt="Continue with Apple" width="330" height="48" style="display:block;max-width:100%;height:auto"></a>
-              <p class="card-sub" style="margin-top:1rem">Use the same Apple account as the GSS app. No separate password to remember.</p>
+              <p class="card-sub" style="margin-top:1rem">Use your Apple Account, with no separate password to remember. If you use the GSS app, choose the same Apple Account.</p>
               <p id="appleStatus" role="status"></p>
             </div>
             <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. We&rsquo;ll return you automatically to <strong>PowerPoint (PPTX) Import</strong>.</p>
-            <p class="signin-notice" id="registerRecoveryNotice" hidden>After creating your account, we&rsquo;ll show you a one-time recovery code. Save it as an offline backup in case you lose access to your email.</p>
+            <p class="signin-notice" id="registerRecoveryNotice" hidden>We&rsquo;ll show you a recovery code after signup. Save it somewhere safe: it lets you reset your password if a reset email does not arrive.</p>
             <details id="legacyLogin" open>
             <summary id="legacySummary" hidden style="cursor:pointer;margin:1rem 0">Or use email and password</summary>
             <form id="signinForm" aria-labelledby="authTitle" novalidate>
@@ -510,7 +510,7 @@
 
           <div id="resetRequestWrap" hidden>
             <h2 id="resetRequestTitle" tabindex="-1">Reset your password</h2>
-            <p class="card-sub">We&rsquo;ll email a single-use link that expires after 15 minutes.</p>
+            <p class="card-sub">Request a password-reset link by email. It works once and expires after 15 minutes. If it does not arrive, check junk mail or use your saved recovery code below.</p>
             <form id="resetRequestForm" aria-labelledby="resetRequestTitle" novalidate>
               <label class="field">Email
                 <input type="email" id="resetEmail" autocomplete="email" maxlength="320" required>
@@ -569,7 +569,7 @@
 
       <div class="hub-help">
         <p>Need help?</p>
-        <p>The <a href="/help">quick-start guide</a> explains editing, printing, accounts, and deck compatibility.</p>
+        <p>The <a href="/help">quick-start guide</a> shows how to draw plays, use PowerPoint, print cards, and share a playbook.</p>
         <p><a href="/pptx-guide">Read the PowerPoint (PPTX) Import Guide</a></p>
       </div>
     </section>
