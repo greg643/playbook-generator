@@ -1047,6 +1047,31 @@ $('signOutBtn').addEventListener('click', async () => {
       if (appleResult) $('appleStatus').textContent = appleResult === 'cancelled'
         ? 'Apple sign-in was cancelled. You can try again.'
         : 'Apple sign-in could not finish. Please try again, or use your existing account below.';
+      const appleStep = new URLSearchParams(location.search).get('apple_step');
+      const appleDiagnostics = {
+        transaction_missing: 'The browser did not return the sign-in cookie. Start again from this page in the same browser.',
+        transaction_invalid: 'The sign-in attempt expired or could not be verified. Start a fresh attempt from this page.',
+        state_mismatch: 'The sign-in attempts did not match. Use one tab and start again from this page.',
+        transaction_used: 'This sign-in attempt was already used. Start again from this page.',
+        signing_key: 'The website could not read its Apple signing key. This needs a site configuration fix.',
+        apple_client: 'Apple rejected the website credentials. This needs a site configuration fix.',
+        apple_code: 'Apple rejected the returned sign-in code. Start a fresh attempt from this page.',
+        apple_exchange: 'The website could not reach Apple to finish sign-in.',
+        apple_response: 'Apple did not return the expected sign-in response.',
+        apple_rate_limit: 'Apple is limiting sign-in attempts. Wait a few minutes before trying again.',
+        gss_exchange: 'The website could not reach the GSS account service.',
+        gss_rejected: 'The GSS account service rejected the Apple identity. This needs investigation by GSS.',
+        gss_response: 'The GSS account service did not return the expected response.',
+        gss_rate_limit: 'The GSS account service is limiting sign-in attempts. Wait a few minutes before trying again.',
+        callback_request: 'The returned sign-in request could not be read.',
+        code_missing: 'Apple did not return a usable sign-in code.',
+        replay_storage: 'The website could not verify this one-time sign-in attempt.',
+        account_lookup: 'The website could not load the connected playbook account.',
+        session_create: 'The website could not finish creating the sign-in session.',
+      };
+      if (appleResult === 'failed' && Object.prototype.hasOwnProperty.call(appleDiagnostics, appleStep)) {
+        $('appleStatus').textContent = appleDiagnostics[appleStep] + ' Reference: ' + appleStep + '. Your saved playbooks have not been moved.';
+      }
     }
   } catch { /* Existing accounts can still sign in during configuration outages. */ }
   if (postAuthDestination === '/converter') {

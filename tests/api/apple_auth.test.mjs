@@ -237,7 +237,7 @@ test('callback exchanges the code server-side and delegates token and nonce veri
   assert.equal(env.PLAYBOOK_BUCKET.records.size,0);
   assert.equal(calls.length,2);
   const replay=await callbackApple({env,request:makeRequest()});
-  assert.equal(replay.headers.get('location'),'/?apple=failed');
+  assert.equal(replay.headers.get('location'),'/?apple=failed&apple_step=transaction_used');
   assert.equal(calls.length,2);
 });
 
@@ -245,7 +245,63 @@ test('invalid callback state never reaches an identity provider', async t => {
   const env=environment(); let calls=0;
   t.mock.method(globalThis,'fetch',async()=>{calls++; throw new Error('unexpected');});
   const response=await callbackApple({env,request:new Request(ORIGIN+'/api/auth/apple/callback',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'state=wrong&code=wrong'})});
-  assert.equal(response.headers.get('location'),'/?apple=failed'); assert.equal(calls,0);
+  assert.equal(response.headers.get('location'),'/?apple=failed&apple_step=transaction_missing'); assert.equal(calls,0);
+});
+
+test('callback diagnostics identify failed stages without disclosing provider bodies or credentials', async t => {
+  const logs=[];
+  t.mock.method(console,'error',value=>logs.push(value));
+  let scenario;
+  const secretMarker='DO-NOT-LOG-provider-token-or-key';
+  t.mock.method(globalThis,'fetch',async url=>{
+    const isApple=url==='https://appleid.apple.com/auth/token';
+    if(scenario==='network') throw new Error(secretMarker);
+    if(scenario==='client') return Response.json({error:'invalid_client',error_description:secretMarker},{status:400});
+    if(scenario==='code') return Response.json({error:'invalid_grant',error_description:secretMarker},{status:400});
+    if(scenario==='unknown') return Response.json({error:secretMarker},{status:500});
+    if(scenario==='oversized') return new Response(secretMarker.repeat(3000));
+    if(scenario==='bad_json') return new Response(secretMarker,{status:502});
+    if(scenario==='null') return Response.json(null);
+    if(isApple) return Response.json({id_token:secretMarker});
+    return Response.json({error:{code:secretMarker}},{status:scenario==='rate' ? 429 : 401});
+  });
+  for(const [kind,expected] of [
+    ['key','signing_key'],['network','apple_exchange'],['client','apple_client'],['code','apple_code'],
+    ['unknown','apple_response'],['oversized','apple_response'],['bad_json','apple_response'],
+    ['null','apple_response'],['gss','gss_rejected'],['rate','gss_rate_limit'],
+  ]) {
+    scenario=kind;
+    const env=environment();
+    if(kind==='key') env.APPLE_PRIVATE_KEY=secretMarker;
+    const state=generatePasswordResetToken();
+    const txn=await sealApple(env,{kind:'transaction',origin:ORIGIN,iat:Math.floor(Date.now()/1000),state,rawNonce:generatePasswordResetToken(),returnTo:'/editor'});
+    const response=await callbackApple({env,request:new Request(ORIGIN+'/api/auth/apple/callback',{
+      method:'POST',headers:{cookie:'__Host-pb_apple_txn='+txn,'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({state,code:secretMarker}),
+    })});
+    assert.equal(response.headers.get('location'),'/?apple=failed&apple_step='+expected,kind);
+    assert.deepEqual(JSON.parse(logs.at(-1)),{event:'apple_callback_failed',code:expected});
+    assert.equal(JSON.stringify([...response.headers]).includes(secretMarker),false);
+    assert.equal(env.PLAYBOOK_BUCKET.records.size,0);
+  }
+  assert.equal(logs.join('').includes(secretMarker),false);
+});
+
+test('expired and mismatched callback transactions return safe actionable diagnostics', async t => {
+  t.mock.method(console,'error',()=>{});
+  let providerCalls=0;
+  t.mock.method(globalThis,'fetch',async()=>{providerCalls++;throw new Error('must not call');});
+  for(const [kind,expected] of [['expired','transaction_invalid'],['mismatch','state_mismatch']]) {
+    const env=environment(), state=generatePasswordResetToken();
+    const txn=await sealApple(env,{kind:'transaction',origin:ORIGIN,iat:Math.floor(Date.now()/1000)-(kind==='expired'?601:0),state,rawNonce:generatePasswordResetToken(),returnTo:'/editor'});
+    const response=await callbackApple({env,request:new Request(ORIGIN+'/api/auth/apple/callback',{
+      method:'POST',headers:{cookie:'__Host-pb_apple_txn='+txn,'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({state:kind==='mismatch'?'wrong':state,code:'code'}),
+    })});
+    assert.equal(response.headers.get('location'),'/?apple=failed&apple_step='+expected);
+    assert.equal(env.AUTH_STATE_BUCKET.records.size,0);
+  }
+  assert.equal(providerCalls,0);
 });
 
 test('invalid setup JSON and oversized bodies are rejected before consuming Apple proof', async () => {

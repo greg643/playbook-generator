@@ -74,6 +74,14 @@ function redirect(location, cookies = []) {
 function failure(reason = "failed") {
   return redirect("/?apple=" + reason, [cookie(TXN_COOKIE, "", 0), cookie(PENDING_COOKIE, "", 0)]);
 }
+class AppleExchangeError extends Error {
+  constructor(code) { super("Identity exchange failed"); this.code = code; }
+}
+function callbackFailure(code) {
+  // Codes are fixed literals from this module, never provider text or credentials.
+  console.error(JSON.stringify({ event: "apple_callback_failed", code }));
+  return failure("failed&apple_step=" + code);
+}
 function sameOrigin(request) {
   return request.headers.get("origin") === new URL(request.url).origin &&
     request.headers.get("content-type")?.split(";")[0].trim() === "application/json";
@@ -89,11 +97,22 @@ async function clientSecret(env) {
   return input + "." + encode(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, bytes(input)));
 }
 
-async function fetchJson(url, options) {
+async function fetchJson(url, options, provider) {
   const response = await fetch(url, { ...options, redirect: "error", signal: AbortSignal.timeout(15000) });
   const text = await readBoundedUtf8Text(response, 32768);
-  if (!response.ok || text === null) throw new Error("Identity provider unavailable");
-  return JSON.parse(text);
+  if (text === null) throw new AppleExchangeError(provider + "_response");
+  let body;
+  try { body = JSON.parse(text); } catch { throw new AppleExchangeError(provider + "_response"); }
+  if (!response.ok) {
+    if (provider === "apple" && ["invalid_client", "unauthorized_client"].includes(body?.error)) {
+      throw new AppleExchangeError("apple_client");
+    }
+    if (provider === "apple" && body?.error === "invalid_grant") throw new AppleExchangeError("apple_code");
+    if (provider === "gss" && response.status === 401) throw new AppleExchangeError("gss_rejected");
+    if (response.status === 429) throw new AppleExchangeError(provider + "_rate_limit");
+    throw new AppleExchangeError(provider + "_response");
+  }
+  return body;
 }
 
 async function consume(env, purpose, nonce) {
@@ -142,24 +161,31 @@ export async function startApple({ request, env }) {
 }
 
 export async function callbackApple({ request, env }) {
+  let stage = "callback_request";
   try {
     if (!appleConfigured(env, request)) return failure("unavailable");
-    if (request.headers.get("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded") return failure();
+    if (request.headers.get("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded") return callbackFailure(stage);
     const text = await readBoundedUtf8Text(request, 16384);
-    if (text === null) return failure();
+    if (text === null) return callbackFailure(stage);
     const form = new URLSearchParams(text);
+    if (!cookieValue(request, TXN_COOKIE)) return callbackFailure("transaction_missing");
     const txn = await readSealed(request, env, TXN_COOKIE, "transaction");
-    if (!txn || form.get("state") !== txn.state || !destinations.has(txn.returnTo)) return failure();
-    if (!await consume(env, "transaction", txn.state)) return failure();
+    if (!txn) return callbackFailure("transaction_invalid");
+    if (form.get("state") !== txn.state || !destinations.has(txn.returnTo)) return callbackFailure("state_mismatch");
+    stage = "replay_storage";
+    if (!await consume(env, "transaction", txn.state)) return callbackFailure("transaction_used");
     if (form.has("error")) return failure("cancelled");
     const code = form.get("code");
-    if (!code || code.length > 4096) return failure();
+    if (!code || code.length > 4096) return callbackFailure("code_missing");
+    stage = "signing_key";
+    const secret = await clientSecret(env);
+    stage = "apple_exchange";
     const apple = await fetchJson("https://appleid.apple.com/auth/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: env.APPLE_SERVICES_ID, client_secret: await clientSecret(env),
+      body: new URLSearchParams({ client_id: env.APPLE_SERVICES_ID, client_secret: secret,
         code, grant_type: "authorization_code", redirect_uri: env.PUBLIC_ORIGIN + "/api/auth/apple/callback" }),
-    });
-    if (typeof apple.id_token !== "string" || apple.id_token.length > 16384) return failure();
+    }, "apple");
+    if (typeof apple?.id_token !== "string" || apple.id_token.length > 16384) return callbackFailure("apple_response");
     let displayName;
     try {
       const name = JSON.parse(form.get("user") || "{}").name;
@@ -167,23 +193,25 @@ export async function callbackApple({ request, env }) {
     } catch { /* Apple sends the name only on first consent. */ }
     // GSS validates Apple's signature, issuer, audience, expiry and hashed nonce.
     // Never derive identity from an unverified client JWT or email address.
+    stage = "gss_exchange";
     const verified = await fetchJson(env.GSS_API_BASE.replace(/\/$/, "") + "/v2/auth/apple", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identity_token: apple.id_token, raw_nonce: txn.rawNonce, display_name: displayName }),
-    });
-    if (!KEY_RE.test(verified.account_key || "") || !verified.session_token) return failure();
+    }, "gss");
+    if (!KEY_RE.test(verified?.account_key || "") || !verified.session_token) return callbackFailure("gss_response");
     displayName = typeof verified.display_name === "string" && verified.display_name.trim()
       ? verified.display_name.trim().slice(0, 80) : (displayName || "Coach");
+    stage = "account_lookup";
     const existing = await findAppleAccount(env, verified.account_key);
+    stage = "session_create";
     if (existing) return redirect(existing.record.disabledAt ? "/apple-delete" : txn.returnTo,
       [await sessionFor(env, existing, true), cookie(TXN_COOKIE, "", 0), cookie(PENDING_COOKIE, "", 0)]);
     const pending = await sealApple(env, { kind: "pending", origin: txn.origin, iat: now(),
       nonce: generatePasswordResetToken(), appleAccountKey: verified.account_key, displayName, returnTo: txn.returnTo });
     return redirect("/apple-welcome", [cookie(TXN_COOKIE, "", 0), cookie(PENDING_COOKIE, pending)]);
-  } catch {
+  } catch (error) {
     // Do not log tokens, authorization codes, cookies or provider response bodies.
-    console.error("Apple sign-in could not complete");
-    return failure();
+    return callbackFailure(error instanceof AppleExchangeError ? error.code : stage);
   }
 }
 
