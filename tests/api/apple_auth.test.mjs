@@ -253,8 +253,12 @@ test('callback diagnostics identify failed stages without disclosing provider bo
   t.mock.method(console,'error',value=>logs.push(value));
   let scenario;
   const secretMarker='DO-NOT-LOG-provider-token-or-key';
-  t.mock.method(globalThis,'fetch',async url=>{
+  t.mock.method(globalThis,'fetch',async (url,options)=>{
+    assert.equal(options.redirect,'manual', 'workerd supports manual redirect rejection, not error');
     const isApple=url==='https://appleid.apple.com/auth/token';
+    if(scenario==='apple_redirect' || (scenario==='gss_redirect' && !isApple)) {
+      return new Response(null,{status:302,headers:{Location:'https://untrusted.example/'+secretMarker}});
+    }
     if(scenario==='network') throw new Error(secretMarker);
     if(scenario==='client') return Response.json({error:'invalid_client',error_description:secretMarker},{status:400});
     if(scenario==='code') return Response.json({error:'invalid_grant',error_description:secretMarker},{status:400});
@@ -269,6 +273,7 @@ test('callback diagnostics identify failed stages without disclosing provider bo
     ['key','signing_key'],['network','apple_exchange'],['client','apple_client'],['code','apple_code'],
     ['unknown','apple_response'],['oversized','apple_response'],['bad_json','apple_response'],
     ['null','apple_response'],['gss','gss_rejected'],['rate','gss_rate_limit'],
+    ['apple_redirect','apple_response'],['gss_redirect','gss_response'],
   ]) {
     scenario=kind;
     const env=environment();

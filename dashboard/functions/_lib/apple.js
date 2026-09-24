@@ -98,7 +98,13 @@ async function clientSecret(env) {
 }
 
 async function fetchJson(url, options, provider) {
-  const response = await fetch(url, { ...options, redirect: "error", signal: AbortSignal.timeout(15000) });
+  // Workerd rejects redirect: "error". Manual mode plus an explicit rejection
+  // keeps identity credentials from ever being forwarded to a redirect target.
+  const response = await fetch(url, { ...options, redirect: "manual", signal: AbortSignal.timeout(15000) });
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel();
+    throw new AppleExchangeError(provider + "_response");
+  }
   const text = await readBoundedUtf8Text(response, 32768);
   if (text === null) throw new AppleExchangeError(provider + "_response");
   let body;
