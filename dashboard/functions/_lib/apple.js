@@ -4,6 +4,7 @@ import { accountSessionVersion, createSessionCookie, generatePasswordResetToken,
   getSecret, getUser, hasRecentAuthentication, jsonNoStore, readBoundedUtf8Text,
   sha256Hex, validCredentialKey } from "./auth.js";
 import { createJson, putJsonIfCurrent } from "./r2.js";
+import { legacyEmailAuthEnabled, appleOnlyResponse } from "./auth-policy.js";
 
 const TXN_COOKIE = "__Host-pb_apple_txn";
 const PENDING_COOKIE = "__Host-pb_apple_pending";
@@ -244,6 +245,7 @@ export async function finishApple({ request, env }) {
       return jsonNoStore({ error: "Please continue with Apple again." }, { status: 401 });
     }
     if (!["new", "link"].includes(body.mode)) return jsonNoStore({ error: "Choose an account option" }, { status: 400 });
+    if (body.mode === "link" && !legacyEmailAuthEnabled(env)) return appleOnlyResponse();
     const user = await getUser(request, env);
     if (body.mode === "link" && (!user || !hasRecentAuthentication(user) || user.userId !== body.userId)) {
       return jsonNoStore({ error: "Sign into your existing playbook account again, then link Apple." }, { status: 401 });

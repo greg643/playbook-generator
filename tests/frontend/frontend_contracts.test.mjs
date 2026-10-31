@@ -44,12 +44,11 @@ test('polling is sequential and bounded on both generation surfaces', () => {
   }
 });
 
-test('editor conflict and recovery dialogs preserve local work and one-time secrets', () => {
+test('editor conflict dialogs preserve local work', () => {
   assert.match(editor, /cancelValue:\s*'keep'/);
   assert.match(editor, /key:\s*'keep',\s*label:\s*'Keep editing'/);
   assert.match(editor, /key:\s*'reload',\s*label:\s*'Discard local changes'/);
   assert.match(editor, /key:\s*'overwrite',\s*label:\s*'Overwrite server'/);
-  assert.match(editor, /function showRecoveryCode[\s\S]*?dismissible:\s*false/);
   assert.match(editor, /const modalQueue\s*=\s*\[\]/);
   assert.match(editor, /beforeunload[\s\S]*?activeModal\s*&&\s*!activeModal\.dismissible/);
 });
@@ -107,15 +106,15 @@ test('editor exposes an accessible named-playbook manager and immutable save ide
   assert.doesNotMatch(editor, /fetch\(['"]\/api\/plays['"]/);
 });
 
-test('authentication and account actions cannot apply stale responses', () => {
-  assert.match(editor, /let authBusy\s*=\s*false/);
-  assert.match(editor, /if\s*\(authBusy\)\s*return/);
-  assert.match(editor, /verifyAuthenticatedAccount\(data\.userId,\s*epoch\)/);
+test('Apple account actions cannot apply stale responses', () => {
+  assert.match(editor, /const epoch = startAuthTransition\(\)/);
   assert.match(editor, /menuEpoch\s*!==\s*authEpoch\s*\|\|\s*menuUserId\s*!==\s*activeUserId/);
   assert.match(editor, /setAccountRequestBusy\(true\)/);
   assert.match(editor, /requestDeletionUntilSettled/);
-  assert.match(editor, /res\.status\s*===\s*423\s*&&\s*data\.deletionPending/);
+  assert.match(editor, /confirm: confirmation, userId: expectedUserId/);
   assert.match(editor, /res\.status\s*===\s*401\s*&&\s*sawPending/);
+  assert.match(editor, /Type DELETE to confirm/);
+  assert.doesNotMatch(editor, /Get new recovery code|Type your password to confirm/);
 });
 
 test('download labels are built without an HTML injection sink', () => {
@@ -150,10 +149,8 @@ test('home is an authenticated two-choice hub, not an upload surface', () => {
   const converterChoice = index.match(/<a class="choice converter"[\s\S]*?<\/a>/);
 
   assert.match(index, /<title>GSS Playbook Editor/);
-  assert.match(index, /<form id="signinForm"/);
-  assert.match(index, /authSubmit\('\/api\/auth\/login'\)/);
-  assert.match(index, /authSubmit\('\/api\/auth\/register'\)/);
-  assert.match(index, /fetch\('\/api\/auth\/recover'/);
+  assert.match(index, /id="appleSigninLink"/);
+  assert.doesNotMatch(index, /<input[^>]+type="(?:email|password)"/);
   assert.match(index, /class="choice editor-choice" href="\/editor"/);
   assert.match(index, /class="choice converter" href="\/converter"/);
   assert.ok(converterChoice, 'missing PowerPoint (PPTX) Import choice');
@@ -173,28 +170,21 @@ test('home is an authenticated two-choice hub, not an upload surface', () => {
   assert.doesNotMatch(index, /['"]\/api\/upload['"]/);
 });
 
-test('home presents account creation as a clear, dedicated mode', () => {
-  assert.match(index, /id="startRegisterBtn"[^>]*>Create a free account<\/button>/);
-  assert.match(index, /function setAuthMode\(mode, focusHeading = false\)/);
-  assert.match(index, /Create your free account/);
-  assert.match(index, /recovery code after signup/i);
-  assert.match(index, /authPassword\.autocomplete = registering \? 'new-password' : 'current-password'/);
-  assert.match(index, /authPassword\.minLength = 8/);
-  assert.match(index, /if \(authMode === 'register'\)[\s\S]*?authSubmit\('\/api\/auth\/register'\)/);
-  assert.match(index, /Already have an account\?[^<]*<a id="signinInsteadLink"/);
+test('Apple sign-in also clearly offers new-account creation', () => {
+  assert.match(index, /Sign in or create an account/);
+  assert.match(index, /New here\? The same button gets you started/);
+  assert.match(read('apple-welcome.html'), /Create my playbook account/);
+  assert.match(read('apple-welcome.html'), /JSON\.stringify\(\{mode:'new'\}\)/);
+  assert.doesNotMatch(read('apple-welcome.html'), /oldLogin|mode:'link'|email and password/);
 });
 
 test('PowerPoint import naming and the allowlisted post-auth return stay consistent', () => {
-  assert.match(index, /id="converterSigninNotice"[^>]*hidden>[^<]*Sign in or create an account first\.[\s\S]*?return you automatically to <strong>PowerPoint \(PPTX\) Import<\/strong>/);
-  assert.match(index, /const POST_AUTH_DESTINATIONS = Object\.freeze\(\{ converter: '\/converter', editor: '\/editor', apple: '\/apple-welcome' \}\)/);
-  assert.match(index, /Object\.prototype\.hasOwnProperty\.call\([\s\S]*?POST_AUTH_DESTINATIONS,[\s\S]*?requestedPostAuthDestination[\s\S]*?\? POST_AUTH_DESTINATIONS\[requestedPostAuthDestination\] : null/);
-  assert.match(index, /function routeAfterAuthentication\(account, focusHeading = false\)[\s\S]*?window\.location\.replace\(postAuthDestination\)[\s\S]*?showHub\(account, focusHeading\)/);
+  assert.match(index, /id="converterSigninNotice"[^>]*hidden>Sign in with Apple to return to/);
+  assert.match(index, /const POST_AUTH_DESTINATIONS = Object\.freeze\(\{ converter: '\/converter', editor: '\/editor' \}\)/);
+  assert.match(index, /Object\.prototype\.hasOwnProperty\.call\(POST_AUTH_DESTINATIONS, requestedPostAuthDestination\)/);
+  assert.match(index, /function routeAfterAuthentication\(account\)[\s\S]*?window\.location\.replace\(postAuthDestination\)[\s\S]*?showHub\(account\)/);
+  assert.match(index, /const destination = postAuthDestination \|\| '\/'/);
   assert.doesNotMatch(index, /window\.location\.assign\(postAuthDestination\)/);
-  assert.match(index, /async function authSubmit\(path\)[\s\S]*?routeAfterAuthentication\(verified, true\)/);
-  assert.match(index, /\$\('recoverForm'\)\.addEventListener[\s\S]*?routeAfterAuthentication\(verified, true\)/);
-  assert.match(index, /async function init\(\)[\s\S]*?routeAfterAuthentication\(data\)/);
-  assert.match(index, /if \(requestedPostAuthDestination === 'apple'\)\s*\{\s*showAuth\(\);\s*return;/,
-    'explicit old-account proof must show the login form instead of looping on a stale session');
 
   assert.match(converter, /<title>GSS Playbook Editor PowerPoint \(PPTX\) Import/);
   assert.match(converter, /<h1>GSS Playbook Editor &mdash; PowerPoint \(PPTX\) Import<\/h1>/);
@@ -204,12 +194,11 @@ test('PowerPoint import naming and the allowlisted post-auth return stay consist
   assert.match(pptxGuide, /class="converter-cta" href="\/converter">Open PowerPoint \(PPTX\) Import &rarr;<\/a>/);
 });
 
-test('optional Apple sign-in leaves the email form and signup visible', () => {
-  assert.match(index, /\$\('legacyLogin'\)\.open = true;/);
-  assert.match(index, /\$\('signupPrompt'\)\.hidden = false;/);
-  assert.doesNotMatch(index, /\$\('signupPrompt'\)\.hidden = [^;]*appleEnabled/);
-  assert.match(index, /Or use email and password/);
-  assert.match(help, /either Apple or your existing email and password/);
+test('Apple configuration outages do not reveal password fallback', () => {
+  assert.match(index, /config\.apple !== true/);
+  assert.match(index, /Apple sign-in is temporarily unavailable/);
+  assert.doesNotMatch(index, /legacyLogin|signupPrompt|authSubmit|resetRequestForm/);
+  assert.match(help, /Use <strong>Continue with Apple<\/strong> for both new and existing accounts/);
 });
 
 test('playbook deletion and portable backup guidance matches the named-book model', () => {
@@ -244,52 +233,31 @@ test('editor keeps 5v5 and 6v6 formats per play', () => {
   assert.match(editor, /schema:\s*2/);
 });
 
-test('home preserves one-time recovery codes until explicit acknowledgement', () => {
-  assert.match(index, /function showRecoveryCode/);
-  assert.match(index, /recoveryModalOpen\s*=\s*true/);
-  assert.match(index, /if \(event\.key === 'Escape'\)[\s\S]*?event\.preventDefault\(\)/);
-  assert.match(index, /saveRecoveryBtn\.addEventListener\('click'/);
-  assert.match(index, /beforeunload[\s\S]*?recoveryModalOpen/);
-  assert.match(index, /const focusable = \[recoveryCode, copyRecoveryBtn, saveRecoveryBtn\]/);
-  assert.match(index, /document\.querySelector\('main'\)\.inert = true/);
-  assert.match(index, /verifyAccount\(data\.userId, epoch\)/);
+test('home and editor have no password or recovery entry points', () => {
+  for (const html of [index, editor]) {
+    assert.doesNotMatch(html, /<input[^>]*type="(?:email|password)"|showRecoveryCode|\/api\/auth\/(?:login|register|recover|password-reset)/);
+  }
 });
 
-test('email password reset is primary while the offline code stays available', () => {
-  assert.match(index, /id="forgotLink" href="\/\?forgot=1">Forgot password\?<\/a>/);
-  assert.match(index, /id="resetRequestForm"/);
-  assert.match(index, /Email me a reset link/);
-  assert.match(index, /fetch\('\/api\/auth\/password-reset\/request'/);
-  assert.match(index, /If an active account exists for that email/);
-  assert.match(index, /id="useRecoveryCodeLink"[^>]*>Have a recovery code\? Use it instead<\/a>/);
-  assert.match(index, /fetch\('\/api\/auth\/recover'/);
-  assert.match(editor, /id="emailResetLink" href="\/\?forgot=1" target="_blank" rel="noopener"/);
-  assert.match(editor, /Use an offline recovery code instead/);
-  assert.doesNotMatch(help, /recovery code[^.]*the <strong>only<\/strong> way/i);
+test('help describes Apple account recovery instead of website password resets', () => {
+  assert.match(help, /no separate website password or recovery code/);
+  assert.match(help, /Apple&rsquo;s account recovery/);
+  assert.doesNotMatch(help, /Forgot password\?|Email me a reset link|Apple is optional/);
 });
 
-test('emailed reset credentials stay in the fragment and are cleared before network work', () => {
-  assert.match(resetPassword, /new URLSearchParams\(window\.location\.hash\.slice\(1\)\)/);
-  assert.match(resetPassword, /history\.replaceState\(null, '', window\.location\.pathname\)/);
-  assert.match(resetPassword, /\^\[A-Za-z0-9_-\]\{43\}\$/);
-  assert.match(resetPassword, /id="newPassword"[^>]*autocomplete="new-password"/);
-  assert.match(resetPassword, /id="confirmPassword"[^>]*autocomplete="new-password"/);
-  assert.match(resetPassword, /fetch\('\/api\/auth\/password-reset\/complete'/);
-  assert.match(resetPassword, /body: JSON\.stringify\(\{ email: resetEmail, token: resetToken, newPassword \}\)/);
-  assert.match(resetPassword, /resetToken = ''/);
-  assert.match(resetPassword, /id="savedButton"[^>]*>I saved it/);
-  assert.match(resetPassword, /beforeunload[\s\S]*?resetComplete/);
-  assert.doesNotMatch(resetPassword, /(?:localStorage|sessionStorage|\.innerHTML\s*=)/);
+test('retired reset page removes old credentials without network requests', () => {
+  assert.match(resetPassword, /history\.replaceState\(null, '', '\/reset-password'\)/);
+  assert.match(resetPassword, /We now use Apple sign-in/);
+  assert.doesNotMatch(resetPassword, /fetch\(|<input|localStorage|sessionStorage/);
   assert.match(headers, /\/reset-password\s+[\s\S]*?Cache-Control: no-store[\s\S]*?X-Robots-Tag: noindex, nofollow/);
 });
 
-test('cold signed-out editor visits use home while in-editor reauthentication stays local', () => {
-  assert.match(editor, /finish-deletion/);
-  assert.match(editor, /res\.status === 401 && !finishingDeletion/);
+test('signed-out editor visits use Apple sign-in without discarding local work automatically', () => {
+  assert.match(editor, /res\.status === 401/);
   assert.match(editor, /window\.location\.replace\('\/'\)/);
   assert.match(editor, /function showAuthView/);
   assert.match(editor, /doc && saveState !== 'saved' && docOwner === userId/);
-  assert.match(index, /href="\/editor\?finish-deletion=1"/);
+  assert.match(editor, /href="\/\?signin=editor"/);
 });
 
 test('converter stays hidden until auth succeeds and returns signed-out users home', () => {
@@ -317,7 +285,6 @@ test('coach help explains the two workflows, printing, and safe sharing in plain
   assert.match(help, /Cut around each whole insert, not each individual play/);
   assert.match(help, /Fewer plays per page means larger drawings/);
   assert.match(help, /reprint old cards if their numbers change/);
-  assert.match(help, /Email delivery is not yet reliable/);
   for (const html of [help, pptxGuide]) {
     assert.doesNotMatch(html, /deterministic|AI-mediated|top-level|rectangle-family|waypoint|polls automatically/i);
     assert.match(html, /<details>[\s\S]*?<summary>/);

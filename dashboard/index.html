@@ -474,73 +474,16 @@
         </div>
 
         <div class="card" id="authCard">
-          <div id="signinFormWrap">
-            <h2 id="authTitle" tabindex="-1">Sign in</h2>
-            <p class="card-sub" id="authSubtitle">Save your plays and create a coach card.</p>
-            <div id="appleSignin" hidden>
-              <a class="btn btn-secondary" id="appleSigninLink" href="/api/auth/apple/start?returnTo=%2Feditor" style="display:flex;align-items:center;justify-content:center;min-height:48px;padding:0;background:#fff;border-color:#fff;text-decoration:none"><img src="/apple-continue.png" alt="Continue with Apple" width="330" height="48" style="display:block;max-width:100%;height:auto"></a>
-              <p class="card-sub" style="margin-top:1rem">Use your Apple Account, with no separate password to remember. If you use the GSS app, choose the same Apple Account.</p>
-              <p id="appleStatus" role="status"></p>
-            </div>
-            <p class="signin-notice" id="converterSigninNotice" hidden>Sign in or create an account first. We&rsquo;ll return you automatically to <strong>PowerPoint (PPTX) Import</strong>.</p>
-            <p class="signin-notice" id="registerRecoveryNotice" hidden>We&rsquo;ll show you a recovery code after signup. Save it somewhere safe: it lets you reset your password if a reset email does not arrive.</p>
-            <details id="legacyLogin" open>
-            <summary id="legacySummary" hidden style="cursor:pointer;margin:1rem 0">Or use email and password</summary>
-            <form id="signinForm" aria-labelledby="authTitle" novalidate>
-              <label class="field">Email
-                <input type="email" id="authEmail" autocomplete="email" maxlength="320" required>
-              </label>
-              <label class="field">Password
-                <input type="password" id="authPassword" autocomplete="current-password" maxlength="1024" required>
-                <span class="field-help" id="passwordHelp" hidden>Use at least 8 characters.</span>
-              </label>
-              <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
-              <p class="deletion-help" id="deletionHelp" hidden>Use the <a href="/editor?finish-deletion=1">account-cleanup sign-in</a> to resume an interrupted account deletion.</p>
-              <button class="btn btn-primary" id="loginBtn" type="submit">Sign in</button>
-              <button class="btn btn-primary" id="registerBtn" type="submit" hidden>Create account</button>
-              <div class="auth-switch" id="signupPrompt">
-                <p>New to GSS Playbook Editor?</p>
-                <button class="btn btn-secondary" id="startRegisterBtn" type="button">Create a free account</button>
-              </div>
-            </form>
-            <p class="auth-links" id="signinLinks"><a id="forgotLink" href="/?forgot=1">Forgot password?</a></p>
-            <p class="auth-links" id="registerLinks" hidden>Already have an account? <a id="signinInsteadLink" href="#">Sign in</a></p>
-            </details>
+          <h2 id="authTitle" tabindex="-1">Sign in or create an account</h2>
+          <p class="card-sub">Save your plays and create a coach card.</p>
+          <div id="appleSignin" hidden>
+            <a class="btn btn-secondary" id="appleSigninLink" href="/api/auth/apple/start?returnTo=%2F" style="display:flex;align-items:center;justify-content:center;min-height:48px;padding:0;background:#fff;border-color:#fff;text-decoration:none"><img src="/apple-continue.png" alt="Continue with Apple" width="330" height="48" style="display:block;max-width:100%;height:auto"></a>
           </div>
-
-          <div id="resetRequestWrap" hidden>
-            <h2 id="resetRequestTitle" tabindex="-1">Reset your password</h2>
-            <p class="card-sub">Request a password-reset link by email. It works once and expires after 15 minutes. If it does not arrive, check junk mail or use your saved recovery code below.</p>
-            <form id="resetRequestForm" aria-labelledby="resetRequestTitle" novalidate>
-              <label class="field">Email
-                <input type="email" id="resetEmail" autocomplete="email" maxlength="320" required>
-              </label>
-              <div class="error-msg" id="resetRequestError" role="alert" aria-live="assertive"></div>
-              <div class="success-msg" id="resetRequestSuccess" role="status" aria-live="polite" tabindex="-1" hidden></div>
-              <button class="btn btn-primary" id="resetRequestBtn" type="submit">Email me a reset link</button>
-            </form>
-            <p class="auth-links"><a id="useRecoveryCodeLink" href="#">Have a recovery code? Use it instead</a></p>
-            <p class="auth-links"><a id="resetBackToSignin" href="#">&larr; Back to sign in</a></p>
-          </div>
-
-          <div id="recoverFormWrap" hidden>
-            <h2 id="recoveryResetTitle" tabindex="-1">Use your recovery code</h2>
-            <p class="card-sub">No access to your email? Enter the offline recovery code you saved.</p>
-            <form id="recoverForm" novalidate>
-              <label class="field">Email
-                <input type="email" id="recEmail" autocomplete="email" maxlength="320">
-              </label>
-              <label class="field">Recovery code
-                <input type="text" id="recCode" autocomplete="off" maxlength="64" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
-              </label>
-              <label class="field">New password
-                <input type="password" id="recPassword" autocomplete="new-password" maxlength="1024">
-              </label>
-              <div class="error-msg" id="recError" role="alert" aria-live="assertive"></div>
-              <button class="btn btn-primary" id="recoverBtn" type="submit">Reset password &amp; sign in</button>
-            </form>
-            <p class="auth-links"><a id="backToSignin" href="#">&larr; Back to sign in</a></p>
-          </div>
+          <p class="card-sub" style="margin-top:1rem">Use the same Apple Account as the GSS app. New here? The same button gets you started.</p>
+          <p id="appleStatus" role="status">Checking Apple sign-in…</p>
+          <p class="signin-notice" id="converterSigninNotice" hidden>Sign in with Apple to return to <strong>PowerPoint (PPTX) Import</strong>.</p>
+          <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
+          <noscript>Enable JavaScript to sign in and use the editor.</noscript>
         </div>
       </div>
     </section>
@@ -549,7 +492,6 @@
       <p class="eyebrow">Greenwich Sports Systems &middot; GSS Playbook Editor</p>
       <h1 id="hubHeading" tabindex="-1">Let&rsquo;s make your coach card.</h1>
       <p class="hub-sub">Both paths make the same print-ready coach cards and wristband inserts.</p>
-      <p id="appleLinkNotice" class="hub-sub" hidden><a href="/api/auth/apple/start?returnTo=%2Feditor">Add Apple sign-in to this account</a>. Your email login and saved playbooks stay in place.</p>
       <p class="error-msg" id="hubError" role="alert" aria-live="assertive"></p>
 
       <div class="choice-grid">
@@ -575,439 +517,53 @@
     </section>
   </main>
 
-  <div class="modal-overlay" id="recoveryModal" aria-hidden="true" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle" aria-describedby="recoveryDescription">
-      <h2 id="recoveryTitle">Save your recovery code</h2>
-      <p id="recoveryDescription"></p>
-      <div class="recovery-code" id="recoveryCode" tabindex="0" aria-label="Recovery code"></div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="copyRecoveryBtn" type="button">Copy code</button>
-        <button class="btn btn-primary" id="saveRecoveryBtn" type="button">I saved it</button>
-      </div>
-    </div>
-  </div>
-
   <footer>Greenwich Sports Systems &middot; <a href="/help">Help &amp; printing guide</a> &middot; Your files and saved plays require a signed-in account.</footer>
 
 <script>
 'use strict';
-
 const $ = id => document.getElementById(id);
 const loadingView = $('loadingView');
 const authView = $('authView');
 const hubView = $('hubView');
-const authEmail = $('authEmail');
-const authPassword = $('authPassword');
-const authError = $('authError');
-const loginBtn = $('loginBtn');
-const registerBtn = $('registerBtn');
-const startRegisterBtn = $('startRegisterBtn');
-const recoverBtn = $('recoverBtn');
-const signinFormWrap = $('signinFormWrap');
-const resetRequestWrap = $('resetRequestWrap');
-const recoverFormWrap = $('recoverFormWrap');
-const resetRequestBtn = $('resetRequestBtn');
-const resetEmail = $('resetEmail');
-const resetRequestError = $('resetRequestError');
-const resetRequestSuccess = $('resetRequestSuccess');
-const recEmail = $('recEmail');
-const recCode = $('recCode');
-const recPassword = $('recPassword');
-const recError = $('recError');
-const recoveryModal = $('recoveryModal');
-const recoveryCode = $('recoveryCode');
-const recoveryDescription = $('recoveryDescription');
-const copyRecoveryBtn = $('copyRecoveryBtn');
-const saveRecoveryBtn = $('saveRecoveryBtn');
-
 let authEpoch = 0;
-let authBusy = false;
-let recoveryModalOpen = false;
-let recoveryResolve = null;
-let recoveryReturnFocus = null;
-let authMode = 'signin';
-let appleEnabled = false;
-const POST_AUTH_DESTINATIONS = Object.freeze({ converter: '/converter', editor: '/editor', apple: '/apple-welcome' });
+const POST_AUTH_DESTINATIONS = Object.freeze({ converter: '/converter', editor: '/editor' });
 const requestedPostAuthDestination = new URLSearchParams(window.location.search).get('signin');
-const forgotRequested = new URLSearchParams(window.location.search).get('forgot') === '1';
-const postAuthDestination = Object.prototype.hasOwnProperty.call(
-  POST_AUTH_DESTINATIONS,
-  requestedPostAuthDestination
-) ? POST_AUTH_DESTINATIONS[requestedPostAuthDestination] : null;
-
-function setAuthBusy(busy) {
-  authBusy = busy;
-  loginBtn.disabled = busy;
-  registerBtn.disabled = busy;
-  startRegisterBtn.disabled = busy;
-  recoverBtn.disabled = busy;
-  resetRequestBtn.disabled = busy;
-  $('forgotLink').setAttribute('aria-disabled', String(busy));
-  $('signinInsteadLink').setAttribute('aria-disabled', String(busy));
-  $('backToSignin').setAttribute('aria-disabled', String(busy));
-  $('useRecoveryCodeLink').setAttribute('aria-disabled', String(busy));
-  $('resetBackToSignin').setAttribute('aria-disabled', String(busy));
-  $('forgotLink').style.pointerEvents = busy ? 'none' : '';
-  $('signinInsteadLink').style.pointerEvents = busy ? 'none' : '';
-  $('backToSignin').style.pointerEvents = busy ? 'none' : '';
-  $('useRecoveryCodeLink').style.pointerEvents = busy ? 'none' : '';
-  $('resetBackToSignin').style.pointerEvents = busy ? 'none' : '';
-}
+const postAuthDestination = Object.prototype.hasOwnProperty.call(POST_AUTH_DESTINATIONS, requestedPostAuthDestination)
+  ? POST_AUTH_DESTINATIONS[requestedPostAuthDestination] : null;
 
 function setError(element, message) {
   element.textContent = message || '';
   element.classList.toggle('active', Boolean(message));
 }
-
-function setDeletionHelp(visible) {
-  $('deletionHelp').hidden = !visible;
-}
-
-function showSigninPanel(focus = false) {
-  resetRequestWrap.hidden = true;
-  recoverFormWrap.hidden = true;
-  signinFormWrap.hidden = false;
-  setError(resetRequestError, '');
-  resetRequestSuccess.hidden = true;
-  resetRequestSuccess.textContent = '';
-  setError(recError, '');
-  if (focus) authEmail.focus();
-}
-
-function showResetRequestPanel(focusHeading = false) {
-  signinFormWrap.hidden = true;
-  recoverFormWrap.hidden = true;
-  resetRequestWrap.hidden = false;
-  resetEmail.value = resetEmail.value || authEmail.value;
-  setError(resetRequestError, '');
-  resetRequestSuccess.hidden = true;
-  resetRequestSuccess.textContent = '';
-  if (focusHeading) $('resetRequestTitle').focus();
-  else resetEmail.focus();
-}
-
-function showRecoveryCodePanel() {
-  recEmail.value = recEmail.value || resetEmail.value || authEmail.value;
-  signinFormWrap.hidden = true;
-  resetRequestWrap.hidden = true;
-  recoverFormWrap.hidden = false;
-  setError(recError, '');
-  $('recoveryResetTitle').focus();
-}
-
-function setAuthMode(mode, focusHeading = false) {
-  const registering = mode === 'register';
-  authMode = registering ? 'register' : 'signin';
-  $('authTitle').textContent = registering ? 'Create your free account' : 'Sign in';
-  $('authSubtitle').textContent = registering
-    ? 'Save your plays and use PowerPoint (PPTX) Import with one free account.'
-    : 'Access your saved plays and PowerPoint conversions.';
-  $('registerRecoveryNotice').hidden = !registering;
-  $('passwordHelp').hidden = !registering;
-  loginBtn.hidden = registering;
-  registerBtn.hidden = !registering;
-  $('signupPrompt').hidden = registering;
-  $('signinLinks').hidden = registering;
-  $('registerLinks').hidden = !registering;
-  authPassword.autocomplete = registering ? 'new-password' : 'current-password';
-  if (registering) {
-    authPassword.minLength = 8;
-    authPassword.setAttribute('aria-describedby', 'passwordHelp registerRecoveryNotice');
-  } else {
-    authPassword.removeAttribute('minlength');
-    authPassword.removeAttribute('aria-describedby');
-  }
-  setError(authError, '');
-  setDeletionHelp(false);
-  if (focusHeading) $('authTitle').focus();
-}
-
 function showAuth(message = '') {
   loadingView.hidden = true;
   hubView.hidden = true;
   $('hubAccount').hidden = true;
   $('userEmail').textContent = '';
   authView.hidden = false;
-  setError(authError, message);
-  if (!message) setDeletionHelp(false);
-  if (!recoverFormWrap.hidden) setError(recError, '');
+  setError($('authError'), message);
 }
-
-function showHub(account, focusHeading = false) {
-  if (!account || typeof account.userId !== 'string' || !account.userId ||
-      typeof account.email !== 'string') {
-    throw new Error('The server returned an invalid account');
+function showHub(account) {
+  if (!account || typeof account.userId !== 'string' || !account.userId || account.authMethod !== 'apple') {
+    throw new Error('Please sign in with Apple.');
   }
-  $('userEmail').textContent = account.email || account.displayName || 'Coach';
-  $('appleLinkNotice').hidden = !appleEnabled || account.appleLinked;
+  $('userEmail').textContent = account.displayName || account.email || 'Coach';
   $('hubAccount').hidden = false;
   setError($('hubError'), '');
   loadingView.hidden = true;
   authView.hidden = true;
   hubView.hidden = false;
-  if (focusHeading) $('hubHeading').focus();
 }
-
-function routeAfterAuthentication(account, focusHeading = false) {
-  if (!account || typeof account.userId !== 'string' || !account.userId ||
-      typeof account.email !== 'string') {
-    throw new Error('The server returned an invalid account');
+function routeAfterAuthentication(account) {
+  if (!account || typeof account.userId !== 'string' || !account.userId || account.authMethod !== 'apple') {
+    throw new Error('Please sign in with Apple.');
   }
   if (postAuthDestination) {
-    // The destination comes only from the fixed allowlist above. Replace the
-    // sign-in URL so Back cannot bounce the user through the same redirect.
     window.location.replace(postAuthDestination);
     return;
   }
-  showHub(account, focusHeading);
+  showHub(account);
 }
-
-async function verifyAccount(expectedUserId, epoch) {
-  const res = await fetch('/api/auth/me', { cache: 'no-store' });
-  if (epoch !== authEpoch) return null;
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data || data.userId !== expectedUserId ||
-      typeof data.email !== 'string') {
-    throw new Error('Could not verify the signed-in account');
-  }
-  return data;
-}
-
-function showRecoveryCode(code, context) {
-  if (typeof code !== 'string' || !code) return Promise.reject(new Error('The server did not return a recovery code'));
-  recoveryReturnFocus = document.activeElement;
-  recoveryCode.textContent = code;
-  recoveryDescription.textContent = (context || 'This is your offline password-recovery backup.') +
-    ' Write it down or store it in a password manager. It will not be shown again.';
-  copyRecoveryBtn.textContent = 'Copy code';
-  recoveryModal.hidden = false;
-  recoveryModal.setAttribute('aria-hidden', 'false');
-  document.querySelector('.topbar').inert = true;
-  document.querySelector('main').inert = true;
-  document.querySelector('footer').inert = true;
-  recoveryModalOpen = true;
-  saveRecoveryBtn.focus();
-  return new Promise(resolve => { recoveryResolve = resolve; });
-}
-
-copyRecoveryBtn.addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(recoveryCode.textContent);
-    copyRecoveryBtn.textContent = 'Copied \u2713';
-  } catch {
-    copyRecoveryBtn.textContent = 'Select & copy manually';
-    recoveryCode.focus();
-  }
-});
-
-saveRecoveryBtn.addEventListener('click', () => {
-  if (!recoveryModalOpen) return;
-  recoveryModalOpen = false;
-  recoveryModal.hidden = true;
-  recoveryModal.setAttribute('aria-hidden', 'true');
-  document.querySelector('.topbar').inert = false;
-  document.querySelector('main').inert = false;
-  document.querySelector('footer').inert = false;
-  const resolve = recoveryResolve;
-  recoveryResolve = null;
-  if (recoveryReturnFocus && recoveryReturnFocus.isConnected) recoveryReturnFocus.focus();
-  recoveryReturnFocus = null;
-  if (resolve) resolve(true);
-});
-
-recoveryModal.addEventListener('keydown', event => {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    return;
-  }
-  if (event.key !== 'Tab') return;
-  const focusable = [recoveryCode, copyRecoveryBtn, saveRecoveryBtn];
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-});
-
-window.addEventListener('beforeunload', event => {
-  if (!recoveryModalOpen) return;
-  event.preventDefault();
-  event.returnValue = '';
-});
-
-async function authSubmit(path) {
-  if (authBusy) return;
-  const email = authEmail.value.trim().toLowerCase();
-  const password = authPassword.value;
-  setError(authError, '');
-  setDeletionHelp(false);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setError(authError, 'Enter a valid email address');
-    return;
-  }
-  if (!password) {
-    setError(authError, 'Enter your password');
-    return;
-  }
-  if (path.endsWith('/register') && password.length < 8) {
-    setError(authError, 'Password must be at least 8 characters');
-    return;
-  }
-
-  const epoch = ++authEpoch;
-  setAuthBusy(true);
-  try {
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (epoch !== authEpoch) return;
-    if (res.status === 423 && data.deletionPending === true) {
-      setDeletionHelp(true);
-      throw new Error('Account deletion is pending.');
-    }
-    if (!res.ok) throw new Error(data.error || (path.endsWith('/register') ? 'Registration failed' : 'Sign-in failed'));
-    if (!data || typeof data.userId !== 'string' || !data.userId) throw new Error('The server returned an invalid account');
-    authPassword.value = '';
-    if (data.recoveryCode) {
-      await showRecoveryCode(data.recoveryCode,
-        'Your account was created. Save this offline backup in case you lose access to your email.');
-    }
-    if (epoch !== authEpoch) return;
-    const verified = await verifyAccount(data.userId, epoch);
-    if (verified && epoch === authEpoch) routeAfterAuthentication(verified, true);
-  } catch (error) {
-    if (epoch === authEpoch) setError(authError, error.message || 'Could not sign in');
-  } finally {
-    if (epoch === authEpoch) setAuthBusy(false);
-  }
-}
-
-$('signinForm').addEventListener('submit', event => {
-  event.preventDefault();
-  if (authMode === 'register') {
-    authSubmit('/api/auth/register');
-    return;
-  }
-  authSubmit('/api/auth/login');
-});
-
-startRegisterBtn.addEventListener('click', () => {
-  if (authBusy) return;
-  setAuthMode('register', true);
-});
-
-$('signinInsteadLink').addEventListener('click', event => {
-  event.preventDefault();
-  if (authBusy) return;
-  setAuthMode('signin', true);
-});
-
-$('forgotLink').addEventListener('click', event => {
-  event.preventDefault();
-  if (authBusy) return;
-  resetEmail.value = authEmail.value;
-  showResetRequestPanel(true);
-});
-
-$('useRecoveryCodeLink').addEventListener('click', event => {
-  event.preventDefault();
-  if (authBusy) return;
-  showRecoveryCodePanel();
-});
-
-$('resetBackToSignin').addEventListener('click', event => {
-  event.preventDefault();
-  if (authBusy) return;
-  authEmail.value = authEmail.value || resetEmail.value;
-  showSigninPanel(true);
-});
-
-$('backToSignin').addEventListener('click', event => {
-  event.preventDefault();
-  if (authBusy) return;
-  setAuthMode('signin');
-  authEmail.value = authEmail.value || recEmail.value;
-  showSigninPanel(true);
-});
-
-$('resetRequestForm').addEventListener('submit', async event => {
-  event.preventDefault();
-  if (authBusy) return;
-  const email = resetEmail.value.trim().toLowerCase();
-  setError(resetRequestError, '');
-  resetRequestSuccess.hidden = true;
-  resetRequestSuccess.textContent = '';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setError(resetRequestError, 'Enter a valid email address');
-    return;
-  }
-
-  setAuthBusy(true);
-  try {
-    const response = await fetch('/api/auth/password-reset/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Could not request a reset email');
-    resetRequestSuccess.textContent = data.message ||
-      'If an active account exists for that email, a password-reset link has been sent.';
-    resetRequestSuccess.hidden = false;
-    resetRequestSuccess.focus();
-  } catch (error) {
-    setError(resetRequestError, error.message || 'Could not request a reset email');
-  } finally {
-    setAuthBusy(false);
-  }
-});
-
-$('recoverForm').addEventListener('submit', async event => {
-  event.preventDefault();
-  if (authBusy) return;
-  const email = recEmail.value.trim().toLowerCase();
-  const recoveryCodeValue = recCode.value.trim();
-  const newPassword = recPassword.value;
-  setError(recError, '');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError(recError, 'Enter a valid email address');
-  if (!recoveryCodeValue) return setError(recError, 'Enter your recovery code');
-  if (newPassword.length < 8) return setError(recError, 'New password must be at least 8 characters');
-
-  const epoch = ++authEpoch;
-  setAuthBusy(true);
-  try {
-    const res = await fetch('/api/auth/recover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, recoveryCode: recoveryCodeValue, newPassword }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (epoch !== authEpoch) return;
-    if (!res.ok) throw new Error(data.error || 'Recovery failed');
-    if (!data || typeof data.userId !== 'string' || !data.userId) throw new Error('The server returned an invalid account');
-    recCode.value = '';
-    recPassword.value = '';
-    if (data.recoveryCode) {
-      await showRecoveryCode(data.recoveryCode,
-        'Password reset. Your old recovery code no longer works; this is the new one.');
-    }
-    if (epoch !== authEpoch) return;
-    const verified = await verifyAccount(data.userId, epoch);
-    if (verified && epoch === authEpoch) routeAfterAuthentication(verified, true);
-  } catch (error) {
-    if (epoch === authEpoch) setError(recError, error.message || 'Recovery failed');
-  } finally {
-    if (epoch === authEpoch) setAuthBusy(false);
-  }
-});
-
 $('signOutBtn').addEventListener('click', async () => {
   const button = $('signOutBtn');
   if (button.disabled) return;
@@ -1015,16 +571,11 @@ $('signOutBtn').addEventListener('click', async () => {
   button.disabled = true;
   setError($('hubError'), '');
   try {
-    const res = await fetch('/api/auth/logout', { method: 'POST' });
+    const response = await fetch('/api/auth/logout', { method: 'POST' });
     if (epoch !== authEpoch) return;
-    if (!res.ok) throw new Error('Could not sign out');
-    recoverFormWrap.hidden = true;
-    resetRequestWrap.hidden = true;
-    signinFormWrap.hidden = false;
-    setAuthMode('signin');
-    authPassword.value = '';
+    if (!response.ok) throw new Error('Could not sign out');
     showAuth();
-    authEmail.focus();
+    if (!$('appleSignin').hidden) $('appleSigninLink').focus();
   } catch (error) {
     if (epoch === authEpoch) setError($('hubError'), error.message || 'Could not sign out');
   } finally {
@@ -1034,20 +585,18 @@ $('signOutBtn').addEventListener('click', async () => {
 
 (async function init() {
   try {
-    const config = await fetch('/api/auth/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) }).then(r => r.json());
-    appleEnabled = config.apple === true;
-    $('appleSignin').hidden = !appleEnabled;
-    $('legacySummary').hidden = !appleEnabled;
-    $('legacyLogin').open = true;
-    $('signupPrompt').hidden = false;
-    if (appleEnabled) {
-      const destination = postAuthDestination === '/converter' ? '/converter' : '/editor';
-      $('appleSigninLink').href = '/api/auth/apple/start?returnTo=' + encodeURIComponent(destination);
-      const appleResult = new URLSearchParams(location.search).get('apple');
-      if (appleResult) $('appleStatus').textContent = appleResult === 'cancelled'
-        ? 'Apple sign-in was cancelled. You can try again.'
-        : 'Apple sign-in could not finish. Please try again, or use your existing account below.';
-      const appleStep = new URLSearchParams(location.search).get('apple_step');
+    const response = await fetch('/api/auth/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error('Could not check Apple sign-in.');
+    const config = await response.json();
+    if (config.apple !== true) throw new Error('Apple sign-in is temporarily unavailable. Please try again later.');
+    $('appleSignin').hidden = false;
+    $('appleStatus').textContent = '';
+    const destination = postAuthDestination || '/';
+    $('appleSigninLink').href = '/api/auth/apple/start?returnTo=' + encodeURIComponent(destination);
+    const appleResult = new URLSearchParams(location.search).get('apple');
+    if (appleResult) $('appleStatus').textContent = appleResult === 'cancelled'
+      ? 'Apple sign-in was cancelled. You can try again.'
+      : 'Apple sign-in could not finish. Please try again.';
       const appleDiagnostics = {
         transaction_missing: 'The browser did not return the sign-in cookie. Start again from this page in the same browser.',
         transaction_invalid: 'The sign-in attempt expired or could not be verified. Start a fresh attempt from this page.',
@@ -1069,39 +618,27 @@ $('signOutBtn').addEventListener('click', async () => {
         account_lookup: 'The website could not load the connected playbook account.',
         session_create: 'The website could not finish creating the sign-in session.',
       };
-      if (appleResult === 'failed' && Object.prototype.hasOwnProperty.call(appleDiagnostics, appleStep)) {
-        $('appleStatus').textContent = appleDiagnostics[appleStep] + ' Reference: ' + appleStep + '. Your saved playbooks have not been moved.';
-      }
+    const appleStep = new URLSearchParams(location.search).get('apple_step');
+    if (appleResult === 'failed' && Object.prototype.hasOwnProperty.call(appleDiagnostics, appleStep)) {
+      $('appleStatus').textContent = appleDiagnostics[appleStep] + ' Reference: ' + appleStep + '. Your saved playbooks have not been moved.';
     }
-  } catch { /* Existing accounts can still sign in during configuration outages. */ }
-  if (postAuthDestination === '/converter') {
-    $('converterSigninNotice').hidden = false;
+  } catch (error) {
+    $('appleSignin').hidden = true;
+    $('appleStatus').textContent = error.message || 'Apple sign-in is temporarily unavailable. Please reload to try again.';
   }
-  // This route is the explicit proof of the legacy identity during linking.
-  // Do not bounce a stale signed-in session back to the welcome page forever.
-  if (requestedPostAuthDestination === 'apple') {
-    showAuth();
-    return;
-  }
+  if (postAuthDestination === '/converter') $('converterSigninNotice').hidden = false;
   const epoch = ++authEpoch;
   try {
-    const res = await fetch('/api/auth/me', { cache: 'no-store' });
+    const response = await fetch('/api/auth/me', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
     if (epoch !== authEpoch) return;
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      if (!data || typeof data.userId !== 'string' || !data.userId ||
-          typeof data.email !== 'string') {
-        throw new Error('The server returned an invalid account');
-      }
-      routeAfterAuthentication(data);
+    if (response.ok) {
+      routeAfterAuthentication(await response.json());
       return;
     }
-    if (res.status !== 401) throw new Error('Could not check your account');
+    if (response.status !== 401) throw new Error('Could not check your account. Please try again.');
     showAuth();
-    if (forgotRequested) showResetRequestPanel(true);
   } catch (error) {
-    showAuth(error.message || 'Could not check your account. You can still try signing in.');
-    if (forgotRequested) showResetRequestPanel(true);
+    if (epoch === authEpoch) showAuth(error.message || 'Could not check your account.');
   }
 })();
 </script>

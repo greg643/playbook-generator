@@ -8,8 +8,8 @@ Greenwich Sports Systems web app for drawing flag football plays or converting a
 - `/editor` — GSS Playbook Editor for 5v5 and 6v6 plays
 - `/pptx-guide` — public PowerPoint (PPTX) Import Guide with non-proprietary deck examples
 - `/converter` — signed-in PowerPoint (PPTX) Import screen
-- `/reset-password` — single-use emailed password-reset link target
-- `/apple-welcome` — explicit first-time Apple account setup or existing-account link
+- `/reset-password` — notice that email/password recovery has been retired
+- `/apple-welcome` — first-time Apple account setup
 - `/help` — editor, account, compatibility, and printing help
 
 The PowerPoint (PPTX) Import page verifies the current session before revealing its controls. The upload,
@@ -28,8 +28,6 @@ account, and job results are owner-checked.
 ```
 Browser → Cloudflare Pages (static HTML)
         → Pages Functions (authentication, saves, job ownership and quotas)
-        → Private email Worker (rate gate + fixed password-reset template)
-        → Cloudflare Email Service (transactional delivery)
         → Account R2 bucket (credentials + saved playbooks)
         → Job R2 bucket (uploads, rendered plays, status + PDFs)
         → GitHub Actions (job-bucket credentials only)
@@ -73,30 +71,25 @@ to confirm; the original can instead be renamed and reused. Export first if the
 plays may be needed again. Each JSON backup includes its source playbook name
 and can be shared with another coach or imported into another playbook or account.
 
-- **Apple auth** (feature-gated): uses the existing GSS Services ID and backend
-  verifier, so the native app and website resolve to the same GSS identity.
-  Playbook storage remains separate; app playbook viewing is not implemented.
-  Existing users explicitly prove both logins to link; email matching is never
-  used. Linking preserves the local user ID, saved playbooks and existing
-  password/recovery credentials, and revokes old sessions/reset links. New Apple accounts
-  need no email address or local password. See [Apple setup](docs/apple-sign-in.md)
-  for configuration, activation checks and rollback limits.
-- **Email auth**: email + password remains available to new and existing accounts,
-  including email accounts that subsequently add Apple sign-in.
-  Passwords are hashed with PBKDF2-SHA256 (per-user
-  salt, 100k iterations, the Workers Web Crypto maximum; lower-work-factor
-  legacy hashes upgrade on login). Sessions are
-  HMAC-signed, account/version checked, and revoked after password recovery or
-  deletion. Email-reset links expire after 15 minutes, are single-use, store
-  only a SHA-256 token digest, and are issued/consumed with R2 compare-and-swap.
-  Delivery is limited to one message per minute, three per one-hour accounting
-  window, and five per 24-hour accounting window for an account. Recovery codes
-  remain an offline fallback and rotate atomically. Account
-  deletion first writes a blocking tombstone and durable job inventory; cleanup
-  is idempotent and can be resumed after a transient storage failure without
-  re-enabling a partially deleted account. Finalization leaves only a minimal
-  conditional credential tombstone, which registration can safely replace if
-  the same email is used again.
+- **Apple-only auth**: uses the existing GSS Services ID and backend verifier,
+  so the native app and website resolve to the same GSS identity. New coaches
+  use the same Continue with Apple button to create an account. Previously
+  linked accounts keep their local user ID and saved playbooks unchanged.
+  Playbook storage remains separate; app viewing is a future integration. See
+  [Apple setup](docs/apple-sign-in.md) and the
+  [GSS iPad integration design](docs/GSS-PLAYBOOK-IPAD-INTEGRATION.md).
+- **Retired email auth**: email registration, password sign-in, password resets,
+  recovery codes and new legacy-account linking are disabled by default, including
+  direct API calls. Old password sessions are rejected; existing Apple sessions
+  remain valid. The tested legacy backend is retained only for a controlled
+  migration/rollback with `LEGACY_EMAIL_AUTH_ENABLED="true"`; no public UI exposes
+  it. Leave that variable unset or false in production. Apple unavailability
+  does not silently enable password login.
+- **Sessions and deletion**: sessions are HMAC-signed and account/version checked.
+  Deletion requires recent Apple authentication and typed confirmation. It first
+  blocks the account and saves a durable job inventory, then removes its playbooks
+  and job payloads. Cleanup is idempotent; only a minimal credential tombstone
+  remains after completion.
 - **R2 keys**:
   - `auth/secret` — legacy session signing secret fallback; use `SESSION_SECRET`
     in production
@@ -167,7 +160,11 @@ every push and pull request.
 - `JOBS_BUCKET` — separate transient job R2 bucket
 - `AUTH_STATE_BUCKET` — dedicated one-day Apple replay-marker R2 bucket (when Apple is enabled)
 - `EMAIL_SERVICE` — production-only Service binding to the private
-  `gss-playbook-email` Worker
+  `gss-playbook-email` Worker (legacy reset delivery; unused by Apple-only auth)
+- `APPLE_ENABLED` — `true` for the production Apple-only site; complete
+  [Apple setup](docs/apple-sign-in.md) before deployment
+- `LEGACY_EMAIL_AUTH_ENABLED` — leave unset or `false`; only the exact string
+  `true` re-enables the legacy backend for an operator-controlled migration
 - `SESSION_SECRET` — exactly 64 hexadecimal characters. For an existing deployment,
   preserve the current value (including the R2 `auth/secret` fallback) so sessions
   remain valid. Only for a new installation, create with `openssl rand -hex 32`.
@@ -186,7 +183,10 @@ request-body limits at the edge for `/api/upload` (52 MB) and `/api/generate`
 Application validation and per-account quotas remain the second layer; the
 edge rules are a release requirement, not an optional tuning step.
 
-### Password-reset email
+### Legacy password-reset email
+
+The public reset endpoints are disabled in Apple-only mode and do not send mail.
+The following describes the retained service, not an active recovery option.
 
 Outbound reset messages use Cloudflare Email Service through the route-less
 Worker in `workers/email-sender/`. The Worker has no `workers.dev` or preview
@@ -223,13 +223,13 @@ This service is for transactional messages only, not marketing email.
    bounded cleanup inventory checks today and yesterday, so this lifecycle rule
    is required for older job payloads. If temporarily using a shared bucket,
    scope expiry to `jobs/` only—never `auth/`, `users/` or `accounts/`.
-5. Enable Workers Paid, onboard `greenwichsportssystems.com` in Email Sending,
-   and wait for all sending-domain DNS checks to pass.
-6. Deploy `workers/email-sender/`, then add the production Pages Service binding
+5. Only if restoring legacy email auth, enable Workers Paid, onboard
+   `greenwichsportssystems.com` in Email Sending, and wait for its DNS checks.
+6. For that legacy mode, deploy `workers/email-sender/`, then add the production Pages Service binding
    `EMAIL_SERVICE` targeting `gss-playbook-email`. Keep production email
    unbound from preview deployments.
 7. Configure the remaining variables, secrets and edge rate limits above, then
    deploy `dashboard/`.
-8. Verify registration/email recovery/offline-code recovery, cross-account job
-   denial, PPTX and editor-mode generation, PDF downloads, quota responses and
-   account deletion in staging.
+8. Verify new and returning Apple sign-in, rejection of retired auth endpoints
+   and old password sessions, cross-account job denial, PPTX and editor-mode
+   generation, PDF downloads, quota responses and account deletion in staging.

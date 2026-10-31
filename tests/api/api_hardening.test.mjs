@@ -222,7 +222,8 @@ class ThrowAfterCatalogPutR2 extends MemoryR2 {
 }
 
 function makeEnv(bucket = new MemoryR2(), overrides = {}) {
-  return { PLAYBOOK_BUCKET: bucket, SESSION_SECRET, ...overrides };
+  // Legacy compatibility tests opt in; production defaults to Apple-only.
+  return { PLAYBOOK_BUCKET: bucket, SESSION_SECRET, LEGACY_EMAIL_AUTH_ENABLED: "true", ...overrides };
 }
 
 async function seedAccount(env, {

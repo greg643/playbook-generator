@@ -1,4 +1,5 @@
 import { jsonNoStore, getUser } from "../../_lib/auth.js";
+import { legacyEmailAuthEnabled } from "../../_lib/auth-policy.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -10,7 +11,7 @@ export async function onRequestGet(context) {
     }
     return jsonNoStore({ email: user.email, userId: user.userId,
       ...(user.account.appleAccountKey ? { displayName: user.displayName, authMethod: user.authMethod,
-        appleLinked: true, passwordAvailable: typeof user.account.hash === "string" } : {}) });
+        appleLinked: true, passwordAvailable: legacyEmailAuthEnabled(env) && typeof user.account.hash === "string" } : {}) });
   } catch (err) {
     console.error("Me error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });

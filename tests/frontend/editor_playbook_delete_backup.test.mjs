@@ -87,7 +87,7 @@ test('backup import is bound to the exact document across every await boundary',
 test('delete requires an exact typed name and retires saves before the request', () => {
   const confirmation = sourceBetween(
     'function showDeletePlaybookConfirmation(',
-    '// Recovery codes are queued',
+    '// ---------- PNG export',
   );
   assert.match(confirmation, /Export a backup first if you may want it later/);
   assert.match(confirmation, /input\.value === playbook\.name/);

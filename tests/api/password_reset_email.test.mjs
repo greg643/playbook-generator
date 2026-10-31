@@ -121,7 +121,7 @@ class FakeEmailService {
 }
 
 function makeEnv(bucket = new MemoryR2(), emailService = new FakeEmailService()) {
-  return { PLAYBOOK_BUCKET: bucket, EMAIL_SERVICE: emailService, SESSION_SECRET };
+  return { PLAYBOOK_BUCKET: bucket, EMAIL_SERVICE: emailService, SESSION_SECRET, LEGACY_EMAIL_AUTH_ENABLED: "true" };
 }
 
 async function seedAccount(env, password = "old-password") {
@@ -283,7 +283,7 @@ test("permit, account cooldown, and hourly quota suppress delivery without chang
 
 test("missing email binding fails before account lookup", async () => {
   const bucket = new MemoryR2();
-  const env = { PLAYBOOK_BUCKET: bucket, SESSION_SECRET };
+  const env = { PLAYBOOK_BUCKET: bucket, SESSION_SECRET, LEGACY_EMAIL_AUTH_ENABLED: "true" };
   const response = await requestReset({ request: resetRequest(), env, waitUntil() {} });
   assert.equal(response.status, 503);
   assert.equal(bucket.getCount, 0);

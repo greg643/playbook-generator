@@ -1,8 +1,9 @@
 # Sign in with Apple
 
-Implemented behind a production-only configuration gate. **This document is not
-proof of activation**: the Apple return URL, Pages secrets/bindings and real-device
-acceptance tests must all be completed before advertising Apple sign-in.
+Apple is the only public sign-in method. It remains configuration-gated: the Apple
+return URL, Pages secrets/bindings and real-device acceptance tests must all be
+completed when setting up a new deployment. If Apple is unavailable, the site
+shows an error rather than falling back to password login.
 
 ## Identity and migration
 
@@ -13,14 +14,15 @@ acceptance tests must all be completed before advertising Apple sign-in.
   GSS `/v2/auth/apple` endpoint verifies the ID token and hashed nonce and supplies
   the same `account_key` used by the native app. It must accept the web Services ID
   as an audience. Browser-provided ID tokens and email addresses are not trusted.
-- Existing coaches explicitly authenticate both Apple and their old playbook
-  account. Linking retains the immutable local user ID and all existing playbooks;
-  it preserves the password/recovery hashes, removes outstanding reset tokens,
-  increments the session version and signs out older sessions. No automatic email merge.
-- Apple is optional: new email/password registration and password reset remain
-  available even with the flag enabled. Linked email accounts can use either login.
-  New Apple-only accounts store no email or password and use Apple for recovery;
-  adding an email/password to an Apple-only account is not implemented.
+- Previously linked accounts retain their immutable local user ID and all saved
+  playbooks. They may still have legacy credential fields, but password sign-in,
+  resets and recovery codes cannot use them in Apple-only mode. No automatic email
+  merge occurs. New Apple accounts need neither a local password nor an email address.
+- First-time coaches confirm account creation after Apple sign-in. Public legacy
+  linking is retired. The backend rejects email registration, password sign-in,
+  reset and recovery requests with HTTP 410 (`apple_only`) before touching storage
+  or sending mail. Old password sessions are rejected, even on linked accounts;
+  existing Apple sessions continue to work.
 - This is shared identity, **not shared playbook storage** or cross-site session
   cookies. App browsing/PDF sync is a separate project. Never share the Pages
   session-signing secret with the GSS app just to make sessions look the same.
@@ -45,6 +47,7 @@ acceptance tests must all be completed before advertising Apple sign-in.
    | `GSS_API_BASE` | Existing HTTPS GSS backend origin/base path, not the website |
    | `SESSION_SECRET` | Current Playbook Editor signing secret, exactly 64 hex characters |
    | `APPLE_ENABLED` | Keep `false` until the other setup and verification is complete |
+   | `LEGACY_EMAIL_AUTH_ENABLED` | Leave unset or `false` for Apple-only auth |
 
    Use `wrangler pages secret put NAME --project-name playbook-generator` with
    a secure prompt/file input. Never echo, log, commit or pass keys as arguments.
@@ -73,18 +76,20 @@ before the coach chooses Apple sign-in.
 - Real Apple sign-in on Safari/iPad and desktop: cancellation, retry, first-time
   account, repeat sign-in and converter return path. Confirm the returned GSS
   account key matches the same coach in the app without logging any tokens.
-- Use a disposable email account with saved plays. Link it, confirm all books
-  remain unchanged, then verify both Apple and email/password can sign in to the
-  same account. The old session and pending reset link must stop working, but the
-  existing password/recovery code must remain usable.
-- Try linking after the local session is older than ten minutes: the existing
-  account button must request password authentication again (no redirect loop).
+- Sign in to a previously Apple-linked account and confirm the same local account
+  and saved books remain. Old password cookies must fail on `/api/auth/me`, saved
+  plays, upload and generation. Current Apple cookies must still work.
+- Verify all six retired endpoints return 410: `login`, `register`, `recover`,
+  `recovery-code`, `password-reset/request` and `password-reset/complete`, under
+  `/api/auth/`. The Apple finish endpoint must reject `mode: "link"` but accept a
+  valid first-time Apple proof with `mode: "new"`.
 - Export a playbook, choose included plays, preview, generate and download coach
   PDFs; ensure a second account cannot read those plays or downloads.
 - Test Apple-only and migrated-account deletion, including a retry after a
   transient storage failure. Deletion requires recent Apple auth + typed DELETE.
-- Email accounts can still sign in, create accounts and reset passwords. The
-  email service remains necessary; optional Apple sign-in does not replace it.
+- Check that home, editor, welcome and help show no email/password forms or
+  recovery-code instructions. Old reset URLs explain the change without consuming
+  or displaying their token. Apple configuration failure must not expose email auth.
 
 The September 22 read-only production inspection found only `PLAYBOOK_BUCKET`,
 not the separate `JOBS_BUCKET` described in the main README. That pre-existing
@@ -103,13 +108,21 @@ centrally; this editor does not revoke the GSS-wide Apple grant when deleting
 only its own playbooks.
 
 Keep the new auth-reading code during rollback. After migration, old code cannot
-read Apple-only accounts. Turning Apple off prevents Apple-only coaches from
-signing back in; linked email accounts retain their password sign-in.
+read Apple-only accounts. Turning Apple off prevents coaches from signing back in.
 Prefer repairing Apple configuration or retaining the auth endpoints while
 rolling back unrelated UI changes. Never restore password hashes from a backup
 as an automatic rollback strategy.
+
+`LEGACY_EMAIL_AUTH_ENABLED="true"` is an operator-only compatibility switch for
+the retained legacy API and explicit linking implementation. It does not restore
+the deleted UI. Never set it as an automatic outage fallback or assume an old
+email account belongs to an Apple user. Legacy tests opt in to this mode explicitly;
+production must leave it unset or false. Deleting a Playbook Editor account does
+not delete the coach's separate GSS app account.
 
 Automated tests: `node --test tests/api/apple_auth.test.mjs` covers sealed proof
 expiry/origin/tampering, state/nonce and one-use callbacks, code exchange, explicit
 linking, collisions, compare-and-swap retries, session revocation and deletion.
 Mocks do not replace the real-device acceptance checks above.
+`tests/api/apple_only.test.mjs` covers the default production policy, old-cookie
+rejection, preserved Apple access, first-time signup and Apple account deletion.

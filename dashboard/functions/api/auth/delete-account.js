@@ -11,6 +11,7 @@ import {
   hasRecentAuthentication,
 } from "../../_lib/auth.js";
 import { createJson, putJsonIfCurrent } from "../../_lib/r2.js";
+import { legacyEmailAuthEnabled } from "../../_lib/auth-policy.js";
 import { deleteAccountPlaybooks } from "../../_lib/playbooks.js";
 import {
   cancelAndScrubUserJobs,
@@ -36,7 +37,7 @@ function validDeletionRecord(value, userId) {
   );
 }
 
-async function ensureDeletionRecord(env, userId) {
+export async function ensureDeletionRecord(env, userId) {
   const key = deletionKey(userId);
   for (let attempt = 0; attempt < MAX_INDEX_ATTEMPTS; attempt += 1) {
     const object = await env.PLAYBOOK_BUCKET.get(key);
@@ -69,7 +70,7 @@ async function ensureDeletionRecord(env, userId) {
   throw new Error("Could not create account deletion record after concurrent updates");
 }
 
-async function completeDeletion(env, credentialKey, record) {
+export async function completeDeletion(env, credentialKey, record) {
   // Close the inventory race: a job that reserved before disabledAt but after
   // the first scan is now visible. Reservations made later observe disabledAt
   // and self-clean instead of dispatching.
@@ -168,6 +169,7 @@ export async function onRequestPost(context) {
     // initiate deletion for an active account.
     let { user, response } = await requireUser(context, { allowDisabled: true });
     if (!user) {
+      if (!legacyEmailAuthEnabled(env)) return response;
       const email = normalizeEmail(body.email);
       if (!isValidEmail(email)) return response;
       const accountObject = await env.PLAYBOOK_BUCKET.get(await emailKey(email));

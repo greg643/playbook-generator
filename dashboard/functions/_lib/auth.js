@@ -1,4 +1,5 @@
 // Shared auth helpers for Pages Functions. Web Crypto only, no libraries.
+import { legacyEmailAuthEnabled } from "./auth-policy.js";
 
 const SESSION_COOKIE = "pb_session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
@@ -319,6 +320,9 @@ export async function getUser(request, env, { allowDisabled = false } = {}) {
     if (!timingSafeEqual(expected, given)) return null;
 
     const data = JSON.parse(new TextDecoder().decode(b64urlDecode(payload)));
+    // A linked account is not proof that this session used Apple. Retire old
+    // password cookies too, including cookies belonging to linked accounts.
+    if (!legacyEmailAuthEnabled(env) && !data.ck) return null;
     if (typeof data.uid !== "string" || typeof data.exp !== "number") return null;
     if (data.exp <= Math.floor(Date.now() / 1000)) return null;
     const email = normalizeEmail(data.em);

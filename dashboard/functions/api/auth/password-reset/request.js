@@ -1,3 +1,4 @@
+import { legacyEmailAuthEnabled, appleOnlyResponse } from "../../../_lib/auth-policy.js";
 import {
   emailKey,
   isValidEmail,
@@ -131,6 +132,7 @@ async function issueAndSendPasswordReset(env, email) {
 }
 
 export async function onRequestPost(context) {
+  if (!legacyEmailAuthEnabled(context.env)) return appleOnlyResponse();
   const { request, env } = context;
 
   try {

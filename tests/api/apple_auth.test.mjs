@@ -36,7 +36,7 @@ const pem = '-----BEGIN PRIVATE KEY-----\n' + Buffer.from(await crypto.subtle.ex
 function environment() {
   return { PLAYBOOK_BUCKET:new Bucket(), JOBS_BUCKET:new Bucket(), AUTH_STATE_BUCKET:new Bucket(), SESSION_SECRET:'a'.repeat(64), APPLE_ENABLED:'true',
     APPLE_SERVICES_ID:'com.gss.web', APPLE_TEAM_ID:'TEAM', APPLE_KEY_ID:'KEY', APPLE_PRIVATE_KEY:pem,
-    PUBLIC_ORIGIN:ORIGIN, GSS_API_BASE:'https://gss.example' };
+    PUBLIC_ORIGIN:ORIGIN, GSS_API_BASE:'https://gss.example', LEGACY_EMAIL_AUTH_ENABLED:'true' };
 }
 function request(path, cookie = '', body, origin = ORIGIN) {
   return new Request(ORIGIN + path, { method:body === undefined ? 'GET' : 'POST', headers:{cookie,origin,'Content-Type':'application/json'},

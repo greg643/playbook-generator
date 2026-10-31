@@ -1,3 +1,4 @@
+import { legacyEmailAuthEnabled, appleOnlyResponse } from "../../_lib/auth-policy.js";
 import {
   jsonNoStore,
   requireUser,
@@ -8,6 +9,7 @@ import {
 import { putJsonIfCurrent } from "../../_lib/r2.js";
 
 export async function onRequestPost(context) {
+  if (!legacyEmailAuthEnabled(context.env)) return appleOnlyResponse();
   const { env } = context;
 
   try {

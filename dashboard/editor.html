@@ -679,37 +679,10 @@
         <p class="splash-help"><a href="/help">Read the quick-start guide &rarr;</a></p>
       </div>
       <div class="card" id="authCard">
-        <div id="signinForm">
-          <h2>Sign in</h2>
-          <p class="auth-sub">Free account &mdash; your playbooks are saved in the cloud.</p>
-          <label class="field">Email
-            <input type="email" id="authEmail" autocomplete="email">
-          </label>
-          <label class="field">Password
-            <input type="password" id="authPassword" autocomplete="current-password">
-          </label>
-          <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
-          <button class="btn btn-primary" id="loginBtn">Sign in</button>
-          <button class="btn btn-secondary" id="registerBtn">Create account</button>
-          <p class="auth-links"><a id="emailResetLink" href="/?forgot=1" target="_blank" rel="noopener">Forgot password? Email me a reset link</a></p>
-          <p class="auth-links"><a id="forgotLink" href="#">Use an offline recovery code instead</a></p>
-        </div>
-        <div id="recoverForm" style="display:none">
-          <h2>Reset password</h2>
-          <p class="auth-sub">Enter the offline recovery code you saved when you created the account.</p>
-          <label class="field">Email
-            <input type="email" id="recEmail" autocomplete="email">
-          </label>
-          <label class="field">Recovery code
-            <input type="text" id="recCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
-          </label>
-          <label class="field">New password
-            <input type="password" id="recPassword" autocomplete="new-password">
-          </label>
-          <div class="error-msg" id="recError" role="alert" aria-live="assertive"></div>
-          <button class="btn btn-primary" id="recoverBtn">Reset password &amp; sign in</button>
-          <p class="auth-links"><a id="backToSignin" href="#">&larr; Back to sign in</a></p>
-        </div>
+        <h2>Sign in with Apple</h2>
+        <p class="auth-sub">Use your linked Apple Account to open your saved playbooks.</p>
+        <div class="error-msg" id="authError" role="alert" aria-live="assertive"></div>
+        <a class="btn btn-primary" href="/?signin=editor">Continue to sign in</a>
       </div>
     </div>
   </div>
@@ -1344,8 +1317,8 @@ function render(play, section, numLabel) {
 
 const $ = id => document.getElementById(id);
 const authView = $('authView'), editorView = $('editorView');
-const authEmail = $('authEmail'), authPassword = $('authPassword'), authError = $('authError');
-const loginBtn = $('loginBtn'), registerBtn = $('registerBtn'), signOutBtn = $('signOutBtn');
+const authError = $('authError');
+const signOutBtn = $('signOutBtn');
 const userEmail = $('userEmail');
 const playbookSelect = $('playbookSelect'), newPlaybookBtn = $('newPlaybookBtn');
 const renamePlaybookBtn = $('renamePlaybookBtn'), deletePlaybookBtn = $('deletePlaybookBtn');
@@ -2849,7 +2822,7 @@ async function resolveConflict(context = captureDocumentContext()) {
         { key: 'overwrite', label: 'Overwrite server', danger: true },
       ],
     });
-    // The dialog may have waited behind a recovery-code acknowledgement. Do
+    // The dialog may have waited behind another account action. Do
     // not apply an old conflict decision after sign-out or an account switch.
     if (!isCurrentDocumentContext(context) || doc !== conflictedDoc) return;
     if (choice === 'overwrite') {
@@ -3332,46 +3305,6 @@ function showDeletePlaybookConfirmation(playbook) {
   });
 }
 
-// Recovery codes are queued like every other dialog, but deliberately cannot
-// be dismissed with Escape or the backdrop: the promise resolves only after
-// the user explicitly acknowledges the one-time secret.
-function showRecoveryCode(code, context) {
-  return enqueueModal({
-    dismissible: false,
-    render(close) {
-      modalHeading('Save your recovery code',
-        (context || 'This is your offline password-recovery backup.') +
-        ' Write it down or store it in a password manager — it will not be shown again.');
-      const codeBox = document.createElement('div');
-      codeBox.textContent = code;
-      codeBox.tabIndex = 0;
-      codeBox.setAttribute('aria-label', 'Recovery code');
-      codeBox.style.cssText = 'font-family:ui-monospace,Menlo,monospace;font-size:1.05rem;' +
-        'background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:0.6rem;' +
-        'text-align:center;letter-spacing:0.05em;user-select:all;margin:0.4rem 0;';
-      modalBox.appendChild(codeBox);
-      const row = document.createElement('div');
-      row.className = 'btn-row';
-      const copy = document.createElement('button');
-      copy.type = 'button';
-      copy.className = 'mbtn-cancel';
-      copy.textContent = 'Copy code';
-      copy.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(code); copy.textContent = 'Copied \u2713'; }
-        catch { copy.textContent = 'Select & copy manually'; }
-      });
-      const done = document.createElement('button');
-      done.type = 'button';
-      done.className = 'mbtn-confirm';
-      done.textContent = 'I saved it';
-      done.addEventListener('click', () => close(true));
-      row.append(copy, done);
-      modalBox.appendChild(row);
-      return done;
-    },
-  });
-}
-
 // ---------- PNG export (2152x2000, white background) ----------
 // Renders offscreen from data, so plays not currently open export correctly.
 // `index` is the play's included-index (0-based position among included plays
@@ -3700,21 +3633,7 @@ resetGenLink.addEventListener('click', () => {
 let authEpoch = 0;
 let activeUserId = null;
 let activeAccount = null;
-let appleEnabled = false;
-let authBusy = false;
 let accountRequestBusy = false;
-
-function setAuthBusy(busy) {
-  authBusy = busy;
-  loginBtn.disabled = busy;
-  registerBtn.disabled = busy;
-  $('recoverBtn').disabled = busy;
-  for (const id of ['emailResetLink', 'forgotLink', 'backToSignin']) {
-    const link = $(id);
-    link.setAttribute('aria-disabled', String(busy));
-    link.style.pointerEvents = busy ? 'none' : '';
-  }
-}
 
 function setAccountRequestBusy(busy) {
   accountRequestBusy = busy;
@@ -3739,33 +3658,12 @@ function startAuthTransition() {
   return authEpoch;
 }
 
-async function verifyAuthenticatedAccount(expectedUserId, epoch) {
-  const res = await fetch('/api/auth/me', { cache: 'no-store' });
-  if (epoch !== authEpoch) return null;
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data || data.userId !== expectedUserId || typeof data.email !== 'string') {
-    throw new Error('Could not verify the signed-in account');
-  }
-  activeAccount = data;
-  return data;
-}
-
-async function requestDeletionUntilSettled(
-  password,
-  epoch,
-  expectedUserId,
-  sawPending = false,
-  email = ''
-) {
+async function requestDeletionUntilSettled(confirmation, epoch, expectedUserId, sawPending = false) {
   while (epoch === authEpoch) {
     const res = await fetch('/api/auth/delete-account', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(email
-        ? { email, password, userId: expectedUserId }
-        : activeAccount && activeAccount.authMethod === 'apple'
-          ? { confirm: password, userId: expectedUserId }
-          : { password, userId: expectedUserId }),
+      body: JSON.stringify({ confirm: confirmation, userId: expectedUserId }),
     });
     const data = await res.json().catch(() => ({}));
     if (epoch !== authEpoch) return false;
@@ -4491,123 +4389,6 @@ newPlaybookBtn.addEventListener('click', createPlaybook);
 renamePlaybookBtn.addEventListener('click', renamePlaybook);
 deletePlaybookBtn.addEventListener('click', deleteActivePlaybook);
 
-async function authSubmit(path) {
-  if (authBusy) return;
-  const email = authEmail.value.trim().toLowerCase();
-  const password = authPassword.value;
-  hideAuthError();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAuthError('Enter a valid email address'); return; }
-  if (!password) { showAuthError('Enter your password'); return; }
-  if (path.endsWith('register') && password.length < 8) {
-    showAuthError('Password must be at least 8 characters');
-    return;
-  }
-  const epoch = startAuthTransition();
-  setAuthBusy(true);
-  try {
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (epoch !== authEpoch) return;
-    if (res.status === 423 && data.deletionPending === true && path.endsWith('/login')) {
-      const finish = await showModal({
-        title: 'Finish deleting this account?',
-        message: 'A previous deletion attempt disabled account access but did not finish storage cleanup.',
-        confirmLabel: 'Finish deletion',
-        danger: true,
-      });
-      if (!finish || epoch !== authEpoch) {
-        showAuthError('Account deletion is still pending. Sign in again when you are ready to finish it.');
-        return;
-      }
-      if (await requestDeletionUntilSettled(password, epoch, data.userId, true, email)) {
-        forgetRememberedPlaybook(data.userId);
-        discardLocalDoc();
-        showAuthView('Account deleted.');
-      } else if (epoch === authEpoch) {
-        showAuthError('Account deletion is still pending. Sign in again to retry.');
-      }
-      return;
-    }
-    if (!res.ok) throw new Error(data.error || 'Sign-in failed');
-    authPassword.value = '';
-    if (data.recoveryCode) {
-      await showRecoveryCode(data.recoveryCode,
-        'Your account was created. Save this offline backup in case you lose access to your email.');
-    }
-    if (epoch !== authEpoch) return;
-    const verified = await verifyAuthenticatedAccount(data.userId, epoch);
-    if (!verified || epoch !== authEpoch) return;
-    await enterEditor(verified.email || data.email || email, verified.userId, epoch);
-  } catch (err) {
-    if (epoch === authEpoch) showAuthError(err.message);
-  } finally {
-    setAuthBusy(false);
-  }
-}
-
-// ---- Password recovery flow ----
-const signinForm = $('signinForm'), recoverForm = $('recoverForm');
-const recEmail = $('recEmail'), recCode = $('recCode'), recPassword = $('recPassword');
-const recError = $('recError'), recoverBtn = $('recoverBtn');
-
-$('forgotLink').addEventListener('click', e => {
-  e.preventDefault();
-  if (authBusy) return;
-  recEmail.value = authEmail.value;
-  signinForm.style.display = 'none';
-  recoverForm.style.display = '';
-  recError.classList.remove('active');
-});
-$('backToSignin').addEventListener('click', e => {
-  e.preventDefault();
-  if (authBusy) return;
-  recoverForm.style.display = 'none';
-  signinForm.style.display = '';
-});
-
-recoverBtn.addEventListener('click', async () => {
-  if (authBusy) return;
-  const email = recEmail.value.trim().toLowerCase();
-  const recoveryCode = recCode.value.trim();
-  const newPassword = recPassword.value;
-  recError.classList.remove('active');
-  const fail = msg => { recError.textContent = msg; recError.classList.add('active'); };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Enter a valid email address');
-  if (!recoveryCode) return fail('Enter your recovery code');
-  if (newPassword.length < 8) return fail('New password must be at least 8 characters');
-  const epoch = startAuthTransition();
-  setAuthBusy(true);
-  try {
-    const res = await fetch('/api/auth/recover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, recoveryCode, newPassword }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (epoch !== authEpoch) return;
-    if (!res.ok) throw new Error(data.error || 'Recovery failed');
-    recCode.value = recPassword.value = '';
-    recoverForm.style.display = 'none';
-    signinForm.style.display = '';
-    if (data.recoveryCode) {
-      await showRecoveryCode(data.recoveryCode,
-        'Password reset. Your OLD recovery code no longer works — this is your new one.');
-    }
-    if (epoch !== authEpoch) return;
-    const verified = await verifyAuthenticatedAccount(data.userId, epoch);
-    if (!verified || epoch !== authEpoch) return;
-    await enterEditor(verified.email || data.email || email, verified.userId, epoch);
-  } catch (err) {
-    if (epoch === authEpoch) fail(err.message);
-  } finally {
-    setAuthBusy(false);
-  }
-});
-
 // ---- Account menu ----
 $('accountBtn').addEventListener('click', async () => {
   if (accountRequestBusy || playbookBusy) return;
@@ -4617,49 +4398,21 @@ $('accountBtn').addEventListener('click', async () => {
     title: 'Account',
     message: userEmail.textContent,
     choices: [
-      ...(activeAccount && activeAccount.appleLinked
-        ? [{ key: 'apple', label: 'Sign in with Apple again' }]
-        : (appleEnabled ? [{ key: 'link', label: 'Add Apple sign-in' }] : [])),
-      ...(!activeAccount?.appleLinked || activeAccount.passwordAvailable
-        ? [{ key: 'code', label: 'Get new recovery code' }] : []),
+      { key: 'apple', label: 'Sign in with Apple again' },
       { key: 'delete', label: 'Delete account', danger: true },
       { key: 'cancel', label: 'Close' },
     ],
   });
   if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
-  if (choice === 'link' || choice === 'apple') {
+  if (choice === 'apple') {
     if (doc && saveState !== 'saved' && !await saveDoc()) return;
     window.location.assign('/api/auth/apple/start?returnTo=%2Feditor');
-  } else if (choice === 'code') {
-    const sure = await showModal({
-      title: 'New recovery code',
-      message: 'This replaces your current recovery code — the old one stops working. Continue?',
-      confirmLabel: 'Generate',
-    });
-    if (!sure) return;
-    if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
-    setAccountRequestBusy(true);
-    try {
-      const res = await fetch('/api/auth/recovery-code', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (menuEpoch !== authEpoch || menuUserId !== activeUserId) return;
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      await showRecoveryCode(data.recoveryCode, 'Here is your new recovery code.');
-    } catch (err) {
-      if (menuEpoch === authEpoch && menuUserId === activeUserId) {
-        await showModal({ title: 'Could not generate code', message: err.message, confirmLabel: 'OK' });
-      }
-    } finally {
-      setAccountRequestBusy(false);
-    }
   } else if (choice === 'delete') {
     const pw = await showModal({
       title: 'Delete account',
-      message: activeAccount && activeAccount.authMethod === 'apple'
-        ? 'This permanently deletes your Playbook Editor account and all its playbooks. Your GSS app account stays separate. Type DELETE to confirm. You must have signed in with Apple in the last 10 minutes.'
-        : 'This permanently deletes your account AND all of its playbooks. Type your password to confirm.',
+      message: 'This permanently deletes your Playbook Editor account and all its playbooks. Your GSS app account stays separate. Type DELETE to confirm. You must have signed in with Apple in the last 10 minutes.',
       withInput: true,
-      inputType: activeAccount && activeAccount.authMethod === 'apple' ? 'text' : 'password',
+      inputType: 'text',
       confirmLabel: 'Delete forever',
       danger: true,
     });
@@ -4681,11 +4434,6 @@ $('accountBtn').addEventListener('click', async () => {
     }
   }
 });
-
-loginBtn.addEventListener('click', () => authSubmit('/api/auth/login'));
-registerBtn.addEventListener('click', () => authSubmit('/api/auth/register'));
-authPassword.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.click(); });
-authEmail.addEventListener('keydown', e => { if (e.key === 'Enter') authPassword.focus(); });
 
 signOutBtn.addEventListener('click', async () => {
   if (accountRequestBusy || playbookBusy) return;
@@ -4737,21 +4485,18 @@ syncStyleUI();
 
 (async function init() {
   const epoch = startAuthTransition();
-  void fetch('/api/auth/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) })
-    .then(r => r.ok ? r.json() : null).then(config => { appleEnabled = config?.apple === true; })
-    .catch(() => { /* Apple stays hidden until configuration is confirmed. */ });
   try {
     const res = await fetch('/api/auth/me');
     if (epoch !== authEpoch) return;
     if (res.ok) {
       const data = await res.json();
       if (epoch !== authEpoch) return;
+      if (data.authMethod !== 'apple') throw new Error('Sign in with Apple again.');
       activeAccount = data;
       await enterEditor(data.email || data.displayName || 'Coach', data.userId, epoch);
       return;
     }
-    const finishingDeletion = new URLSearchParams(window.location.search).get('finish-deletion') === '1';
-    if (res.status === 401 && !finishingDeletion) {
+    if (res.status === 401) {
       window.location.replace('/');
       return;
     }
