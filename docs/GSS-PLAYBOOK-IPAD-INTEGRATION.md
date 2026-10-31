@@ -13,6 +13,13 @@ Keep editing and printing setup on the website initially. The app is a read-only
 viewer. This document proposes the integration; the viewer and its APIs are not
 implemented by the Apple-only website release.
 
+Start with saved editor playbooks. PowerPoint (PPTX) Import currently produces
+conversion jobs, not persistent editor books. A later **Save to app library**
+action can publish a completed job's rendered play images and PDFs through the
+same snapshot pipeline, without pretending those images are editable diagrams.
+Verify job ownership and copy its assets before expiry; never publish from an
+arbitrary job ID or URL supplied by the client.
+
 ## Coach experience
 
 1. On the website, select a named playbook and check the plays to include, just as
@@ -128,6 +135,11 @@ private-cache policy is added; ETags still support explicit app refreshes.
 Publish a versioned, immutable manifest plus image/PDF assets. This is separate
 from the editable JSON and from temporary generation jobs. Do not store a job
 download URL as a permanent app library entry: jobs can expire or be scrubbed.
+
+Before expanding production access, complete the existing account/job bucket
+isolation work described in the README. The October account inspection still
+found a shared account/job bucket. Generation runners must have access only to
+job data, not credentials, saved books or the permanent app snapshot library.
 
 The website first saves the selected book, then submits its source revision and
 print settings to a new authenticated publish operation. The server verifies
