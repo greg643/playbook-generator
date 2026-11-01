@@ -15,7 +15,8 @@ const ORIGIN = 'https://playbook.example';
 const APPLE_ID = '0123456789abcdef';
 const UID = '11111111-1111-4111-8111-111111111111';
 // Same wire encoding as GSS mint_token; synthetic signature, never a credential.
-const GSS_TOKEN = Buffer.from(`v3|${APPLE_ID}|0|1793570000|1793573600|${'0'.repeat(64)}`).toString('base64');
+const GSS_TOKEN = Buffer.from(`v3|${APPLE_ID}|10|1793570000|1793573600|${'0'.repeat(64)}`).toString('base64');
+assert.match(GSS_TOKEN, /=+$/, 'callback fixture must exercise GSS padding');
 class Bucket {
   records = new Map(); sequence = 0; beforePut = null;
   async get(key) {
