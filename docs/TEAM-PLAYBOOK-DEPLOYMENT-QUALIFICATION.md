@@ -5,7 +5,40 @@ snapshot → existing GSS app reader. Greg owns the site deployment. Do not chan
 the [shared route contract](TEAM-PLAYBOOK-API-V1.md) without coordinating with K3.
 PPTX/PDF publishing, starter books, new GSS routes and native changes are deferred.
 
-## Current release status
+## Current release status — deployed November 1, 21:09 UTC
+
+Greg authorized completing the prerequisites and deployment, and explicitly
+accepted breaking the seven historical render jobs' download links. No old
+objects were copied or deleted. Saved editor books and account/auth data were
+not changed.
+
+- Live revision: `7cf47b1db1c215976aa92a3ffc11da51fabc8132`.
+- Pages deployment: `28b9c125-6ea2-465b-ac86-e9e01831614d`, created
+  `2026-11-01T21:09:19.562558Z`; production success readback verified.
+- [Production deployment](https://github.com/greg643/playbook-generator/actions/runs/41350473428)
+  and [CI](https://github.com/greg643/playbook-generator/actions/runs/41350473456) passed.
+- Private `JOBS_BUCKET=gss-playbook-jobs`, one-day expiry. Permanent
+  `PLAYBOOK_BUCKET=playbook-files` and `AUTH_STATE_BUCKET=gss-playbook-auth-state`
+  preserved, along with all production env values and email service binding.
+- The renderer now uses `R2_JOBS_*` repository secrets. Effective job-bucket
+  write/read/list/delete and **AccessDenied** against both permanent buckets
+  passed in [check-only run](https://github.com/greg643/playbook-generator/actions/runs/41350338780)
+  and again before the production deployment. Probe objects were removed.
+- Preview production bindings/secrets were removed. Callback origin configured.
+- Process Playbook workflow was paused for cutover, then re-enabled; active
+  state read back after successful production checks.
+- 211 Node and 89 Python tests passed locally; Pages Functions compiled.
+- Live smoke checks: home 200; anonymous native list/asset and Team discovery
+  401; callback without capability 404. These prove route wiring and denial,
+  **not** an authenticated Black publication or member/foreign-Team acceptance.
+- Durable readback: `output/checks/deploy-live-1101/production-readback.json`.
+  Rollback baseline/config fingerprints: `output/checks/deploy-live-1101/before.json`.
+
+**Next:** Greg chooses the existing editor book and intended audience, then run
+the live Black qualification below. No live book/snapshot IDs exist from this
+deployment. No app, GSS API or TestFlight changes were made.
+
+## Historical preparation status — superseded by the deployment above
 
 **Not ready to deploy until the storage and callback prerequisites below are met.**
 Production was checked read-only at 18:33 UTC on November 1:
@@ -53,7 +86,7 @@ coaches-only visibility, and denial of old public snapshots after a visibility
 change. These results do not establish live identity, bucket permissions or
 Black-Team membership.
 
-## Prerequisites for Greg
+## Deployment runbook (completed; retain for rollback/redeployment)
 
 1. **Plan a coordinated job cutover.** Stop new render submissions for the
    migration window and let accepted jobs settle. Keep the website account/auth
@@ -70,7 +103,8 @@ Black-Team membership.
 3. **Create/verify the renderer's bucket-scoped credential.** It needs object
    read/write access to the job bucket only, with no account, auth or snapshot
    bucket access. Review the Cloudflare token policy and securely update GitHub's
-   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT` and `R2_BUCKET` together.
+   `R2_JOBS_ACCESS_KEY_ID`, `R2_JOBS_SECRET_ACCESS_KEY`, `R2_JOBS_ENDPOINT` and
+   `R2_JOBS_BUCKET` together (mapped to `R2_*` environment variables in Actions).
    Record the scope and date, not the secret values. GitHub secret-name listings
    cannot prove this scope. Do not reuse the old shared-bucket credential.
 4. **Set the Actions repository variable**
@@ -159,8 +193,8 @@ not production IDs.
 
 | Evidence | Current result |
 | --- | --- |
-| K1/K2 deployed revision and UTC time | Pending Greg's deployment; current live revision is aeb0e7e |
-| Verified actual job bucket and renderer credential scope | Pending |
+| K1/K2 deployed revision and UTC time | `7cf47b1`, November 1 at 21:09:19 UTC |
+| Verified actual job bucket and renderer credential scope | PASS; job roundtrip and two protected-bucket AccessDenied checks |
 | Black Team ID and source book ID | Pending authenticated selection |
 | Published book B and first snapshot S1 | Pending |
 | Successful update snapshot S2 | Pending |
@@ -169,6 +203,7 @@ not production IDs.
 | Coaches-only S3 and denial of previous public asset URLs | Pending |
 | Final snapshot ID, audience and default choice | Pending |
 
-Resume live qualification after Greg supplies the deployed revision and the
-configuration checks above are green. Until then, report K1/K2 as locally
-qualified but not deployed or production-qualified.
+Deployment prerequisites are green and K1/K2 is live. Resume authenticated live
+qualification once Greg selects the book/audience and the required legitimate
+sessions are available. Do not describe deployment or anonymous denial checks
+as proof of a successful Black-Team publication.
