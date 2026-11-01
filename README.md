@@ -197,6 +197,10 @@ python pipeline/pptx_to_editor.py <playbook.pptx> <playbook.json>
 
 ## Tests
 
+Team publishing and native reads share one [v1 route contract](docs/TEAM-PLAYBOOK-API-V1.md).
+The [v1 product cut](docs/GSS-PLAYBOOK-IPAD-V1-CUT.md) overrides the older integration
+proposal. Greg owns site deployment; local tests are not production acceptance.
+
 ```bash
 python -m unittest discover -s tests/pipeline -v
 node --test tests/api/*.test.mjs tests/frontend/*.test.mjs tests/workflows/*.test.mjs
@@ -272,6 +276,11 @@ This service is for transactional messages only, not marketing email.
   to the **job bucket only**
 - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` — Pages and private Worker
   deployment; the token needs Pages deployment and Workers Scripts edit access
+
+GitHub repository variable `PLAYBOOK_PUBLIC_ORIGIN` must be
+`https://playbook-generator.pages.dev` (HTTPS origin, no trailing slash or path).
+Publication jobs check it before rendering; ordinary PDF generation does not
+require it. A render result alone is not an acknowledgement of app publication.
 
 ### Migration/deployment order
 

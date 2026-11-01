@@ -98,6 +98,35 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaises(PublicationCompletionError): self.run_callback()
         self.assertEqual(self.client.calls, [])
 
+    def test_invalid_callback_configuration_never_sends_capability(self):
+        for origin in ['', 'http://playbook.example', 'https://user:secret@playbook.example',
+                       'https://playbook.example/path', 'https://playbook.example?token=secret',
+                       'https://playbook.example:bad', 'https://[broken',
+                       'https://playbook.example\n']:
+            with self.subTest(origin=origin), patch.dict('os.environ', PLAYBOOK_PUBLIC_ORIGIN=origin):
+                with self.assertRaisesRegex(PublicationCompletionError, '^Publication callback is not configured$'):
+                    self.run_callback()
+        self.assertEqual(self.client.calls, [])
+
+    def test_missing_callback_fails_job_before_download_or_render(self):
+        status = {'mode': 'images', 'publicationId': JOB, 'ownerId': OWNER}
+        self.storage.get_object = lambda **kw: {'Body': io.BytesIO(json.dumps(status).encode())}
+        def put(**kw):
+            status.clear(); status.update(json.loads(kw['Body']))
+        self.storage.put_object = put
+        with patch.dict('os.environ', R2_BUCKET='jobs-only', PLAYBOOK_PUBLIC_ORIGIN=''), \
+             patch.object(sys, 'argv', ['process_job.py', JOB]), \
+             patch.object(process_job, 'get_r2_client', return_value=self.storage), \
+             patch.object(process_job, 'download_play_images') as download, \
+             patch.object(process_job, 'complete_app_publication') as callback:
+            with self.assertRaises(SystemExit) as result:
+                process_job.main()
+            self.assertEqual(result.exception.code, 1)
+            download.assert_not_called(); callback.assert_not_called()
+        self.assertEqual(status['status'], 'error')
+        self.assertEqual(status['message'], 'Publication callback is not configured')
+        self.assertEqual(status['publicationId'], JOB)
+
     def test_orchestrator_calls_publication_after_upload_without_browser(self):
         self.assert_pipeline_completion(False)
 

@@ -42,17 +42,31 @@ class NoPublicationRedirect(urllib.request.HTTPRedirectHandler):
         return None  # Never forward a publication capability to another URL.
 
 
+def publication_callback_origin():
+    """Validate operator configuration before downloading or rendering a job."""
+    origin = os.environ.get('PLAYBOOK_PUBLIC_ORIGIN', '')
+    try:
+        url = urllib.parse.urlsplit(origin)
+        if (url.scheme != 'https' or not url.hostname or url.username or url.password or
+                url.path or url.query or url.fragment or url.port not in (None, 443) or
+                any(c.isspace() or ord(c) < 32 for c in origin)):
+            raise ValueError()
+    except ValueError:
+        # Never include the supplied setting in public status or logs.
+        raise ValueError('Publication callback is not configured') from None
+    return origin
+
+
 def complete_app_publication(s3, bucket, job_id, *, opener=None, sleep=time.sleep):
     """An accepted render finishes without a browser poll or coach credentials.
 
     The callback origin is deployment configuration, never job-controlled input.
     The one-job capability cannot access account data or authorize another job.
     """
-    origin = os.environ.get('PLAYBOOK_PUBLIC_ORIGIN', '')
-    url = urllib.parse.urlsplit(origin)
-    if (url.scheme != 'https' or not url.hostname or url.username or url.password or
-            url.path or url.query or url.fragment or url.port not in (None, 443)):
-        raise PublicationCompletionError('Publication callback is not configured')
+    try:
+        origin = publication_callback_origin()
+    except ValueError:
+        raise PublicationCompletionError('Publication callback is not configured') from None
     object = s3.get_object(Bucket=bucket, Key=f'jobs/{job_id}/app-publication.json')
     try:
         raw = object['Body'].read(1025)
@@ -303,6 +317,8 @@ def main():
         if 'publicationId' in request_fields and (mode != 'images' or request_fields['publicationId'] != job_id):
             raise ValueError('Publication job binding is invalid')
         ensure_job_active(s3, bucket, job_id)
+        if request_fields.get('publicationId'):
+            publication_callback_origin()
         print(f"Job mode: {mode}")
 
         # Update status to processing

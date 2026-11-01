@@ -70,7 +70,8 @@ async function fixture(t) {
       account_status: upstream.accountStatus, migration_complete: upstream.migration });
     assert.ok(url.endsWith('/v2/teams/get'));
     if (upstream.forbidden || JSON.parse(options.body).team_id !== TEAM) return Response.json({}, { status: 403 });
-    return Response.json({ team: { team_id: TEAM, role: upstream.role, status: 'active' } });
+    return Response.json({ team: { team_id: TEAM, role: upstream.role, status: 'active',
+      is_family_member: upstream.family === true } });
   });
   const input = { teamId: TEAM, operationId: crypto.randomUUID(), sourceBookId: 'default', sourceRevision: REV,
     coachesOnly: false, makeDefault: true };
@@ -224,6 +225,29 @@ test('foreign Team access cannot enumerate books or fetch a guessed asset', asyn
   const f = await fixture(t), manifest = await publish(f);
   assert.equal((await read(f, [OTHER])).status, 404);
   assert.equal((await read(f, [OTHER, manifest.bookId, manifest.snapshotId, 'image-cross'])).status, 404);
+});
+
+test('a family member cannot inherit manager-only publishing or reading authority', async t => {
+  const f = await fixture(t), manifest = await publish(f, { ...f.input, coachesOnly: true });
+  f.upstream.family = true; // Even if the upstream household retains leader role.
+  const response = await read(f), library = await response.json();
+  assert.equal(response.status, 200); assert.equal(library.canPublish, false);
+  assert.deepEqual(library.books, []);
+  assert.equal((await read(f, [TEAM, manifest.bookId, manifest.snapshotId, 'image-cross'])).status, 404);
+  await assert.rejects(beginAppPublication(f.env, f.user,
+    { ...f.input, operationId: crypto.randomUUID() }, TOKEN), { status: 404 });
+});
+
+test('a successful read does not cache access past Team membership revocation', async t => {
+  const f = await fixture(t), manifest = await publish(f);
+  f.upstream.role = 'member';
+  assert.equal((await read(f)).status, 200);
+  const imagePath = [TEAM, manifest.bookId, manifest.snapshotId, 'image-cross'];
+  const image = await read(f, imagePath);
+  assert.equal(image.status, 200); await image.body.cancel();
+  f.upstream.forbidden = true;
+  assert.equal((await read(f)).status, 404);
+  assert.equal((await read(f, imagePath)).status, 404);
 });
 
 test('disabled/deleted publisher and deleted source book stop all fresh reads', async t => {
