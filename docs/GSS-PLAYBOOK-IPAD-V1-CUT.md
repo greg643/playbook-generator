@@ -39,6 +39,13 @@ Signed service assertions and GSS-side proxy routes, snapshot garbage collection
 
 ## Bring your own playbook (Greg, 11/1)
 
+**Owner correction, later 11/1:** defer K5/K6 import integration. Greg has no
+PPTX acceptance book. Qualify the existing website editor → immutable Team
+snapshot → app path first. Creation, editing, and future format conversion stay
+on the website; the app consumes one published snapshot format, never raw
+PPTX/PDF/editor documents. Existing import renderer work is retained but is not
+a release gate or a reason to delay K1–K3. Site deployment remains Greg's.
+
 Coaches who already have a playbook should not redraw it. Two more sources feed the same snapshot and the same grid, list and tap-to-zoom viewer:
 
 - **PowerPoint (K5).** A completed PPTX Import can be published to a Team exactly like an editor book. Entries come from the full slides in slide order, named from the slide title or "Play n". Greg's book is the first acceptance target.

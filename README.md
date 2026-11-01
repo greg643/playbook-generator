@@ -209,6 +209,21 @@ node --test tests/api/*.test.mjs tests/frontend/*.test.mjs tests/workflows/*.tes
 CI runs these tests plus Python compilation and JavaScript syntax checks on
 every push and pull request.
 
+The local Mac producer/consumer gate compiles the **actual** app model and
+feeds it manifests from the **actual** website snapshot builder, with PNG/PDF
+byte, hash and decode verification (no copied wire-model fixture):
+
+```bash
+FLAG_APP_ROOT=/path/to/flag-app/worktree node tests/integration/app_snapshot_native.mjs
+```
+
+It requires Xcode and the named app checkout, fails rather than skips missing
+prerequisites, and retains source hashes, synthetic media and results under
+`output/checks/snapshot-native-*`. It does not prove deployment, membership,
+offline storage or phone UI; those remain separate gates. PPTX/PDF import
+integration is deferred per Greg's later 11/1 correction; qualify editor
+publishing first.
+
 The Team publishing browser gate is `tests/frontend/editor_publication_browser.mjs`.
 Run it against a local static `dashboard/` server on port 8769 with Playwright
 available (`PLAYWRIGHT_MODULE` may point to an existing installation and
