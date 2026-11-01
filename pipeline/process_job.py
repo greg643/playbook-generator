@@ -20,6 +20,9 @@ import tempfile
 import traceback
 import uuid
 import re
+import urllib.request
+import urllib.error
+import urllib.parse
 from pathlib import Path
 
 import boto3
@@ -28,6 +31,69 @@ from botocore.exceptions import ClientError
 
 class JobCancelled(RuntimeError):
     """Raised when account deletion has cancelled an in-flight job."""
+
+
+class PublicationCompletionError(RuntimeError):
+    """Rendered PDFs are intact; making the snapshot current was not ACKed."""
+
+
+class NoPublicationRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # Never forward a publication capability to another URL.
+
+
+def complete_app_publication(s3, bucket, job_id, *, opener=None, sleep=time.sleep):
+    """An accepted render finishes without a browser poll or coach credentials.
+
+    The callback origin is deployment configuration, never job-controlled input.
+    The one-job capability cannot access account data or authorize another job.
+    """
+    origin = os.environ.get('PLAYBOOK_PUBLIC_ORIGIN', '')
+    url = urllib.parse.urlsplit(origin)
+    if (url.scheme != 'https' or not url.hostname or url.username or url.password or
+            url.path or url.query or url.fragment or url.port not in (None, 443)):
+        raise PublicationCompletionError('Publication callback is not configured')
+    object = s3.get_object(Bucket=bucket, Key=f'jobs/{job_id}/app-publication.json')
+    try:
+        raw = object['Body'].read(1025)
+    finally:
+        object['Body'].close()
+    try:
+        callback = json.loads(raw) if len(raw) <= 1024 else None
+        valid = (isinstance(callback, dict) and set(callback) == {'ownerId', 'operationId', 'token'}
+            and callback['operationId'] == job_id and str(uuid.UUID(callback['ownerId'])) == callback['ownerId']
+            and re.fullmatch('[a-f0-9]{64}', callback['token']) is not None)
+    except (ValueError, TypeError, AttributeError):
+        valid = False
+    if not valid:
+        raise PublicationCompletionError('Publication callback is invalid')
+    client = opener or urllib.request.build_opener(NoPublicationRedirect())
+    for attempt in range(3):
+        ensure_job_active(s3, bucket, job_id)
+        request = urllib.request.Request(origin + '/api/app-publication/complete',
+            data=json.dumps(callback).encode(), method='POST', headers={'Content-Type':'application/json'})
+        try:
+            with client.open(request, timeout=30) as response:
+                body = response.read(4097)
+                if response.status != 200 or len(body) > 4096:
+                    raise PublicationCompletionError('Publication response was not acknowledged')
+                result = json.loads(body)
+                if (result.get('published') is not True or result.get('snapshotId') != job_id
+                        or not isinstance(result.get('bookId'), str)):
+                    raise PublicationCompletionError('Publication response did not match the job')
+                return result
+        except urllib.error.HTTPError as error:
+            code = error.code
+            error.close()
+            if code != 429 and code < 500:
+                raise PublicationCompletionError('Publication was not accepted; check the current book before retrying') from None
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+        except (ValueError, TypeError, AttributeError):
+            raise PublicationCompletionError('Publication response was invalid') from None
+        if attempt < 2:
+            sleep(2 ** attempt)
+    raise PublicationCompletionError('Publication completion could not be confirmed')
 
 
 PLAY_IMAGE_NAME_RE = re.compile(r"(?:0[1-9]|[1-5][0-9]|6[0-4]|D(?:[1-9]|1[0-9]|2[0-4]))\.png")
@@ -228,12 +294,14 @@ def main():
             raise RuntimeError("Could not read the job request (status.json) from R2")
         request_fields = {
             k: request_data[k]
-            for k in ("mode", "options", "createdAt", "ownerId")
+            for k in ("mode", "options", "createdAt", "ownerId", "publicationId")
             if k in request_data
         }
         mode = request_data.get("mode", "pptx")
         if mode not in {"pptx", "images"}:
             raise ValueError("Unsupported job mode")
+        if 'publicationId' in request_fields and (mode != 'images' or request_fields['publicationId'] != job_id):
+            raise ValueError('Publication job binding is invalid')
         ensure_job_active(s3, bucket, job_id)
         print(f"Job mode: {mode}")
 
@@ -387,9 +455,23 @@ def main():
             complete_status = build_complete_status(uploaded, pipeline_warnings)
             update_status(s3, bucket, job_id, complete_status, request_fields)
             ensure_job_active(s3, bucket, job_id)
+            if request_fields.get('publicationId'):
+                try:
+                    publication = complete_app_publication(s3, bucket, job_id)
+                    update_status(s3, bucket, job_id, {**complete_status, 'publication': publication}, request_fields)
+                except PublicationCompletionError:
+                    # Keep the completed artifacts retryable; no browser needs
+                    # to stay open, and a lost ACK never triggers a new snapshot.
+                    update_status(s3, bucket, job_id, {**complete_status, 'publication': {
+                        'published': False, 'status': 'unconfirmed',
+                        'message': 'The playbook could not be confirmed in GSS. Check before publishing again.'}}, request_fields)
+                    raise
             print(f"Job {job_id} complete. Uploaded: {uploaded}")
 
     except Exception as e:
+        if isinstance(e, PublicationCompletionError):
+            print('Publication completion was not acknowledged; rendered files remain available.')
+            sys.exit(1)  # Finalizer preserves the complete render + explicit publication state.
         error_msg = f"{type(e).__name__}: {e}"
         tb = traceback.format_exc()
         print(f"Job {job_id} failed: {error_msg}")

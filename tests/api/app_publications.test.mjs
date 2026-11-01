@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { beginAppPublication, completeAppPublication, readTeamPublications, snapshotPrefix } from '../../dashboard/functions/_lib/app-publications.js';
 import { verifyTeamAccess } from '../../dashboard/functions/_lib/app-access.js';
 import { onRequestGet as readApp } from '../../dashboard/functions/api/app/playbooks/[[path]].js';
+import { preparePublicationJob, finishPublicationJob } from '../../dashboard/functions/_lib/app-publication-jobs.js';
+import { onRequestPost as finishRoute } from '../../dashboard/functions/api/app-publication/complete.js';
 
 const UID = '11111111-1111-4111-8111-111111111111';
 const TEAM = 'T-22222222-2222-4222-8222-222222222222';
@@ -38,7 +40,7 @@ class R2 {
 }
 const json = (bucket, key, value) => bucket.put(key, JSON.stringify(value));
 async function fixture(t) {
-  const env = { PLAYBOOK_BUCKET: new R2(), JOBS_BUCKET: new R2(), GSS_API_BASE: 'https://gss.example' };
+  const env = { PLAYBOOK_BUCKET: new R2(), JOBS_BUCKET: new R2(), GSS_API_BASE: 'https://gss.example', SESSION_SECRET: 'a'.repeat(64) };
   const credentialKey = `users/byapple/${ACCOUNT}.json`;
   const account = { userId: UID, appleAccountKey: ACCOUNT, email: '', sessionVersion: 1 };
   const user = { userId: UID, email: '', credentialKey, account };
@@ -289,4 +291,55 @@ test('replaced canonical Apple identity cannot publish through a still-active le
   });
   await assert.rejects(completeAppPublication(f.env, f.user, f.input.operationId, TOKEN), { status: 401 });
   assert.equal((await readTeamPublications(f.env, TEAM)).value.entries[0].current, null);
+});
+
+test('accepted publication finishes without browser state and keeps the GSS token out of the renderer', async t => {
+  const f = await fixture(t), { callback } = await preparePublicationJob(f.env, f.user, f.input, TOKEN);
+  const raw = [...f.env.PLAYBOOK_BUCKET.records.values()].map(r => new TextDecoder().decode(r.bytes)).join('\n');
+  assert.equal(raw.includes(TOKEN), false);
+  assert.deepEqual(Object.keys(callback).sort(), ['operationId', 'ownerId', 'token']);
+  await render(f);
+  const request = () => new Request('https://playbook.example/api/app-publication/complete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(callback),
+  });
+  const response = await finishRoute({ env: f.env, request: request() });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).snapshotId, f.input.operationId);
+  assert.equal((await finishRoute({ env: f.env, request: request() })).status, 200); // lost ACK
+  assert.equal((await readTeamPublications(f.env, TEAM)).value.entries[0].current.snapshotId, f.input.operationId);
+});
+
+test('callback rejects wrong job, tampering and expired capability without advancing the book', async t => {
+  const f = await fixture(t), now = Math.floor(Date.now()/1000);
+  const { callback } = await preparePublicationJob(f.env, f.user, f.input, TOKEN, now);
+  await render(f);
+  for (const changed of [{ ...callback, token: '0'.repeat(64) },
+    { ...callback, operationId: crypto.randomUUID() }, { ...callback, ownerId: crypto.randomUUID() }]) {
+    await assert.rejects(finishPublicationJob(f.env, changed, now), { status: 404 });
+  }
+  await assert.rejects(finishPublicationJob(f.env, callback, now + 3600), { status: 404 });
+  const key = `accounts/${UID}/playbooks/publications/${f.input.operationId}.grant.json`;
+  const grant = await (await f.env.PLAYBOOK_BUCKET.get(key)).json();
+  grant.sealed = (grant.sealed.startsWith('00') ? '01' : '00') + grant.sealed.slice(2);
+  await json(f.env.PLAYBOOK_BUCKET, key, grant);
+  await assert.rejects(finishPublicationJob(f.env, callback, now), { status: 404 });
+  assert.equal((await readTeamPublications(f.env, TEAM)).value.entries[0].current, null);
+});
+
+test('callback rechecks Team manager access and does not trust acceptance-time authority', async t => {
+  const f = await fixture(t), { callback } = await preparePublicationJob(f.env, f.user, f.input, TOKEN);
+  await render(f); f.upstream.role = 'member';
+  await assert.rejects(finishPublicationJob(f.env, callback), { status: 404 });
+  assert.equal((await readTeamPublications(f.env, TEAM)).value.entries[0].current, null);
+});
+
+test('duplicate prepare preserves the exact callback capability; route bounds input', async t => {
+  const f = await fixture(t);
+  const first = await preparePublicationJob(f.env, f.user, f.input, TOKEN);
+  const second = await preparePublicationJob(f.env, f.user, f.input, TOKEN);
+  assert.deepEqual(first.callback, second.callback);
+  const response = await finishRoute({ env: f.env, request: new Request('https://playbook.example/api/app-publication/complete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(1025),
+  }) });
+  assert.equal(response.status, 413);
 });

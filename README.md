@@ -54,8 +54,19 @@ existing `/v2/me` and `/v2/teams/get` routes; parents do not need editor account
 Coaches-only publications require Team manager authority, and old snapshots are
 not downloadable after a replacement. No public bucket URL is returned.
 
-The web publish control, durable render-completion integration and native Team
-screen remain to be connected. Production activation also requires verification
+The existing GitHub renderer now supports completion via
+`POST /api/app-publication/complete` after it uploads the PDFs. Its one-hour,
+one-job signed capability is separate from the coach's GSS session, which remains
+encrypted in private account storage. The callback checks current manager access
+again; a lost ACK retries the same publication, and an uncertain outcome is shown
+as unconfirmed rather than successful. Set the Actions variable
+`PLAYBOOK_PUBLIC_ORIGIN` to the exact HTTPS editor origin (no path/trailing slash);
+the callback never follows redirects or accepts a job-provided destination.
+
+The web publish control/authenticated session bridge and native Team screen remain
+to be connected. Publish setup must store the capability as the job's private
+`app-publication.json` and set `publicationId` to its job ID; neither credential is
+part of public job status. Production activation also requires verification
 that the account and job bindings really target separate buckets and that the
 render runner has job-only credentials; distinct binding names alone are not proof.
 
