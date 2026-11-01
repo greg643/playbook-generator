@@ -8,6 +8,11 @@ on:
       - 'workers/email-sender/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
+    inputs:
+      check_only:
+        description: Verify isolated renderer storage without deploying
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -20,7 +25,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up storage verification
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify isolated renderer storage
+        run: |
+          pip install boto3
+          python pipeline/verify_job_storage.py
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_JOBS_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_JOBS_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_JOBS_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_JOBS_BUCKET }}
+
       - name: Deploy private email Worker
+        if: ${{ inputs.check_only != true }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -30,6 +51,7 @@ jobs:
           workingDirectory: workers/email-sender
 
       - name: Deploy to Cloudflare Pages
+        if: ${{ inputs.check_only != true }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

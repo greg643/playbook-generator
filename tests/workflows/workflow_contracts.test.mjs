@@ -44,6 +44,19 @@ test('checkout credentials are not persisted in production workflows', () => {
   }
 });
 
+test('renderer uses only job-scoped secrets and deployment checks their effective access', () => {
+  assert.doesNotMatch(processWorkflow, /secrets\.R2_(ENDPOINT|ACCESS_KEY_ID|SECRET_ACCESS_KEY|BUCKET)\s/);
+  for (const name of ['ENDPOINT', 'ACCESS_KEY_ID', 'SECRET_ACCESS_KEY', 'BUCKET']) {
+    assert.ok(processWorkflow.includes(`secrets.R2_JOBS_${name}`));
+  }
+  const check = workflowStep(deployWorkflow, 'Verify isolated renderer storage');
+  assert.ok(check.includes('python pipeline/verify_job_storage.py'));
+  assert.ok(deployWorkflow.indexOf(check) < deployWorkflow.indexOf('name: Deploy private email Worker'));
+  for (const name of ['Deploy private email Worker', 'Deploy to Cloudflare Pages']) {
+    assert.ok(workflowStep(deployWorkflow, name).includes('inputs.check_only != true'));
+  }
+});
+
 test('dashboard and email Worker changes trigger the production deployment', () => {
   assert.match(deployWorkflow, /^\s+- 'dashboard\/\*\*'$/m);
   assert.match(deployWorkflow, /^\s+- 'workers\/email-sender\/\*\*'$/m);
