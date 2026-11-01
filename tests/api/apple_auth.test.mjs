@@ -14,6 +14,8 @@ import { readAppWebSession } from '../../dashboard/functions/_lib/app-web-sessio
 const ORIGIN = 'https://playbook.example';
 const APPLE_ID = '0123456789abcdef';
 const UID = '11111111-1111-4111-8111-111111111111';
+// Same wire encoding as GSS mint_token; synthetic signature, never a credential.
+const GSS_TOKEN = Buffer.from(`v3|${APPLE_ID}|0|1793570000|1793573600|${'0'.repeat(64)}`).toString('base64');
 class Bucket {
   records = new Map(); sequence = 0; beforePut = null;
   async get(key) {
@@ -230,7 +232,7 @@ test('callback exchanges the code server-side and delegates token and nonce veri
     assert.equal(body.identity_token,'server-exchanged-token');
     assert.equal(body.display_name,undefined,'repeat consent must not overwrite the GSS name with a fallback');
     assert.equal(await sha256Hex(body.raw_nonce),await sha256Hex(rawNonce));
-    return Response.json({account_key:APPLE_ID,session_token:'verified-gss-session',display_name:'Coach'});
+    return Response.json({account_key:APPLE_ID,session_token:GSS_TOKEN,display_name:'Coach'});
   });
   const makeRequest=()=>new Request(ORIGIN+'/api/auth/apple/callback',{method:'POST',headers:{cookie:'__Host-pb_apple_txn='+txn,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({state,code:'one-use-code',id_token:'attacker-controlled-token'})});
   const response=await callbackApple({env,request:makeRequest()});
@@ -240,9 +242,9 @@ test('callback exchanges the code server-side and delegates token and nonce veri
   const setupCookie = response.headers.getSetCookie().find(c => c.startsWith('__Host-pb_apple_pending=')).split(';')[0];
   const setup = await finishApple({ env, request: request('/api/auth/apple/finish', setupCookie, { mode: 'new' }) });
   assert.equal(setup.status, 200);
-  assert.equal((await readAppWebSession(request('/', sessionCookie(setup)), env)).bearer, 'verified-gss-session');
+  assert.equal((await readAppWebSession(request('/', sessionCookie(setup)), env)).bearer, GSS_TOKEN);
   assert.equal([...env.AUTH_STATE_BUCKET.records.keys()].some(k => k.startsWith('app-web-pending/')), false);
-  assert.equal([...env.AUTH_STATE_BUCKET.records.values()].some(v => v.text.includes('verified-gss-session')), false);
+  assert.equal([...env.AUTH_STATE_BUCKET.records.values()].some(v => v.text.includes(GSS_TOKEN)), false);
   const replay=await callbackApple({env,request:makeRequest()});
   assert.equal(replay.headers.get('location'),'/?apple=failed&apple_step=transaction_used');
   assert.equal(calls.length,2);
@@ -370,7 +372,7 @@ test('known Apple identities return to their requested tool; disabled identities
   await finishApple({env,request:request('/',await pending(env),{mode:'new'})});
   t.mock.method(globalThis,'fetch',async url=>url==='https://appleid.apple.com/auth/token'
     ? Response.json({id_token:'server-token'})
-    : Response.json({account_key:APPLE_ID,session_token:'verified-gss-session'}));
+    : Response.json({account_key:APPLE_ID,session_token:GSS_TOKEN}));
   for (const disabled of [false,true]) {
     if(disabled) {
       const key=appleKey(APPLE_ID), record=await (await env.PLAYBOOK_BUCKET.get(key)).json();
@@ -383,7 +385,7 @@ test('known Apple identities return to their requested tool; disabled identities
     const user=await getUser(request('/',sessionCookie(response)),env);
     assert.equal(Boolean(user),!disabled);
     assert.equal((await getUser(request('/',sessionCookie(response)),env,{allowDisabled:true})).authMethod,'apple');
-    if (!disabled) assert.equal((await readAppWebSession(request('/', sessionCookie(response)), env)).bearer, 'verified-gss-session');
+    if (!disabled) assert.equal((await readAppWebSession(request('/', sessionCookie(response)), env)).bearer, GSS_TOKEN);
     else await assert.rejects(readAppWebSession(request('/', sessionCookie(response)), env), { status: 401 });
   }
 });

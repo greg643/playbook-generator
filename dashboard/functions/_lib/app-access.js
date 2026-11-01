@@ -1,4 +1,5 @@
 import { readBoundedUtf8Text } from './auth.js';
+import { validGSSBearer } from './gss-bearer.js';
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const isUUID = value => typeof value === 'string' && UUID_RE.test(value);
@@ -9,7 +10,7 @@ export class AppAccessError extends Error {
 
 export function appBearer(request) {
   const header = request.headers.get('authorization') || '';
-  if (!/^Bearer [A-Za-z0-9._~-]{16,16384}$/.test(header)) throw new AppAccessError(401, 'Sign in to GSS again');
+  if (!header.startsWith('Bearer ') || !validGSSBearer(header.slice(7))) throw new AppAccessError(401, 'Sign in to GSS again');
   return header.slice(7);
 }
 
@@ -42,7 +43,7 @@ async function gssRead(env, bearer, path, body) {
 // authority from the Playbook cookie/email. Do not cache raw bearer credentials.
 export async function verifyTeamAccess(env, bearer, teamId) {
   if (!isTeamID(teamId)) throw new AppAccessError(404, 'Playbook not found');
-  if (typeof bearer !== 'string' || !/^[A-Za-z0-9._~-]{16,16384}$/.test(bearer)) {
+  if (!validGSSBearer(bearer)) {
     throw new AppAccessError(401, 'Sign in to GSS again');
   }
   const me = await gssRead(env, bearer, '/v2/me', { include_teams: false });

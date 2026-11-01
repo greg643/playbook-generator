@@ -2,6 +2,8 @@
 // Encrypted grants live only in the private, one-day-lifecycle auth bucket.
 import { getSecret, getUser, readBoundedUtf8Text, sha256Hex } from './auth.js';
 import { AppAccessError } from './app-access.js';
+import { validGSSBearer } from './gss-bearer.js';
+export { validGSSBearer } from './gss-bearer.js';
 
 const SCHEMA = 'gss.playbook-web-session.v1';
 const bytes = value => new TextEncoder().encode(value);
@@ -9,7 +11,6 @@ const hex = value => [...new Uint8Array(value)].map(n => n.toString(16).padStart
 const unhex = value => Uint8Array.from(value.match(/../g), n => parseInt(n, 16));
 const now = () => Math.floor(Date.now() / 1000);
 const expired = () => new AppAccessError(401, 'Continue with Apple again to publish to your Team');
-export const validGSSBearer = value => typeof value === 'string' && /^[A-Za-z0-9._~-]{16,16384}$/.test(value);
 
 function sessionHandle(cookie) {
   const parts = (cookie || '').split(';').map(p => p.trim()).filter(p => p.startsWith('pb_session='));
