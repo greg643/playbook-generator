@@ -63,12 +63,25 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(request.full_url, 'https://playbook.example/api/app-publication/complete')
         self.assertEqual(json.loads(request.data), self.storage.body)
         self.assertNotIn('Authorization', request.headers)
+        self.assertEqual(request.get_header('User-agent'), 'GSS-Playbook-Renderer/1.0')
+        self.assertEqual(request.get_header('Accept'), 'application/json')
 
     def test_transient_and_lost_ack_retries_are_bounded_and_same_identity(self):
         self.client.failures = [URLError('synthetic'), TimeoutError()]
         self.assertTrue(self.run_callback()['published'])
         self.assertEqual(self.sleeps, [1, 2])
         self.assertEqual(len({r.data for r in self.client.calls}), 1)
+
+    def test_edge_admits_identified_renderer_without_weakening_capability_auth(self):
+        original_open = self.client.open
+        def edge(request, timeout):
+            if request.get_header('User-agent') != 'GSS-Playbook-Renderer/1.0':
+                raise HTTPError(request.full_url, 403, 'Forbidden', {}, None)
+            self.assertEqual(json.loads(request.data), self.storage.body)
+            return original_open(request, timeout)
+        self.client.open = edge
+        self.assertTrue(self.run_callback()['published'])
+        self.assertEqual(len(self.client.calls), 1)
 
     def test_three_failures_stop_without_exposing_credentials(self):
         self.client.failures = [URLError('sensitive-detail')]*3

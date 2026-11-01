@@ -285,7 +285,8 @@ test('real callback route displays progress before any provider request, then si
   const f=await handoffFixture(env);
   assert.equal(f.landing.status,200);
   assert.equal(calls,0,'progress must not wait for Apple/GSS exchange');
-  assert.match(f.html,/Finishing sign-in/);
+  assert.match(f.html,/Finishing sign in/);
+  assert.doesNotMatch(f.html,/press Continue again/);
   assert.ok(f.handoff);
   assert.equal(f.html.includes('private-apple-code'),false);
   assert.equal(f.html.includes(GSS_TOKEN),false);

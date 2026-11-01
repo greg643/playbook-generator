@@ -85,7 +85,11 @@ def complete_app_publication(s3, bucket, job_id, *, opener=None, sleep=time.slee
     for attempt in range(3):
         ensure_job_active(s3, bucket, job_id)
         request = urllib.request.Request(origin + '/api/app-publication/complete',
-            data=json.dumps(callback).encode(), method='POST', headers={'Content-Type':'application/json'})
+            data=json.dumps(callback).encode(), method='POST', headers={
+                'Content-Type': 'application/json',
+                'User-Agent': 'GSS-Playbook-Renderer/1.0',
+                'Accept': 'application/json',
+            })
         try:
             with client.open(request, timeout=30) as response:
                 body = response.read(4097)
@@ -99,6 +103,7 @@ def complete_app_publication(s3, bucket, job_id, *, opener=None, sleep=time.slee
         except urllib.error.HTTPError as error:
             code = error.code
             error.close()
+            print(f'Publication callback HTTP {code} (attempt {attempt + 1}/3)', file=sys.stderr)
             if code != 429 and code < 500:
                 raise PublicationCompletionError('Publication was not accepted; check the current book before retrying') from None
         except (urllib.error.URLError, TimeoutError, OSError):

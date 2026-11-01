@@ -257,8 +257,8 @@ export async function landingApple({ request, env }) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="apple-handoff" content="${handoff}"><title>Finishing sign-in · GSS</title>
 <link rel="stylesheet" href="/apple-finishing.css"><script src="/apple-finishing.js" defer></script></head>
-<body><main><div class="brand">GSS PLAYBOOK</div><div id="spinner" aria-hidden="true"></div>
-<h1 id="heading">Finishing sign-in…</h1><p id="status" role="status">Please wait. You don’t need to press Continue again.</p>
+<body><main><div id="spinner" aria-hidden="true"></div>
+<h1 id="heading">Finishing sign in</h1><p id="status" role="status"></p>
 <a id="retry" href="/api/auth/apple/start?returnTo=%2F" hidden>Try sign-in again</a>
 <noscript>JavaScript is needed to finish signing in. Enable it, then start sign-in again.</noscript></main></body></html>`, {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
