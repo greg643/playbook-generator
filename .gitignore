@@ -8,3 +8,4 @@ venv/
 .wrangler/
 dashboard/.wrangler/
 tmp/
+/output/
