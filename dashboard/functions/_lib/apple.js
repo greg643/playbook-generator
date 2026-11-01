@@ -46,8 +46,11 @@ export async function sealApple(env, payload) {
   return encode(result);
 }
 async function readSealed(request, env, name, kind) {
+  return readSealedValue(request, env, cookieValue(request, name), kind);
+}
+async function readSealedValue(request, env, sealed, kind) {
   try {
-    const raw = decode(cookieValue(request, name));
+    const raw = decode(sealed);
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(0, 12) }, await aesKey(env), raw.slice(12));
     const value = JSON.parse(new TextDecoder().decode(plain));
     if (value.kind !== kind || value.origin !== new URL(request.url).origin ||
@@ -228,6 +231,61 @@ export async function callbackApple({ request, env }) {
     // Do not log tokens, authorization codes, cookies or provider response bodies.
     return callbackFailure(error instanceof AppleExchangeError ? error.code : stage);
   }
+}
+
+// Leave Apple's consent page before the two provider exchanges. Otherwise its
+// Continue button becomes enabled again while this request is still pending.
+// Only an encrypted, origin-bound handoff enters the page, never the Apple code
+// or GSS bearer. The original HttpOnly transaction cookie is still required and
+// callbackApple remains the sole consumer of its one-time state.
+export async function landingApple({ request, env }) {
+  if (!appleConfigured(env, request)) return failure('unavailable');
+  try {
+    if (request.headers.get('content-type')?.split(';')[0] !== 'application/x-www-form-urlencoded') return callbackFailure('callback_request');
+    const text = await readBoundedUtf8Text(request, 16384);
+    if (text === null) return callbackFailure('callback_request');
+    const form = new URLSearchParams(text);
+    if (!cookieValue(request, TXN_COOKIE)) return callbackFailure('transaction_missing');
+    const txn = await readSealed(request, env, TXN_COOKIE, 'transaction');
+    if (!txn) return callbackFailure('transaction_invalid');
+    if (form.get('state') !== txn.state || !destinations.has(txn.returnTo)) return callbackFailure('state_mismatch');
+    if (form.has('error')) return failure('cancelled');
+    if (!form.get('code') || form.get('code').length > 4096) return callbackFailure('code_missing');
+    const handoff = await sealApple(env, { kind: 'callback', origin: new URL(request.url).origin,
+      iat: now(), form: text });
+    return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-handoff" content="${handoff}"><title>Finishing sign-in · GSS</title>
+<link rel="stylesheet" href="/apple-finishing.css"><script src="/apple-finishing.js" defer></script></head>
+<body><main><div class="brand">GSS PLAYBOOK</div><div id="spinner" aria-hidden="true"></div>
+<h1 id="heading">Finishing sign-in…</h1><p id="status" role="status">Please wait. You don’t need to press Continue again.</p>
+<a id="retry" href="/api/auth/apple/start?returnTo=%2F" hidden>Try sign-in again</a>
+<noscript>JavaScript is needed to finish signing in. Enable it, then start sign-in again.</noscript></main></body></html>`, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
+        'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" },
+    });
+  } catch { return callbackFailure('callback_request'); }
+}
+
+export async function completeAppleHandoff({ request, env }) {
+  if (!appleConfigured(env, request)) return jsonNoStore({ error: 'Apple sign-in is unavailable' }, { status: 503 });
+  if (!sameOrigin(request)) return jsonNoStore({ error: 'Invalid request origin' }, { status: 403 });
+  let handoff;
+  try {
+    const text = await readBoundedUtf8Text(request, 32768);
+    const input = text && JSON.parse(text);
+    if (typeof input?.handoff !== 'string' || !/^[A-Za-z0-9_-]{1,24000}$/.test(input.handoff)) throw Error();
+    handoff = await readSealedValue(request, env, input.handoff, 'callback');
+    if (typeof handoff?.form !== 'string' || bytes(handoff.form).length > 16384) throw Error();
+  } catch { return jsonNoStore({ error: 'Please start sign-in again.' }, { status: 400 }); }
+  const response = await callbackApple({ env, request: new Request(new URL('/api/auth/apple/callback', request.url), {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie: request.headers.get('cookie') || '' },
+    body: handoff.form,
+  }) });
+  const headers = new Headers();
+  for (const value of response.headers.getSetCookie()) headers.append('Set-Cookie', value);
+  return jsonNoStore({ redirect: response.headers.get('location') }, { headers });
 }
 
 export async function pendingApple({ request, env }) {

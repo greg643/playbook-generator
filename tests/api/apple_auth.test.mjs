@@ -10,6 +10,8 @@ import { onRequestPost as login } from '../../dashboard/functions/api/auth/login
 import { onRequestPost as resetRequest } from '../../dashboard/functions/api/auth/password-reset/request.js';
 import { onRequestPost as resetComplete } from '../../dashboard/functions/api/auth/password-reset/complete.js';
 import { readAppWebSession } from '../../dashboard/functions/_lib/app-web-session.js';
+import { onRequestPost as landingApple } from '../../dashboard/functions/api/auth/apple/callback.js';
+import { onRequestPost as completeAppleHandoff } from '../../dashboard/functions/api/auth/apple/complete.js';
 
 const ORIGIN = 'https://playbook.example';
 const APPLE_ID = '0123456789abcdef';
@@ -256,6 +258,67 @@ test('invalid callback state never reaches an identity provider', async t => {
   t.mock.method(globalThis,'fetch',async()=>{calls++; throw new Error('unexpected');});
   const response=await callbackApple({env,request:new Request(ORIGIN+'/api/auth/apple/callback',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'state=wrong&code=wrong'})});
   assert.equal(response.headers.get('location'),'/?apple=failed&apple_step=transaction_missing'); assert.equal(calls,0);
+});
+
+async function handoffFixture(env, changes = {}) {
+  const state=generatePasswordResetToken();
+  const txn=await sealApple(env,{kind:'transaction',origin:ORIGIN,iat:Math.floor(Date.now()/1000),
+    state,rawNonce:generatePasswordResetToken(),returnTo:'/editor',...changes});
+  const cookie='__Host-pb_apple_txn='+txn;
+  const landing=await landingApple({env,request:new Request(ORIGIN+'/api/auth/apple/callback',{
+    method:'POST',headers:{cookie,'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({state,code:'private-apple-code'}),
+  })});
+  const html=await landing.text();
+  return {landing,html,cookie,handoff:html.match(/name="apple-handoff" content="([^"]+)"/)?.[1]};
+}
+
+test('real callback route displays progress before any provider request, then signs in exactly once', async t => {
+  const env=environment();
+  await env.PLAYBOOK_BUCKET.put(appleKey(APPLE_ID),JSON.stringify({userId:UID,email:'',appleAccountKey:APPLE_ID,sessionVersion:1}));
+  let calls=0;
+  t.mock.method(globalThis,'fetch',async url=>{
+    calls++;
+    return Response.json(url==='https://appleid.apple.com/auth/token' ? {id_token:'server-token'}
+      : {account_key:APPLE_ID,session_token:GSS_TOKEN,display_name:'Coach'});
+  });
+  const f=await handoffFixture(env);
+  assert.equal(f.landing.status,200);
+  assert.equal(calls,0,'progress must not wait for Apple/GSS exchange');
+  assert.match(f.html,/Finishing sign-in/);
+  assert.ok(f.handoff);
+  assert.equal(f.html.includes('private-apple-code'),false);
+  assert.equal(f.html.includes(GSS_TOKEN),false);
+  assert.equal(f.landing.headers.get('cache-control'),'no-store');
+  assert.match(f.landing.headers.get('content-security-policy'),/script-src 'self'/);
+  assert.equal(f.landing.headers.get('content-security-policy').includes('unsafe-inline'),false);
+  const complete=()=>completeAppleHandoff({env,request:request('/api/auth/apple/complete',f.cookie,{handoff:f.handoff})});
+  const results=await Promise.all([complete(),complete()]);
+  const bodies=await Promise.all(results.map(r=>r.clone().json()));
+  assert.deepEqual(bodies.map(b=>b.redirect).sort(),['/?apple=failed&apple_step=transaction_used','/editor'].sort());
+  assert.equal(calls,2,'a double submission cannot exchange the Apple code twice');
+  const success=results[bodies.findIndex(b=>b.redirect==='/editor')];
+  assert.equal((await getUser(request('/',sessionCookie(success)),env)).userId,UID);
+  assert.equal((await readAppWebSession(request('/',sessionCookie(success)),env)).bearer,GSS_TOKEN);
+});
+
+test('handoff rejects tampering, expiry, wrong origin, missing/mismatched cookies and malformed payloads', async t => {
+  const env=environment(); let calls=0;
+  t.mock.method(globalThis,'fetch',async()=>{calls++;throw Error('must not reach provider');});
+  const f=await handoffFixture(env);
+  for(const handoff of [f.handoff.slice(0,-3)+'AAA', 'bad', null, 'x'.repeat(24001),
+    await sealApple(env,{kind:'callback',origin:ORIGIN,iat:Math.floor(Date.now()/1000)-601,form:'code=x'}),
+    await sealApple(env,{kind:'callback',origin:'https://other.example',iat:Math.floor(Date.now()/1000),form:'code=x'})]) {
+    assert.equal((await completeAppleHandoff({env,request:request('/api/auth/apple/complete',f.cookie,{handoff})})).status,400);
+  }
+  assert.equal((await completeAppleHandoff({env,request:request('/api/auth/apple/complete',f.cookie,{handoff:f.handoff},'https://other.example')})).status,403);
+  const missing=await completeAppleHandoff({env,request:request('/api/auth/apple/complete','',{handoff:f.handoff})});
+  assert.equal((await missing.json()).redirect,'/?apple=failed&apple_step=transaction_missing');
+  const other=await handoffFixture(env);
+  const mismatch=await completeAppleHandoff({env,request:request('/api/auth/apple/complete',other.cookie,{handoff:f.handoff})});
+  assert.equal((await mismatch.json()).redirect,'/?apple=failed&apple_step=state_mismatch');
+  assert.equal((await handoffFixture(env,{iat:Math.floor(Date.now()/1000)-601})).landing.status,303);
+  assert.equal(calls,0);
 });
 
 test('callback diagnostics identify failed stages without disclosing provider bodies or credentials', async t => {

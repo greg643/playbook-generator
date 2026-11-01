@@ -1,1 +1,1 @@
-export { callbackApple as onRequestPost } from "../../../_lib/apple.js";
+export { landingApple as onRequestPost } from "../../../_lib/apple.js";
