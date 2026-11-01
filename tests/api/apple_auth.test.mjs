@@ -9,6 +9,7 @@ import { onRequestPost as recoveryCode } from '../../dashboard/functions/api/aut
 import { onRequestPost as login } from '../../dashboard/functions/api/auth/login.js';
 import { onRequestPost as resetRequest } from '../../dashboard/functions/api/auth/password-reset/request.js';
 import { onRequestPost as resetComplete } from '../../dashboard/functions/api/auth/password-reset/complete.js';
+import { readAppWebSession } from '../../dashboard/functions/_lib/app-web-session.js';
 
 const ORIGIN = 'https://playbook.example';
 const APPLE_ID = '0123456789abcdef';
@@ -17,7 +18,7 @@ class Bucket {
   records = new Map(); sequence = 0; beforePut = null;
   async get(key) {
     const entry = this.records.get(key);
-    return entry ? { key, etag: entry.etag, uploaded: new Date(), json: async () => JSON.parse(entry.text), text: async () => entry.text } : null;
+    return entry ? { key, etag: entry.etag, uploaded: new Date(), body: new Blob([entry.text]).stream(), json: async () => JSON.parse(entry.text), text: async () => entry.text } : null;
   }
   async head(key) { return this.get(key); }
   async put(key, text, { onlyIf } = {}) {
@@ -236,6 +237,12 @@ test('callback exchanges the code server-side and delegates token and nonce veri
   assert.equal(response.headers.get('location'),'/apple-welcome');
   assert.equal(env.PLAYBOOK_BUCKET.records.size,0);
   assert.equal(calls.length,2);
+  const setupCookie = response.headers.getSetCookie().find(c => c.startsWith('__Host-pb_apple_pending=')).split(';')[0];
+  const setup = await finishApple({ env, request: request('/api/auth/apple/finish', setupCookie, { mode: 'new' }) });
+  assert.equal(setup.status, 200);
+  assert.equal((await readAppWebSession(request('/', sessionCookie(setup)), env)).bearer, 'verified-gss-session');
+  assert.equal([...env.AUTH_STATE_BUCKET.records.keys()].some(k => k.startsWith('app-web-pending/')), false);
+  assert.equal([...env.AUTH_STATE_BUCKET.records.values()].some(v => v.text.includes('verified-gss-session')), false);
   const replay=await callbackApple({env,request:makeRequest()});
   assert.equal(replay.headers.get('location'),'/?apple=failed&apple_step=transaction_used');
   assert.equal(calls.length,2);
@@ -376,5 +383,7 @@ test('known Apple identities return to their requested tool; disabled identities
     const user=await getUser(request('/',sessionCookie(response)),env);
     assert.equal(Boolean(user),!disabled);
     assert.equal((await getUser(request('/',sessionCookie(response)),env,{allowDisabled:true})).authMethod,'apple');
+    if (!disabled) assert.equal((await readAppWebSession(request('/', sessionCookie(response)), env)).bearer, 'verified-gss-session');
+    else await assert.rejects(readAppWebSession(request('/', sessionCookie(response)), env), { status: 401 });
   }
 });

@@ -7,6 +7,10 @@ import {
 } from "../_lib/jobs.js";
 import { putJson } from "../_lib/r2.js";
 import { coachLayouts } from "../_lib/coach-layouts.js";
+import { AppAccessError } from "../_lib/app-access.js";
+import { readAppWebSession } from "../_lib/app-web-session.js";
+import { preparePublicationJob } from "../_lib/app-publication-jobs.js";
+import { selectedAssets } from "../_lib/app-publications.js";
 
 const OFFENSE_NAME_RE = /^(0[1-9]|[1-5][0-9]|6[0-4])\.png$/;
 const DEFENSE_NAME_RE = /^D([1-9]|1[0-9]|2[0-4])\.png$/;
@@ -91,6 +95,19 @@ export async function onRequestPost(context) {
     }
     if (!options || typeof options !== "object" || Array.isArray(options)) {
       return jsonNoStore({ error: "Invalid options" }, { status: 400 });
+    }
+    const publication = options.appPublication;
+    let appSession;
+    if (publication !== undefined) {
+      if (request.headers.get('origin') !== new URL(request.url).origin) {
+        throw new AppAccessError(403, 'Invalid request origin');
+      }
+      if (!publication || typeof publication !== 'object' || Array.isArray(publication) ||
+          Object.keys(publication).sort().join(',') !== 'coachesOnly,makeDefault,sourceBookId,sourceRevision,teamId') {
+        throw new AppAccessError(400, 'Invalid publication');
+      }
+      appSession = await readAppWebSession(request, env);
+      if (appSession.user.userId !== user.userId) throw new AppAccessError(401, 'Sign in again');
     }
     const selected = {
       offense_coach_card: options.offense_coach_card === true,
@@ -183,10 +200,22 @@ export async function onRequestPost(context) {
       `jobs/${jobId}/owner.json`,
       `jobs/${jobId}/status.json`,
       ...files.map((file) => `jobs/${jobId}/plays/${file.name}`),
+      ...(publication ? [`jobs/${jobId}/app-publication.json`] : []),
     ];
 
     try {
       await createJobOwner(env, jobId, user.userId, createdAt);
+      if (publication) {
+        const { intent, callback } = await preparePublicationJob(env, user, { ...publication, operationId: jobId,
+          layouts: { offense: selected.offense_plays_per_page, defense: selected.defense_plays_per_page } }, appSession.bearer);
+        const assets = selectedAssets(intent.source.document);
+        const expected = assets.filter(a => a.mediaType === 'image/png').map(a => a.file.slice('plays/'.length)).sort();
+        if (JSON.stringify([...names].sort()) !== JSON.stringify(expected) ||
+            ['offense', 'defense'].some(side => selected[`${side}_coach_card`] !== assets.some(a => a.id === `coach-${side}`))) {
+          throw new AppAccessError(409, 'Render every included play and its coach card before publishing');
+        }
+        await putJson({ PLAYBOOK_BUCKET: jobsBucket }, `jobs/${jobId}/app-publication.json`, callback);
+      }
       for (const file of files) {
         await jobsBucket.put(`jobs/${jobId}/plays/${file.name}`, file, {
           httpMetadata: { contentType: "image/png" },
@@ -197,6 +226,7 @@ export async function onRequestPost(context) {
         createdAt,
         mode: "images",
         options: selected,
+        ...(publication ? { publicationId: jobId } : {}),
       });
 
       if (!(await isAccountActive(env, user))) {
@@ -208,6 +238,8 @@ export async function onRequestPost(context) {
         `https://api.github.com/repos/${env.GITHUB_REPO || "greg643/playbook-generator"}/dispatches`,
         {
           method: "POST",
+          redirect: "manual",
+          signal: AbortSignal.timeout(10000),
           headers: {
             Authorization: `Bearer ${env.GITHUB_TOKEN}`,
             Accept: "application/vnd.github.v3+json",
@@ -221,8 +253,8 @@ export async function onRequestPost(context) {
       );
 
       if (!githubResponse.ok) {
-        const errorText = await githubResponse.text();
-        console.error("GitHub dispatch failed:", githubResponse.status, errorText);
+        await githubResponse.body?.cancel();
+        console.error(JSON.stringify({ event: 'playbook_dispatch_failed', status: githubResponse.status }));
         await cleanupFailedJob(env, user.userId, jobId, keys);
         return jsonNoStore({ error: "Failed to trigger processing" }, { status: 502 });
       }
@@ -233,6 +265,7 @@ export async function onRequestPost(context) {
 
     return jsonNoStore({ jobId });
   } catch (err) {
+    if (err instanceof AppAccessError) return jsonNoStore({ error: err.message }, { status: err.status });
     console.error("Generate error:", err);
     return jsonNoStore({ error: "Internal server error" }, { status: 500 });
   }

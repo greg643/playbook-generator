@@ -5,6 +5,9 @@ import { verifyTeamAccess } from '../../dashboard/functions/_lib/app-access.js';
 import { onRequestGet as readApp } from '../../dashboard/functions/api/app/playbooks/[[path]].js';
 import { preparePublicationJob, finishPublicationJob } from '../../dashboard/functions/_lib/app-publication-jobs.js';
 import { onRequestPost as finishRoute } from '../../dashboard/functions/api/app-publication/complete.js';
+import { onRequestPost as generate } from '../../dashboard/functions/api/generate.js';
+import { createSessionCookie } from '../../dashboard/functions/_lib/auth.js';
+import { bindAppWebSession, clearAppWebSession } from '../../dashboard/functions/_lib/app-web-session.js';
 
 const UID = '11111111-1111-4111-8111-111111111111';
 const TEAM = 'T-22222222-2222-4222-8222-222222222222';
@@ -25,7 +28,8 @@ class R2 {
   async head(key) { const object = await this.get(key); if (object) { await object.body.cancel(); delete object.body; } return object; }
   async put(key, input, options = {}) {
     if (this.beforePut) await this.beforePut(key, options);
-    const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
+    const bytes = typeof input === 'string' ? new TextEncoder().encode(input)
+      : input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : new Uint8Array(input);
     const hash = await crypto.subtle.digest('SHA-256', bytes);
     if (options.sha256) assert.equal(Buffer.from(hash).toString('hex'), options.sha256);
     // The precondition and commit are atomic in R2: do not insert an await
@@ -36,11 +40,15 @@ class R2 {
     const record = { bytes, hash, etag: String(++this.sequence), httpMetadata: options.httpMetadata };
     this.records.set(key, record); return this.object(key, record);
   }
-  async delete(key) { this.records.delete(key); }
+  async delete(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) this.records.delete(key); }
+  async list({ prefix = '' } = {}) {
+    return { objects: [...this.records.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })), truncated: false };
+  }
 }
 const json = (bucket, key, value) => bucket.put(key, JSON.stringify(value));
 async function fixture(t) {
-  const env = { PLAYBOOK_BUCKET: new R2(), JOBS_BUCKET: new R2(), GSS_API_BASE: 'https://gss.example', SESSION_SECRET: 'a'.repeat(64) };
+  const env = { PLAYBOOK_BUCKET: new R2(), JOBS_BUCKET: new R2(), AUTH_STATE_BUCKET: new R2(),
+    GSS_API_BASE: 'https://gss.example', SESSION_SECRET: 'a'.repeat(64) };
   const credentialKey = `users/byapple/${ACCOUNT}.json`;
   const account = { userId: UID, appleAccountKey: ACCOUNT, email: '', sessionVersion: 1 };
   const user = { userId: UID, email: '', credentialKey, account };
@@ -55,6 +63,7 @@ async function fixture(t) {
   const upstream = { role: 'leader', accountStatus: 'enabled', migration: true, forbidden: false, requests: [] };
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     upstream.requests.push({ url, options });
+    if (url.startsWith('https://api.github.com/')) return new Response(null, { status: upstream.dispatchStatus || 204 });
     assert.equal(options.redirect, 'manual');
     assert.equal(options.headers.Authorization, `Bearer ${TOKEN}`);
     if (url.endsWith('/v2/me')) return Response.json({ account_key: ACCOUNT,
@@ -79,6 +88,68 @@ async function publish(f, input = f.input) {
   await beginAppPublication(f.env, f.user, input, TOKEN); await render(f, input);
   return completeAppPublication(f.env, f.user, input.operationId, TOKEN);
 }
+
+async function publicationRequest(f, { missingDefense = false, origin = 'https://playbook.example', changes = {} } = {}) {
+  const cookie = await createSessionCookie(UID, '', f.env, 1, { credentialKey: f.user.credentialKey, appleAccountKey: ACCOUNT });
+  await bindAppWebSession(f.env, 'https://playbook.example', cookie, f.user.account, TOKEN);
+  const { operationId, ...selection } = f.input;
+  const form = new FormData();
+  form.set('options', JSON.stringify({ offense_coach_card: true, defense_coach_card: !missingDefense,
+    offense_plays_per_page: 4, defense_plays_per_page: 9, appPublication: { ...selection, ...changes } }));
+  form.append('plays', new File([PNG], '01.png', { type: 'image/png' }));
+  if (!missingDefense) form.append('plays', new File([PNG], 'D1.png', { type: 'image/png' }));
+  return new Request('https://playbook.example/api/generate', { method: 'POST', headers: { cookie: cookie.split(';')[0], origin }, body: form });
+}
+
+test('web publication dispatch persists private capability and completes after browser sign-out', async t => {
+  const f = await fixture(t), request = await publicationRequest(f);
+  const response = await generate({ env: f.env, request });
+  assert.equal(response.status, 200, await response.clone().text());
+  const { jobId } = await response.json();
+  const prefix = `jobs/${jobId}/`, status = await (await f.env.JOBS_BUCKET.get(prefix + 'status.json')).json();
+  assert.equal(status.publicationId, jobId); assert.equal(status.mode, 'images');
+  assert.equal(JSON.stringify(status).includes(TOKEN), false); assert.equal(status.callback, undefined);
+  const callback = await (await f.env.JOBS_BUCKET.get(prefix + 'app-publication.json')).json();
+  assert.equal(callback.operationId, jobId); assert.equal(JSON.stringify(callback).includes(TOKEN), false);
+  const dispatch = f.upstream.requests.find(r => r.url.startsWith('https://api.github.com/'));
+  assert.deepEqual(JSON.parse(dispatch.options.body).client_payload, { job_id: jobId });
+  await clearAppWebSession(request, f.env);
+  await render(f, { ...f.input, operationId: jobId });
+  const done = await finishPublicationJob(f.env, callback);
+  assert.equal(done.published, true);
+  const manifest = await completeAppPublication(f.env, f.user, jobId, TOKEN);
+  assert.equal(manifest.coachCards.offense.playsPerPage, 4); assert.equal(manifest.coachCards.defense.playsPerPage, 9);
+});
+
+test('web publication rejects mismatched included render files without dispatching', async t => {
+  const f = await fixture(t);
+  const response = await generate({ env: f.env, request: await publicationRequest(f, { missingDefense: true }) });
+  assert.equal(response.status, 409);
+  assert.equal(f.upstream.requests.some(r => r.url.startsWith('https://api.github.com/')), false);
+  const catalogue = await readTeamPublications(f.env, TEAM);
+  assert.equal(catalogue.value.entries[0].current, null);
+  assert.equal([...f.env.JOBS_BUCKET.records.keys()].some(k => k.endsWith('app-publication.json')), false);
+});
+
+test('web publication rejects CSRF and non-manager without dispatch or published changes', async t => {
+  const f = await fixture(t);
+  assert.equal((await generate({ env: f.env, request: await publicationRequest(f, { origin: 'https://evil.example' }) })).status, 403);
+  assert.equal(f.upstream.requests.length, 0);
+  f.upstream.role = 'member';
+  assert.equal((await generate({ env: f.env, request: await publicationRequest(f) })).status, 404);
+  assert.equal(f.upstream.requests.some(r => r.url.startsWith('https://api.github.com/')), false);
+  assert.deepEqual((await readTeamPublications(f.env, TEAM)).value.entries, []);
+});
+
+test('failed web dispatch preserves prior published snapshot and scrubs callback capability', async t => {
+  const f = await fixture(t), prior = await publish(f);
+  f.upstream.dispatchStatus = 503;
+  t.mock.method(console, 'error', () => {});
+  const response = await generate({ env: f.env, request: await publicationRequest(f) });
+  assert.equal(response.status, 502);
+  assert.equal((await readTeamPublications(f.env, TEAM)).value.entries[0].current.snapshotId, prior.snapshotId);
+  assert.equal([...f.env.JOBS_BUCKET.records.keys()].some(k => k.endsWith('app-publication.json')), false);
+});
 function read(f, path = [TEAM]) {
   return readApp({ env: f.env, params: { path }, request: new Request(`https://playbook.example/api/app/playbooks/${path.join('/')}`,
     { headers: { Authorization: `Bearer ${TOKEN}` } }) });

@@ -5,6 +5,8 @@ import { accountSessionVersion, createSessionCookie, generatePasswordResetToken,
   sha256Hex, validCredentialKey } from "./auth.js";
 import { createJson, putJsonIfCurrent } from "./r2.js";
 import { legacyEmailAuthEnabled, appleOnlyResponse } from "./auth-policy.js";
+import { bindAppWebSession, clearPendingAppSession, readPendingAppSession,
+  savePendingAppSession, validGSSBearer } from "./app-web-session.js";
 
 const TXN_COOKIE = "__Host-pb_apple_txn";
 const PENDING_COOKIE = "__Host-pb_apple_pending";
@@ -205,16 +207,22 @@ export async function callbackApple({ request, env }) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identity_token: apple.id_token, raw_nonce: txn.rawNonce, display_name: displayName }),
     }, "gss");
-    if (!KEY_RE.test(verified?.account_key || "") || !verified.session_token) return callbackFailure("gss_response");
+    if (!KEY_RE.test(verified?.account_key || "") || !validGSSBearer(verified.session_token)) return callbackFailure("gss_response");
     displayName = typeof verified.display_name === "string" && verified.display_name.trim()
       ? verified.display_name.trim().slice(0, 80) : (displayName || "Coach");
     stage = "account_lookup";
     const existing = await findAppleAccount(env, verified.account_key);
     stage = "session_create";
-    if (existing) return redirect(existing.record.disabledAt ? "/apple-delete" : txn.returnTo,
-      [await sessionFor(env, existing, true), cookie(TXN_COOKIE, "", 0), cookie(PENDING_COOKIE, "", 0)]);
+    if (existing) {
+      const session = await sessionFor(env, existing, true);
+      if (!existing.record.disabledAt) await bindAppWebSession(env, txn.origin, session, existing.record, verified.session_token);
+      return redirect(existing.record.disabledAt ? "/apple-delete" : txn.returnTo,
+        [session, cookie(TXN_COOKIE, "", 0), cookie(PENDING_COOKIE, "", 0)]);
+    }
+    const nonce = generatePasswordResetToken();
+    await savePendingAppSession(env, txn.origin, nonce, verified.account_key, verified.session_token);
     const pending = await sealApple(env, { kind: "pending", origin: txn.origin, iat: now(),
-      nonce: generatePasswordResetToken(), appleAccountKey: verified.account_key, displayName, returnTo: txn.returnTo });
+      nonce, appSession: true, appleAccountKey: verified.account_key, displayName, returnTo: txn.returnTo });
     return redirect("/apple-welcome", [cookie(TXN_COOKIE, "", 0), cookie(PENDING_COOKIE, pending)]);
   } catch (error) {
     // Do not log tokens, authorization codes, cookies or provider response bodies.
@@ -251,6 +259,10 @@ export async function finishApple({ request, env }) {
       return jsonNoStore({ error: "Sign into your existing playbook account again, then link Apple." }, { status: 401 });
     }
     if (body.mode === "new" && user) return jsonNoStore({ error: "You are signed in. Link your existing playbooks instead." }, { status: 409 });
+    // Legacy ten-minute pending cookies can finish account setup after deploy,
+    // but cannot publish until a new Apple exchange supplies a private grant.
+    const appBearer = pending.appSession
+      ? await readPendingAppSession(env, pending.origin, pending.nonce, pending.appleAccountKey) : null;
     if (!await consume(env, "finish", pending.nonce)) return jsonNoStore({ error: "This Apple sign-in was already used. Please continue with Apple again." }, { status: 409 });
     const key = appleKey(pending.appleAccountKey);
     const indexObject = await env.PLAYBOOK_BUCKET.get(key);
@@ -291,7 +303,12 @@ export async function finishApple({ request, env }) {
       account = { record, credentialKey: user.credentialKey };
     }
     const headers = new Headers();
-    headers.append("Set-Cookie", await sessionFor(env, account));
+    const session = await sessionFor(env, account);
+    if (appBearer) {
+      await bindAppWebSession(env, pending.origin, session, account.record, appBearer);
+      await clearPendingAppSession(env, pending.nonce);
+    }
+    headers.append("Set-Cookie", session);
     headers.append("Set-Cookie", cookie(PENDING_COOKIE, "", 0));
     return jsonNoStore({ ok: true, returnTo: pending.returnTo }, { headers });
   } catch {

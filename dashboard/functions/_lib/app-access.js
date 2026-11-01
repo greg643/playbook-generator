@@ -55,3 +55,24 @@ export async function verifyTeamAccess(env, bearer, teamId) {
   }
   return { accountKey: me.account_key, teamId, isManager: team.role === 'leader' && team.is_family_member !== true };
 }
+
+// One bounded discovery page for the editor; publication still rechecks the
+// selected Team directly. Never infer management from names or email addresses.
+export async function managedTeams(env, bearer, accountKey, continuation = null) {
+  if (continuation !== null && (typeof continuation !== 'string' || continuation.length > 4096 || !continuation)) {
+    throw new AppAccessError(400, 'Invalid Team page');
+  }
+  const me = await gssRead(env, bearer, '/v2/me', { include_teams: false });
+  if (me?.account_key !== accountKey || !/^[a-f0-9]{16}$/.test(accountKey || '') ||
+      me.account_status !== 'enabled' || me.migration_complete !== true) throw new AppAccessError(401, 'Continue with Apple again');
+  const page = await gssRead(env, bearer, '/v2/teams/list', { limit: 25, ...(continuation ? { continuation } : {}) });
+  if (!Array.isArray(page?.teams) || page.teams.length > 25 ||
+      (page.next !== null && (typeof page.next !== 'string' || !page.next || page.next.length > 4096))) {
+    throw new AppAccessError(503, 'Team access is temporarily unavailable');
+  }
+  const teams = page.teams.filter(team => team && isTeamID(team.team_id) && team.status === 'active' &&
+    team.role === 'leader' && team.is_family_member !== true && typeof team.name === 'string' && team.name.trim())
+    .map(team => ({ teamId: team.team_id, name: team.name.slice(0, 80),
+      season: typeof team.active_season_label === 'string' ? team.active_season_label.slice(0, 80) : '' }));
+  return { teams, next: page.next };
+}

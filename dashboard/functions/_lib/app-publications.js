@@ -122,7 +122,7 @@ export async function beginAppPublication(env, user, input, bearer) {
   throw conflict();
 }
 
-function selectedAssets(document) {
+export function selectedAssets(document) {
   const entries = [];
   for (const side of ['offense', 'defense']) {
     const plays = document[side]?.filter(p => p.included !== false) || [];

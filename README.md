@@ -63,10 +63,24 @@ as unconfirmed rather than successful. Set the Actions variable
 `PLAYBOOK_PUBLIC_ORIGIN` to the exact HTTPS editor origin (no path/trailing slash);
 the callback never follows redirects or accepts a job-provided destination.
 
-The web publish control/authenticated session bridge and native Team screen remain
-to be connected. Publish setup must store the capability as the job's private
-`app-publication.json` and set `publicationId` to its job ID; neither credential is
-part of public job status. Production activation also requires verification
+Apple sign-in now retains its verified GSS session encrypted in the private
+`AUTH_STATE_BUCKET`, bound to the exact HttpOnly editor cookie, account and origin
+for at most one hour. The browser and renderer never receive that token. New
+account setup uses a ten-minute private handoff; sign-out deletes the session
+grant. A rotated/disabled/deleted account cannot read it. Older web sessions can
+still edit, but need Apple sign-in again before publishing.
+
+`POST /api/app-publication/teams` provides one page of managed Teams through
+existing GSS identity/Team-list routes. Same-origin `/api/generate` accepts
+`options.appPublication` with `teamId`, `sourceBookId`, `sourceRevision`,
+`coachesOnly` and `makeDefault`. It checks the saved included-play set and coach
+cards, stores the private `app-publication.json` capability, and sets
+`publicationId` to its server-generated job ID. Neither credential enters public
+job status or the GitHub dispatch payload. Accepted jobs finish independently of
+browser logout; completion still rechecks manager authority and account liveness.
+
+The web publish controls and native Team screen remain to be connected.
+Production activation also requires verification
 that the account and job bindings really target separate buckets and that the
 render runner has job-only credentials; distinct binding names alone are not proof.
 
@@ -189,7 +203,7 @@ every push and pull request.
 
 - `PLAYBOOK_BUCKET` — permanent account-data R2 bucket
 - `JOBS_BUCKET` — separate transient job R2 bucket
-- `AUTH_STATE_BUCKET` — dedicated one-day Apple replay-marker R2 bucket (when Apple is enabled)
+- `AUTH_STATE_BUCKET` — private, dedicated R2 bucket with a one-day lifecycle over the whole bucket: Apple replay markers and encrypted short-lived GSS web-session grants (when Apple is enabled); never accessible by the render runner
 - `EMAIL_SERVICE` — production-only Service binding to the private
   `gss-playbook-email` Worker (legacy reset delivery; unused by Apple-only auth)
 - `APPLE_ENABLED` — `true` for the production Apple-only site; complete
