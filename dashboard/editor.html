@@ -648,6 +648,20 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
+    .publish-dialog { width: min(510px, calc(100vw - 2rem)); max-height: 90vh; margin: auto;
+      padding: 1.5rem; border: 1px solid #484f58; border-radius: 14px; background: #161b22; color: #e6edf3; }
+    .publish-dialog::backdrop { background: #000a; }
+    .publish-dialog p { margin: .65rem 0 1rem; color: #aeb8c4; line-height: 1.5; }
+    .publish-dialog select { display: block; width: 100%; min-height: 44px; margin: .5rem 0 1rem;
+      background: #0d1117; color: #e6edf3; border: 1px solid #484f58; border-radius: 8px; padding: .65rem; font: inherit; }
+    .publish-choice { display: flex; align-items: center; gap: .75rem; min-height: 48px; cursor: pointer; }
+    .publish-choice input { width: 20px; height: 20px; accent-color: #2ea043; flex-shrink: 0; }
+    .publish-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+    .publish-actions button { flex: 1; min-height: 44px; }
+    #publicationNotice { color: #7ee787; line-height: 1.5; margin: .75rem 0; }
+    #publishReauth { display: inline-block; margin: .5rem 0; color: #58a6ff; }
+    #publishReauth[hidden] { display: none; }
+    #publishConfirm:not(:disabled) { background: #238636; }
   </style>
 </head>
 <body>
@@ -657,6 +671,7 @@
     <a class="back" href="/">&larr; Home</a>
     <div class="spacer"></div>
     <button class="linkbtn" id="coachCardShortcut" type="button" hidden>Create coach card</button>
+    <button class="linkbtn" id="publishAppShortcut" type="button" hidden>Make available in GSS app</button>
     <a class="back" href="/help" target="_blank" rel="noopener">Help</a>
     <span class="email" id="userEmail"></span>
     <button class="linkbtn" id="accountBtn" style="display:none">Account</button>
@@ -816,6 +831,8 @@
       <p id="coachLayoutHelp" style="font-size:.85rem;color:#aeb8c4;line-height:1.5">Fewer plays per page means larger drawings. Unused spaces stay blank; extra plays continue on another page. These choices do not change wristband sizes.</p>
       <button class="btn btn-secondary" id="previewCoachBtn" type="button" style="margin-bottom:.5rem" disabled>Preview coach card</button>
       <button class="btn btn-primary" id="generateBtn">Create coach card</button>
+      <button class="btn btn-secondary" id="publishAppBtn" type="button" style="margin-top:.6rem" disabled>Make available in GSS app</button>
+      <p id="publicationNotice" role="status" aria-live="polite" hidden></p>
       <p style="font-size:.85rem;color:#aeb8c4;line-height:1.5">Download the PDF when it is ready. Print on US Letter paper at 100% or Actual size. For wristbands, laminate before cutting. <a href="/help#printing">Printing help</a></p>
 
       <div class="progress-section" id="progressSection" role="status" aria-live="polite">
@@ -851,6 +868,25 @@
       <button class="btn btn-secondary" id="closeCoachPreview" type="button">Back to editing</button>
       <button class="btn btn-primary" id="createFromPreview" type="button">Create coach card</button>
     </div>
+  </dialog>
+
+  <dialog id="publishDialog" class="publish-dialog" aria-labelledby="publishTitle" aria-describedby="publishSummary">
+    <h2 id="publishTitle" tabindex="-1" autofocus>Make available in GSS app</h2>
+    <p id="publishSummary"></p>
+    <label for="publishTeam">Choose your Team</label>
+    <select id="publishTeam" disabled><option value="">Loading your Teams…</option></select>
+    <button class="linkbtn" id="publishMoreTeams" type="button" hidden>Load more Teams</button>
+    <label class="publish-choice"><input id="publishDefault" type="checkbox"><span>★ Open this book by default</span></label>
+    <label class="publish-choice"><input id="publishCoachesOnly" type="checkbox"><span>Coaches only</span></label>
+    <p id="publishAudience">Everyone on this Team, including parents, can open it. Other Teams cannot.</p>
+    <p id="publishTeamStatus" role="status" aria-live="polite"></p>
+    <a id="publishReauth" href="/api/auth/apple/start?returnTo=/editor" hidden>Continue with Apple</a>
+    <button class="linkbtn" id="publishRetry" type="button" hidden>Try again</button>
+    <div class="publish-actions">
+      <button class="btn btn-secondary" id="publishCancel" type="button">Back to editing</button>
+      <button class="btn btn-primary" id="publishConfirm" type="button" disabled>Publish to Team</button>
+    </div>
+    <p style="font-size:.8rem;margin-bottom:0">Creates a saved copy of the included plays and coach cards. Later edits stay private until you publish again.</p>
   </dialog>
 
 <script>
@@ -2612,6 +2648,7 @@ function syncGenerateChecks() {
     box.parentElement.style.opacity = ok ? '' : '0.5';
   }
   generateBtn.disabled = generating || !doc || !outputChecks.some(box => !box.disabled && box.checked);
+  $('publishAppBtn').disabled = $('publishAppShortcut').disabled = generating || (!hasOff && !hasDef);
   if ($('previewCoachBtn')) $('previewCoachBtn').disabled = generating || (!hasOff && !hasDef);
   if ($('coachCardSummary')) $('coachCardSummary').textContent = hasOff || hasDef
     ? offCount + ' offense + ' + defCount + ' defense plays selected. Uncheck a play in the sidebar to leave it off the cards.'
@@ -3340,6 +3377,7 @@ let generating = false;
 let pollTimer = null;
 let generationEpoch = 0;
 let generationRequest = null;
+let generationPublication = null;
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const POLL_REQUEST_TIMEOUT_MS = 15000;
@@ -3351,12 +3389,14 @@ function isGenerationCurrent(epoch) {
 }
 
 function invalidateGeneration({ clearUI = false, resetPreferences = false } = {}) {
+  if ($('publishDialog').open) $('publishDialog').close();
   generationEpoch++;
   if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
   if (generationRequest) generationRequest.abort();
   generationRequest = null;
   generating = false;
+  generationPublication = null;
   if (resetPreferences) outputChecks.forEach(box => { box.checked = box === chkOffenseCoach || box === chkDefenseCoach; });
   if (clearUI) {
     progressSection.classList.remove('active');
@@ -3364,6 +3404,7 @@ function invalidateGeneration({ clearUI = false, resetPreferences = false } = {}
     resetLink.classList.remove('active');
     hideGenError();
     dlGrid.replaceChildren();
+    $('publicationNotice').hidden = true;
   }
   syncGenerateChecks();
 }
@@ -3406,20 +3447,25 @@ function failGeneration(epoch, message) {
 function showProgress(msg) {
   progressSection.classList.add('active');
   statusText.textContent = msg;
+  if (generationPublication) statusText.scrollIntoView({ block: 'nearest' });
 }
 
 function showGenError(msg) {
   genError.textContent = msg;
   genError.classList.add('active');
   progressSection.classList.remove('active');
+  if (generationPublication) genError.scrollIntoView({ block: 'nearest' });
 }
 
 function hideGenError() {
   genError.classList.remove('active');
 }
 
-generateBtn.addEventListener('click', async () => {
+async function generatePlaybook(publication = null) {
   if (generating || !doc) return;
+  if (drawing) finishDrawing();
+  const documentContext = captureDocumentContext();
+  const startingChange = changeCounter;
   const options = {
     offense_coach_card: !chkOffenseCoach.disabled && chkOffenseCoach.checked,
     offense_wristband: !chkOffenseWrist.disabled && chkOffenseWrist.checked,
@@ -3430,6 +3476,12 @@ generateBtn.addEventListener('click', async () => {
     offense_plays_per_page: Number($('offensePerPage').value),
     defense_plays_per_page: Number($('defensePerPage').value),
   };
+  if (publication) {
+    options.offense_coach_card = doc.offense.some(isIncluded);
+    options.defense_coach_card = doc.defense.some(isIncluded);
+    options.offense_wristband = options.defense_wristband = false;
+  }
+  $('publicationNotice').hidden = true;
   hideGenError();
   downloads.classList.remove('active');
   resetLink.classList.remove('active');
@@ -3487,36 +3539,47 @@ generateBtn.addEventListener('click', async () => {
   }
   const epoch = ++generationEpoch;
   generating = true;
+  generationPublication = publication;
   syncGenerateChecks();
   try {
     showProgress('Saving…');
     if (!await saveDoc()) throw new Error('Could not save your playbook');
     if (!isGenerationCurrent(epoch)) return;
+    if (publication && (!isCurrentDocumentContext(documentContext) || changeCounter !== startingChange || saveState !== 'saved')) {
+      throw new Error('The playbook changed while saving. Publish again when your edits are saved.');
+    }
+    if (publication) options.appPublication = { teamId: publication.teamId, sourceBookId: documentContext.playbookId,
+      sourceRevision: serverRevision, coachesOnly: publication.coachesOnly, makeDefault: publication.makeDefault };
     showProgress('Rendering play images…');
     // Export from a frozen copy: the canvas stays interactive during the async
     // export loop, and a mid-export edit must not tear the rendered set.
-    const frozenOffense = offensePlays.map(snapshot).sort((a, b) => a.num - b.num);
-    const frozenDefense = defensePlays.map(snapshot).sort((a, b) => a.num - b.num);
+    const frozenOffense = offensePlays.map(snapshot);
+    const frozenDefense = defensePlays.map(snapshot);
+    if (!publication) { frozenOffense.sort((a, b) => a.num - b.num); frozenDefense.sort((a, b) => a.num - b.num); }
     const form = new FormData();
     form.append('options', JSON.stringify(options));
     if (needOffense) {
-      for (const p of frozenOffense) {
+      for (const [index, p] of frozenOffense.entries()) {
         const blob = await exportPlayPNG(p, 'offense', displayNum('offense', p));
         if (!isGenerationCurrent(epoch)) return;
-        form.append('plays', blob, String(p.num).padStart(2, '0') + '.png');
+        form.append('plays', blob, String(publication ? index + 1 : p.num).padStart(2, '0') + '.png');
       }
     }
     if (needDefense) {
-      for (const p of frozenDefense) {
+      for (const [index, p] of frozenDefense.entries()) {
         const blob = await exportPlayPNG(p, 'defense', displayNum('defense', p));
         if (!isGenerationCurrent(epoch)) return;
-        form.append('plays', blob, 'D' + p.num + '.png');
+        form.append('plays', blob, 'D' + (publication ? index + 1 : p.num) + '.png');
       }
+    }
+    if (publication && (!isCurrentDocumentContext(documentContext) || changeCounter !== startingChange)) {
+      throw new Error('Your plays changed during preparation. Publish again to include those edits.');
     }
     showProgress('Uploading play images…');
     const res = await generationFetch('/api/generate', { method: 'POST', body: form }, epoch, 120000);
     if (!isGenerationCurrent(epoch)) return;
     if (res.status === 401) {
+      if (publication) throw new Error('Continue with Apple again before publishing. Your saved plays are safe.');
       showAuthView('Your session expired — sign in again.');
       return;
     }
@@ -3525,12 +3588,19 @@ generateBtn.addEventListener('click', async () => {
     if (!data || typeof data.jobId !== 'string' || !JOB_ID_RE.test(data.jobId)) {
       throw new Error('Generate started, but the server returned an invalid job ID');
     }
-    showProgress('Processing your playbook…');
+    showProgress(publication ? 'Publishing to ' + publication.teamName + '… You can close this page.' : 'Processing your playbook…');
     startPolling(data.jobId, epoch);
   } catch (err) {
     if (isGenerationCurrent(epoch)) failGeneration(epoch, err.message || 'Generate failed');
   }
-});
+}
+generateBtn.addEventListener('click', () => generatePlaybook());
+
+function publicationResult(data, jobId) {
+  if (!data.publication) return 'pending';
+  if (data.publication.published === true && data.publication.snapshotId === jobId && JOB_ID_RE.test(data.publication.bookId || '')) return 'published';
+  return 'unconfirmed';
+}
 
 function startPolling(jobId, epoch) {
   const startedAt = Date.now();
@@ -3546,7 +3616,9 @@ function startPolling(jobId, epoch) {
     if (!isGenerationCurrent(epoch)) return;
     const elapsed = Math.floor((Date.now() - startedAt) / 1000);
     if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
-      failGeneration(epoch, 'Processing took too long. Please try again; if this keeps happening, use a smaller playbook.');
+      failGeneration(epoch, generationPublication
+        ? 'Publication is taking longer than expected. Check the Team’s Playbook in GSS before publishing again.'
+        : 'Processing took too long. Please try again; if this keeps happening, use a smaller playbook.');
       return;
     }
     try {
@@ -3576,9 +3648,21 @@ function startPolling(jobId, epoch) {
           err.fatal = true;
           throw err;
         }
+        const publication = generationPublication;
+        const result = publication ? publicationResult(data, jobId) : null;
+        if (result === 'pending') {
+          statusText.textContent = 'Coach cards ready. Finishing publication to ' + publication.teamName + '…';
+          schedule(); return;
+        }
         if (!finishGeneration(epoch)) return;
         progressSection.classList.remove('active');
         showDownloads(jobId, data.files);
+        if (result === 'published') {
+          $('publicationNotice').textContent = 'Available in GSS → My Teams → ' + publication.teamName + ' → Playbook' +
+            (publication.coachesOnly ? ' · Coaches only' : ' · Everyone on the Team');
+          $('publicationNotice').hidden = false;
+          $('publicationNotice').scrollIntoView({ block: 'nearest' });
+        } else if (result === 'unconfirmed') showGenError('Your PDFs are ready, but Team publication could not be confirmed. Please check the app before publishing again.');
       } else if (data.status === 'error') {
         let errText = data.message || 'Processing failed';
         if (data.detail) errText += '\n\nDetail: ' + data.detail;
@@ -3626,6 +3710,116 @@ function showDownloads(jobId, files) {
 
 resetGenLink.addEventListener('click', () => {
   invalidateGeneration({ clearUI: true });
+});
+
+// ---------- Team publication dialog ----------
+
+let publishEpoch = 0, publishRequest = null, publishContext = null, publishNext = null;
+const publishTeams = new Map();
+const TEAM_ID_RE = /^T-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function publicationDialogCurrent(epoch) {
+  return epoch === publishEpoch && $('publishDialog').open && isCurrentDocumentContext(publishContext);
+}
+function syncPublicationConfirm() {
+  $('publishConfirm').disabled = !!publishRequest || !publishTeams.has($('publishTeam').value);
+}
+async function loadPublicationTeams(continuation = null) {
+  if (publishRequest) return;
+  const epoch = publishEpoch, controller = new AbortController();
+  publishRequest = controller;
+  const timer = setTimeout(() => controller.abort(), 15000);
+  $('publishTeamStatus').textContent = 'Loading your Teams…';
+  $('publishRetry').hidden = $('publishReauth').hidden = true;
+  $('publishMoreTeams').disabled = true;
+  syncPublicationConfirm();
+  try {
+    const response = await fetch('/api/app-publication/teams', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ continuation }), signal: controller.signal });
+    if (!publicationDialogCurrent(epoch)) return;
+    const data = await response.json().catch(() => ({}));
+    if (!publicationDialogCurrent(epoch)) return;
+    if (response.status === 401) {
+      publishTeams.clear(); $('publishTeam').replaceChildren(new Option('Sign in again to choose a Team', ''));
+      $('publishTeam').disabled = true;
+      $('publishReauth').hidden = false;
+      throw new Error('Continue with Apple to choose a Team. Your playbook stays saved.');
+    }
+    if (!response.ok) throw new Error(data.error || 'Could not load your Teams.');
+    if (!Array.isArray(data.teams) || data.teams.length > 25 ||
+        (data.next !== null && (typeof data.next !== 'string' || data.next.length > 4096 || !data.next)) ||
+        data.teams.some(t => !TEAM_ID_RE.test(t?.teamId || '') || typeof t.name !== 'string' || !t.name || t.name.length > 80)) {
+      throw new Error('Could not read your Team list.');
+    }
+    for (const team of data.teams) {
+      if (publishTeams.has(team.teamId)) continue;
+      publishTeams.set(team.teamId, team);
+      const option = document.createElement('option'); option.value = team.teamId;
+      option.textContent = team.name + (team.season ? ' · ' + team.season : '');
+      $('publishTeam').appendChild(option);
+    }
+    if (data.next === continuation && continuation) throw new Error('The Team list did not advance. Try again.');
+    publishNext = data.next;
+    $('publishTeam').disabled = !publishTeams.size;
+    if (publishTeams.size === 1 && !$('publishTeam').value) $('publishTeam').value = publishTeams.keys().next().value;
+    $('publishTeamStatus').textContent = publishTeams.size
+      ? 'Only Teams you manage are shown.'
+      : publishNext ? 'No managed Teams on this page. Load more Teams to continue.' : 'You do not manage a GSS Team yet. You can still create and print coach cards.';
+    $('publishMoreTeams').hidden = !publishNext;
+  } catch (error) {
+    if (!publicationDialogCurrent(epoch)) return;
+    $('publishTeamStatus').textContent = error.name === 'AbortError' ? 'Loading Teams took too long. Try again.' : error.message;
+    $('publishRetry').hidden = !$('publishReauth').hidden;
+  } finally {
+    clearTimeout(timer);
+    if (publishRequest === controller) publishRequest = null;
+    if (publicationDialogCurrent(epoch)) { $('publishMoreTeams').disabled = false; syncPublicationConfirm(); }
+  }
+}
+function openPublicationDialog() {
+  if (generating || !doc || !activeUserId) return;
+  if (drawing) finishDrawing();
+  publishEpoch++; publishContext = captureDocumentContext(); publishNext = null; publishTeams.clear();
+  $('publishTeam').replaceChildren(new Option('Choose a Team', ''));
+  $('publishTeam').disabled = true;
+  $('publishDefault').checked = $('publishCoachesOnly').checked = false;
+  $('publishAudience').textContent = 'Everyone on this Team, including parents, can open it. Other Teams cannot.';
+  $('publishMoreTeams').hidden = $('publishRetry').hidden = $('publishReauth').hidden = true;
+  $('publishSummary').textContent = (playbookById(activePlaybookId)?.name || 'Your playbook') + ' · ' +
+    doc.offense.filter(isIncluded).length + ' offense + ' + doc.defense.filter(isIncluded).length + ' defense plays';
+  $('publishDialog').showModal(); $('publishTitle').focus();
+  loadPublicationTeams();
+}
+$('publishAppBtn').addEventListener('click', openPublicationDialog);
+$('publishAppShortcut').addEventListener('click', openPublicationDialog);
+$('publishCancel').addEventListener('click', () => $('publishDialog').close());
+$('publishDialog').addEventListener('close', () => {
+  publishEpoch++; publishRequest?.abort(); publishRequest = null; publishContext = null;
+});
+$('publishTeam').addEventListener('change', syncPublicationConfirm);
+$('publishRetry').addEventListener('click', () => loadPublicationTeams(publishNext));
+$('publishMoreTeams').addEventListener('click', () => loadPublicationTeams(publishNext));
+$('publishCoachesOnly').addEventListener('change', () => {
+  $('publishAudience').textContent = $('publishCoachesOnly').checked
+    ? 'Only this Team’s managers can open this book. Parents and other Team members cannot.'
+    : 'Everyone on this Team, including parents, can open it. Other Teams cannot.';
+});
+$('publishReauth').addEventListener('click', async event => {
+  event.preventDefault();
+  const epoch = publishEpoch;
+  const saved = await saveDoc();
+  if (!publicationDialogCurrent(epoch)) return;
+  if (saved && saveState === 'saved') window.location.assign('/api/auth/apple/start?returnTo=/editor');
+  else $('publishTeamStatus').textContent = 'Could not save your changes. Stay here and try saving again before signing in.';
+});
+$('publishConfirm').addEventListener('click', () => {
+  const team = publishTeams.get($('publishTeam').value);
+  if (!team || publishRequest || !isCurrentDocumentContext(publishContext)) return;
+  const publication = { teamId: team.teamId, teamName: team.name,
+    coachesOnly: $('publishCoachesOnly').checked, makeDefault: $('publishDefault').checked };
+  $('publishDialog').close();
+  $('coachCardHeading').scrollIntoView({ block: 'center' });
+  generatePlaybook(publication);
 });
 
 // ---------- Auth ----------
@@ -3702,6 +3896,7 @@ function showAuthView(msg) {
   $('accountBtn').style.display = 'none';
   userEmail.textContent = '';
   $('coachCardShortcut').hidden = true;
+  $('publishAppShortcut').hidden = true;
   if (msg) showAuthError(msg);
   else hideAuthError();
 }
@@ -3887,6 +4082,7 @@ async function enterEditor(email, userId, expectedEpoch = null) {
   activeUserId = userId;
   userEmail.textContent = email || '';
   $('coachCardShortcut').hidden = false;
+  $('publishAppShortcut').hidden = false;
   signOutBtn.style.display = '';
   $('accountBtn').style.display = '';
   authView.classList.remove('active');

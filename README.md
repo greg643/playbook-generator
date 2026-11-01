@@ -79,7 +79,15 @@ cards, stores the private `app-publication.json` capability, and sets
 job status or the GitHub dispatch payload. Accepted jobs finish independently of
 browser logout; completion still rechecks manager authority and account liveness.
 
-The web publish controls and native Team screen remain to be connected.
+The editor's **Make available in GSS app** action saves the exact current revision,
+lets the manager choose a Team, and defaults to all Team members. **Coaches only**
+and **Open this book by default** are optional. It publishes only included plays,
+preserving source order and printed numbers, with the relevant coach PDFs. Edits
+during preparation abort before submission; a completed render is not advertised
+as published until its matching publication receipt arrives. Expired sign-in and
+unconfirmed publication retain the editor and available PDFs.
+
+The native Team screen remains to be connected.
 Production activation also requires verification
 that the account and job bindings really target separate buckets and that the
 render runner has job-only credentials; distinct binding names alone are not proof.
@@ -196,6 +204,15 @@ node --test tests/api/*.test.mjs tests/frontend/*.test.mjs tests/workflows/*.tes
 
 CI runs these tests plus Python compilation and JavaScript syntax checks on
 every push and pull request.
+
+The Team publishing browser gate is `tests/frontend/editor_publication_browser.mjs`.
+Run it against a local static `dashboard/` server on port 8769 with Playwright
+available (`PLAYWRIGHT_MODULE` may point to an existing installation and
+`CHROME_EXECUTABLE` to installed Chrome). It intercepts all APIs with synthetic
+fixtures, blocks non-local traffic, checks real PNG multipart submission and
+responsive dialogs, and saves screenshots/receipt under `UI_REVIEW_DIR`. This
+local gate does not replace production membership, bucket-isolation or physical
+app acceptance.
 
 ## Production configuration
 
