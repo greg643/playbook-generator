@@ -23,8 +23,14 @@ test('snapshot preserves included order, sticky numbers, defense letters and mix
     [['first', 9, '9'], ['second', 4, '4'], ['defense', 3, 'C']]);
   assert.equal(result.format, 'mixed');
   assert.equal(result.coachesOnly, false);
+  assert.ok(result.plays.every(play => play.source === 'editor'));
   assert.equal(result.coachCards.offense.playsPerPage, 16);
   assert.deepEqual(args, before);
+});
+
+test('source provenance comes from the server publication path, not editable play fields', () => {
+  const args = input(); args.document.offense[0].source = 'pdf';
+  assert.equal(buildAppSnapshot(args).plays[0].source, 'editor');
 });
 
 test('source rename/printed number do not change snapshot play identity', () => {

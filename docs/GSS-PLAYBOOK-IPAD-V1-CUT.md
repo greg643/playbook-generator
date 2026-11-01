@@ -28,7 +28,7 @@ The integration doc stands as the full design. This page is what to build first 
 
 ## Deferred to the second release
 
-Signed service assertions and GSS-side proxy routes, snapshot garbage collection and retention, ETag/304, rate limits, wristbands in the app, PPTX-import books, sharing, clip association, editing.
+Signed service assertions and GSS-side proxy routes, snapshot garbage collection and retention, ETag/304, rate limits, wristbands in the app, sharing, clip association, editing.
 
 ## Acceptance
 
@@ -36,3 +36,14 @@ Signed service assertions and GSS-side proxy routes, snapshot garbage collection
 - A 16-play offense book shows as a 4x4 grid matching the printed coach card, and as a list; tapping any tile opens that play; Back returns to the same place.
 - Offline: airplane mode, kill the app, reopen, the default book opens and every play renders.
 - A parent on the Team opens the Team's playbook; a parent on another Team cannot list or fetch it; a "Coaches only" book is invisible to parents.
+
+## Bring your own playbook (Greg, 11/1)
+
+Coaches who already have a playbook should not redraw it. Two more sources feed the same snapshot and the same grid, list and tap-to-zoom viewer:
+
+- **PowerPoint (K5).** A completed PPTX Import can be published to a Team exactly like an editor book. Entries come from the full slides in slide order, named from the slide title or "Play n". Greg's book is the first acceptance target.
+- **PDF (K6).** New upload beside PPTX Import. One tile per page. A page that holds a grid of plays stays one tile and the coach zooms into it; names from the page's text layer when present, else "Page n", editable before publishing. Splitting a grid page into separate tiles by drawing boxes is a later option if coaches ask.
+
+The manifest marks each entry's `source` as `editor`, `pptx` or `pdf`. The app shows "Imported" for the last two and never offers editing. The same viewer serves all sources.
+
+Upload and conversion stay on the website/Actions runner for v1 (LibreOffice and Poppler). Phone share-sheet upload is a later step after K6 and must use the same pipeline. Site deployment remains Greg's.

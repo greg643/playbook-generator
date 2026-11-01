@@ -63,7 +63,7 @@ export function buildAppSnapshot({ bookId, snapshotId, teamId, name, document,
       ids.add(play.id); numbers.add(play.num); formats.add(play.playersPerSide);
       const imageId = `image-${play.id}`;
       usedAssets.push(descriptor(byId.get(imageId), imageId, 'image/png'));
-      plays.push({ id: play.id, sourcePlayId: play.id, side, name: play.name, number: play.num,
+      plays.push({ id: play.id, sourcePlayId: play.id, source: 'editor', side, name: play.name, number: play.num,
         displayNumber: side === 'defense' && play.num <= 26 ? String.fromCharCode(64 + play.num) : String(play.num),
         playersPerSide: play.playersPerSide, imageAssetId: imageId });
     }

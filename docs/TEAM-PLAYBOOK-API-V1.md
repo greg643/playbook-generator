@@ -76,12 +76,26 @@ Snapshot fields (all required):
 | `assets` | Exactly the referenced PNGs and side PDFs; no extra files |
 | `coachCards` | Object keyed by each nonempty side (`offense`, `defense`) |
 
-Each play has `id`, `sourcePlayId` (same stable source ID), `side`, `name`,
+Each play has `id`, `sourcePlayId` (same stable source ID), `source`, `side`, `name`,
 `number` (original integer 1–999), `displayNumber`, `playersPerSide` (5 or 6),
 and `imageAssetId` (`image-` plus the play ID). Defense numbers 1–26 display as
 A–Z; otherwise the display label is the decimal number. Never renumber selected
 plays. Only `included !== false` plays are published. IDs are unique across the
 snapshot, numbers unique per side. Limits: 64 offense + 24 defense plays.
+
+`source` is server-assigned: `editor` for the existing editor publication path;
+the imported-book integration adds `pptx` and `pdf`. A source document cannot
+override this with an editable field. Older snapshots without this additive
+field are editor snapshots. Imported entries are read-only and display
+"Imported". K5/K6 import publication and its native presentation are not yet
+qualified; the renderer inventory below is not itself a published snapshot.
+
+The pipeline's `--import-pages` mode writes `gss.playbook-import-pages.v1`
+(`import.json` plus full-slide PNGs) as a single ready directory. It retains all
+slides, original one-based numbers and title names (`Play n` fallback), with
+source-file size/SHA-256 and per-image size/SHA-256/dimensions. It does not guess
+offense/defense or 5v5/6v6, and never runs the legacy field crop/recognition filter.
+This is private job material, not a new native route or authorization mechanism.
 
 Each asset has `id`, `mediaType` (`image/png` or `application/pdf`), `bytes`
 (positive integer), and `sha256` (64 lowercase hex digits). PNGs additionally

@@ -403,9 +403,10 @@ def convert_pptx_to_images(pptx_path, work_dir, dpi=200):
         else:
             raise FileNotFoundError("LibreOffice not found. Install it: brew install --cask libreoffice")
     subprocess.run([
-        soffice_cmd, "--headless", "--convert-to", "pdf",
+        soffice_cmd, f"-env:UserInstallation={(Path(work_dir).resolve() / 'office-profile').as_uri()}",
+        "--headless", "--convert-to", "pdf",
         "--outdir", str(Path(work_dir).resolve()), pptx_abs
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=180)
 
     # Find the generated PDF (could be in work_dir or next to input)
     generated_pdf = None
@@ -428,7 +429,7 @@ def convert_pptx_to_images(pptx_path, work_dir, dpi=200):
         "pdftoppm", "-png", "-r", str(dpi),
         str(pdf_path),
         str(slides_dir / "slide")
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=120)
 
     # List generated files
     slide_images = sorted(slides_dir.glob("slide-*.png"))
@@ -1091,6 +1092,16 @@ def main():
         sys.exit(1)
 
     pptx_path = sys.argv[1]
+    if '--import-pages' in sys.argv:
+        # The Team app needs whole slides, not the legacy field-recognition and
+        # cropping path used for printed wristbands. Reuse this command rather
+        # than adding an operator wrapper.
+        from import_pages import render_pptx_import
+        if len(sys.argv) != 4 or sys.argv[3] != '--import-pages' or sys.argv[2].startswith('--'):
+            raise ValueError('Use: playbook_pipeline.py input.pptx output_dir --import-pages')
+        result = render_pptx_import(pptx_path, sys.argv[2])
+        print(f"Imported {len(result['entries'])} full slides to {sys.argv[2]}")
+        return result
     coach_layouts = {}
     for section in ("offense", "defense"):
         flag = f"--{section}-plays-per-page"
