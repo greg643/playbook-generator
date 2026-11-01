@@ -39,6 +39,26 @@ files are parsed by LibreOffice, Poppler, Pillow and python-pptx in the Actions
 runner; that runner must not have credentials for password records, saved
 playbooks, or the session-signing key.
 
+### Team app integration (local implementation, not yet shipped)
+
+`app-publications.js` reserves a publication against the saved source revision,
+validates the owned render job, and copies checksum-bound PNG/PDF assets into
+immutable account snapshots. A conditional Team catalog write changes the current
+snapshot and default book together only after every asset is present. Failed,
+cancelled, superseded or stale renders leave the previous publication visible.
+
+`GET /api/app/playbooks/{teamId}` returns the visible snapshot manifests and
+default book. `GET /api/app/playbooks/{teamId}/{bookId}/{snapshotId}/{assetId}`
+streams a verified private asset. Both check the caller's GSS bearer through the
+existing `/v2/me` and `/v2/teams/get` routes; parents do not need editor accounts.
+Coaches-only publications require Team manager authority, and old snapshots are
+not downloadable after a replacement. No public bucket URL is returned.
+
+The web publish control, durable render-completion integration and native Team
+screen remain to be connected. Production activation also requires verification
+that the account and job bindings really target separate buckets and that the
+render runner has job-only credentials; distinct binding names alone are not proof.
+
 ## GSS Playbook Editor
 
 The browser-based **GSS Playbook Editor** lives at `/editor`. Sign in at `/`,
